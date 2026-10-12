@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.campusai.mapper.AiMessageFeedbackMapper">
+
+    <insert id="upsert"
+            parameterType="com.campusai.message.entity.AiMessageFeedback">
+        insert into ai_message_feedback (
+            message_id,
+            user_id,
+            helpful,
+            reason
+        )
+        values (
+            #{messageId},
+            #{userId},
+            #{helpful},
+            #{reason}
+        )
+        on duplicate key update
+            helpful = values(helpful),
+            reason = values(reason),
+            updated_at = current_timestamp
+    </insert>
+
+    <select id="findByUserIdAndMessageId"
+            resultType="com.campusai.message.entity.AiMessageFeedback">
+        select id,
+               message_id,
+               user_id,
+               helpful,
+               reason,
+               created_at,
+               updated_at
+        from ai_message_feedback
+        where user_id = #{userId}
+          and message_id = #{messageId}
+    </select>
+
+    <select id="findAllByUserIdAndConversationId"
+            resultType="com.campusai.message.entity.AiMessageFeedback">
+        select feedback.id,
+               feedback.message_id,
+               feedback.user_id,
+               feedback.helpful,
+               feedback.reason,
+               feedback.created_at,
+               feedback.updated_at
+        from ai_message_feedback feedback
+        inner join ai_messages message
+                on message.id = feedback.message_id
+        where feedback.user_id = #{userId}
+          and message.conversation_id = #{conversationId}
+    </select>
+
+    <select id="findRecentBySchoolId"
+            resultType="com.campusai.dto.AdminMessageFeedbackResponse">
+        select feedback.id,
+               feedback.message_id,
+               feedback.helpful,
+               feedback.reason,
+               feedback.created_at,
+               feedback.updated_at,
+               resolution.resolution_note,
+               resolution.document_id as resolved_document_id,
+               resolution.resolved_at,
+               assistant.content as answer_content,
+               account.username,
+               account.nickname,
+               (
+                   select user_message.content
+                   from ai_messages user_message
+                   where user_message.conversation_id = assistant.conversation_id
+                     and user_message.role = 'user'
+                     and user_message.id &lt; assistant.id
+                   order by user_message.id desc
+                   limit 1
+               ) as question_content
+        from ai_message_feedback feedback
+        inner join ai_messages assistant
+                on assistant.id = feedback.message_id
+        inner join ai_conversations conversation
+                on conversation.id = assistant.conversation_id
+        inner join users account
+                on account.id = feedback.user_id
+        left join ai_feedback_resolutions resolution
+               on resolution.feedback_id = feedback.id
+              and resolution.resolved_at &gt;= feedback.updated_at
+        where account.school_id = #{schoolId}
+          and conversation.user_id = feedback.user_id
+        order by feedback.helpful asc,
+                 feedback.updated_at desc
+        limit 100
+    </select>
+
+    <select id="findAdminFeedback" resultType="com.campusai.dto.AdminMessageFeedbackResponse">
+        select feedback.id, feedback.message_id, feedback.helpful, feedback.reason,
+               feedback.created_at, feedback.updated_at,
+               resolution.resolution_note, resolution.document_id as resolved_document_id,
+               resolution.resolved_at
+        from ai_message_feedback feedback
+        inner join ai_messages message on message.id = feedback.message_id
+        inner join ai_conversations conversation on conversation.id = message.conversation_id
+        inner join users account on account.id = feedback.user_id
+        left join ai_feedback_resolutions resolution on resolution.feedback_id = feedback.id
+        where feedback.id = #{feedbackId} and account.school_id = #{schoolId}
+          and conversation.user_id = feedback.user_id
+        limit 1
+    </select>
+
+    <insert id="resolve">
+        insert into ai_feedback_resolutions (feedback_id, reviewer_id, document_id, resolution_note)
+        values (#{feedbackId}, #{reviewerId}, #{documentId}, #{note})
+        on duplicate key update reviewer_id = values(reviewer_id), document_id = values(document_id),
+                                resolution_note = values(resolution_note), resolved_at = current_timestamp
+    </insert>
+
+    <delete id="clearResolution">
+        delete resolution from ai_feedback_resolutions resolution
+        inner join ai_message_feedback feedback on feedback.id = resolution.feedback_id
+        where feedback.user_id = #{userId} and feedback.message_id = #{messageId}
+    </delete>
+
+</mapper>

@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.campusai.mapper.AiConversationMapper">
+
+    <insert id="insert"
+            parameterType="com.campusai.conversation.entity.AiConversation"
+            useGeneratedKeys="true"
+            keyProperty="id">
+
+        insert into ai_conversations (
+            user_id,
+            title,
+            model
+        )
+        values (
+                   #{userId},
+                   #{title},
+                   #{model}
+               )
+    </insert>
+
+    <select id="findByIdAndUserId"
+            resultType="com.campusai.conversation.entity.AiConversation">
+
+        select id,
+               user_id,
+               title,
+               model,
+               created_at,
+               updated_at
+        from ai_conversations
+        where id = #{id}
+          and user_id = #{userId}
+    </select>
+
+    <select id="findAllByUserId"
+            resultType="com.campusai.conversation.entity.AiConversation">
+
+        select id,
+               user_id,
+               title,
+               model,
+               created_at,
+               updated_at
+        from ai_conversations
+        where user_id = #{userId}
+        order by updated_at desc, id desc
+    </select>
+
+    <update id="updateAfterChat">
+
+        update ai_conversations
+        set title =
+        case
+        when title is null
+        or trim(title) = ''
+        or title = '新对话'
+        then #{title}
+        else title
+        end,
+        model = #{model},
+        updated_at = current_timestamp
+        where id = #{id}
+        and user_id = #{userId}
+
+    </update>
+
+    <delete id="deleteByIdAndUserId">
+
+        delete from ai_conversations
+        where id = #{id}
+        and user_id = #{userId}
+    </delete>
+
+</mapper>

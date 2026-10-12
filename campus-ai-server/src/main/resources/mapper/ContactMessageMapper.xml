@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.campusai.mapper.ContactMessageMapper">
+
+    <sql id="contactColumns">
+        id,
+        user_id,
+        school_id,
+        name,
+        contact,
+        subject,
+        message,
+        status,
+        created_at,
+        updated_at
+    </sql>
+
+    <insert id="insert"
+            parameterType="com.campusai.contact.entity.ContactMessage"
+            useGeneratedKeys="true"
+            keyProperty="id">
+        insert into contact_messages (
+            user_id,
+            school_id,
+            name,
+            contact,
+            subject,
+            message,
+            status
+        ) values (
+            #{userId},
+            #{schoolId},
+            #{name},
+            #{contact},
+            #{subject},
+            #{message},
+            #{status}
+        )
+    </insert>
+
+    <select id="findById"
+            resultType="com.campusai.contact.entity.ContactMessage">
+        select <include refid="contactColumns" />
+        from contact_messages
+        where id = #{id}
+        limit 1
+    </select>
+
+    <select id="lockUser" resultType="java.lang.Long">
+        SELECT id FROM users WHERE id = #{userId} FOR UPDATE
+    </select>
+    <select id="findByRequest" resultType="com.campusai.contact.entity.ContactMessage">
+        SELECT c.* FROM contact_messages c JOIN contact_submission_keys k ON k.message_id = c.id
+        WHERE k.user_id = #{userId} AND k.request_id = #{requestId} AND c.user_id = #{userId} FOR UPDATE
+    </select>
+    <insert id="insertSubmissionKey">
+        INSERT INTO contact_submission_keys(user_id, request_id, message_id)
+        VALUES(#{userId}, #{requestId}, #{messageId})
+    </insert>
+
+    <select id="findAll"
+            resultType="com.campusai.contact.entity.ContactMessage">
+        select <include refid="contactColumns" />
+        from contact_messages
+        where school_id = #{schoolId}
+        order by
+            case when status = 'NEW' then 0 else 1 end,
+            created_at desc,
+            id desc
+        limit 200
+    </select>
+
+    <update id="markHandled">
+        update contact_messages
+        set status = 'HANDLED'
+        where id = #{id}
+          and school_id = #{schoolId}
+          and status = 'NEW'
+    </update>
+
+</mapper>

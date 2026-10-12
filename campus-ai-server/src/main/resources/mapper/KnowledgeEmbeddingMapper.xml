@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.campusai.mapper.KnowledgeEmbeddingMapper">
+    <sql id="activeDocument">
+        document.school_id = #{schoolId} and document.status = 'PUBLISHED'
+        and (document.effective_at is null or document.effective_at &lt;= current_timestamp)
+        and (document.expires_at is null or document.expires_at &gt; current_timestamp)
+    </sql>
+    <select id="findActiveBySchool" resultType="com.campusai.knowledge.semantic.KnowledgeEmbedding">
+        select embedding.chunk_id, embedding.model, embedding.dimensions, embedding.vector_json
+        from knowledge_chunk_embeddings embedding
+        inner join knowledge_chunks chunk on chunk.id = embedding.chunk_id
+        inner join knowledge_documents document on document.id = chunk.document_id
+        where <include refid="activeDocument"/> and embedding.model = #{model}
+        order by embedding.chunk_id desc limit #{limit}
+    </select>
+    <select id="findMissingBySchool" resultType="com.campusai.knowledge.entity.KnowledgeChunk">
+        select chunk.id, chunk.document_id, chunk.chunk_index, chunk.content
+        from knowledge_chunks chunk
+        inner join knowledge_documents document on document.id = chunk.document_id
+        left join knowledge_chunk_embeddings embedding on embedding.chunk_id = chunk.id
+            and embedding.model = #{model}
+        where <include refid="activeDocument"/> and embedding.chunk_id is null
+        order by chunk.id asc limit #{limit}
+    </select>
+    <select id="findMissingByDocument" resultType="com.campusai.knowledge.entity.KnowledgeChunk">
+        select chunk.id, chunk.document_id, chunk.chunk_index, chunk.content
+        from knowledge_chunks chunk
+        inner join knowledge_documents document on document.id = chunk.document_id
+        left join knowledge_chunk_embeddings embedding on embedding.chunk_id = chunk.id
+            and embedding.model = #{model}
+        where <include refid="activeDocument"/> and document.id = #{documentId}
+          and embedding.chunk_id is null
+        order by chunk.id asc limit #{limit}
+    </select>
+    <select id="findActiveChunksByIds" resultType="com.campusai.knowledge.model.KnowledgeSearchResult">
+        select chunk.id as chunk_id, document.id as document_id, document.title,
+               document.category, document.source_department, document.source_url,
+               document.published_at, chunk.content
+        from knowledge_chunks chunk
+        inner join knowledge_documents document on document.id = chunk.document_id
+        where <include refid="activeDocument"/>
+          and chunk.id in <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </select>
+    <insert id="upsert">
+        insert into knowledge_chunk_embeddings (chunk_id, model, dimensions, vector_json)
+        values (#{chunkId}, #{model}, #{dimensions}, #{vectorJson})
+        on duplicate key update model = values(model), dimensions = values(dimensions),
+                                vector_json = values(vector_json), updated_at = current_timestamp
+    </insert>
+</mapper>

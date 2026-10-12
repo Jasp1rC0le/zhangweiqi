@@ -1,0 +1,34 @@
+[Unit]
+Description=Campthink free release backend
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=campthink
+Group=campthink
+WorkingDirectory=/opt/campthink/current
+EnvironmentFile=/etc/campthink/server.env
+ExecStart=/usr/bin/java -Xms256m -Xmx768m -Duser.timezone=Asia/Shanghai -jar /opt/campthink/current/server.jar
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=45
+SuccessExitStatus=143
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LimitNOFILE=8192
+TasksMax=256
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

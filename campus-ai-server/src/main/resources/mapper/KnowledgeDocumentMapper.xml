@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.campusai.mapper.KnowledgeDocumentMapper">
+
+    <insert id="insert"
+            parameterType="com.campusai.knowledge.entity.KnowledgeDocument"
+            useGeneratedKeys="true"
+            keyProperty="id">
+
+        insert into knowledge_documents (
+            school_id,
+            title,
+            category,
+            source_department,
+            source_url,
+            published_at,
+            effective_at,
+            expires_at,
+            status,
+            content_hash,
+            raw_content
+        )
+        values (
+                   #{schoolId},
+                   #{title},
+                   #{category},
+                   #{sourceDepartment},
+                   #{sourceUrl},
+                   #{publishedAt},
+                   #{effectiveAt},
+                   #{expiresAt},
+                   #{status},
+                   #{contentHash},
+                   #{rawContent}
+               )
+
+    </insert>
+
+    <select id="findBySchoolIdAndContentHash"
+            resultType="com.campusai.knowledge.entity.KnowledgeDocument">
+
+        select id,
+               school_id,
+               title,
+               category,
+               source_department,
+               source_url,
+               published_at,
+               effective_at,
+               expires_at,
+               status,
+               content_hash,
+               raw_content,
+               created_at,
+               updated_at
+        from knowledge_documents
+        where school_id = #{schoolId}
+          and content_hash = #{contentHash}
+        limit 1
+
+    </select>
+
+    <select id="findByIdAndSchoolId" resultType="com.campusai.knowledge.entity.KnowledgeDocument">
+        select * from knowledge_documents where id = #{id} and school_id = #{schoolId}
+    </select>
+
+    <select id="findLockedByIdAndSchoolId" resultType="com.campusai.knowledge.entity.KnowledgeDocument">
+        select * from knowledge_documents where id = #{id} and school_id = #{schoolId} for update
+    </select>
+
+    <select id="findPotentialConflicts" resultType="com.campusai.knowledge.entity.KnowledgeDocument">
+        select id, school_id, title, source_department, source_url, status, content_hash
+        from knowledge_documents
+        where school_id = #{schoolId} and status = 'PUBLISHED'
+          and (
+            (#{sourceUrl} is not null and source_url = #{sourceUrl})
+            or title = #{title}
+          )
+        order by id desc limit 10
+    </select>
+
+    <!-- Follow explicit revision lineage only; a withdrawn/expired latest revision must not revive an older one. -->
+    <select id="findCurrentEvaluationTarget" resultType="com.campusai.knowledge.entity.KnowledgeDocument">
+        select candidate.*
+        from knowledge_documents original
+        left join knowledge_document_versions origin_version on origin_version.document_id = original.id
+        left join knowledge_document_versions candidate_version
+          on candidate_version.root_document_id = coalesce(origin_version.root_document_id, original.id)
+        inner join knowledge_documents candidate
+          on candidate.id = coalesce(candidate_version.document_id, original.id)
+          and candidate.school_id = original.school_id
+        where original.id = #{id} and original.school_id = #{schoolId}
+          and candidate.status = 'PUBLISHED'
+          and (candidate.effective_at is null or candidate.effective_at &lt;= current_timestamp)
+          and (candidate.expires_at is null or candidate.expires_at &gt; current_timestamp)
+          and not exists (select 1 from knowledge_document_versions successor
+                          where successor.supersedes_document_id = candidate.id)
+        order by coalesce(candidate_version.version_number, 1) desc, candidate.id desc
+        limit 1
+    </select>
+
+    <select id="findRecentBySchoolId" resultType="com.campusai.knowledge.entity.KnowledgeDocument">
+        select document.id, document.school_id, document.title, document.category,
+               document.source_department, document.source_url, document.published_at,
+               document.effective_at, document.expires_at, document.status,
+               document.content_hash, document.created_at, document.updated_at,
+               coalesce(version.version_number, 1) as version_number,
+               exists(select 1 from knowledge_document_versions successor
+                      where successor.supersedes_document_id = document.id) as has_successor
+        from knowledge_documents document
+        left join knowledge_document_versions version on version.document_id = document.id
+        where document.school_id = #{schoolId}
+        order by document.updated_at desc, document.id desc limit 100
+    </select>
+
+    <!-- Stable IDs keep edits to updated_at from skipping records between pages.
+         Summaries only: full document text is fetched on explicit inspection. -->
+    <select id="scanBySchoolId" resultType="com.campusai.knowledge.entity.KnowledgeDocument">
+        select document.id, document.school_id, document.title, document.category,
+               document.source_department, document.source_url, document.published_at,
+               document.effective_at, document.expires_at, document.status,
+               document.content_hash, document.created_at, document.updated_at,
+               coalesce(version.version_number, 1) as version_number,
+               exists(select 1 from knowledge_document_versions successor
+                      where successor.supersedes_document_id = document.id) as has_successor
+        from knowledge_documents document
+        left join knowledge_document_versions version on version.document_id = document.id
+        where document.school_id = #{schoolId}
+        <if test="beforeId != null">and document.id &lt; #{beforeId}</if>
+        order by document.id desc limit 100
+    </select>
+
+    <select id="findVersions" resultType="com.campusai.knowledge.entity.KnowledgeDocument">
+        select document.id, document.school_id, document.title, document.status,
+               document.published_at, document.created_at, version.version_number
+        from knowledge_document_versions version
+        inner join knowledge_documents document on document.id = version.document_id
+        where version.root_document_id = #{rootDocumentId} and document.school_id = #{schoolId}
+        order by version.version_number desc
+    </select>
+
+    <!-- Date corrections do not duplicate content; compare observed dates to avoid lost updates. -->
+    <update id="updateDates">
+        update knowledge_documents
+        set published_at = #{after.publishedAt}, effective_at = #{after.effectiveAt}, expires_at = #{after.expiresAt}
+        where id = #{before.id} and school_id = #{before.schoolId} and status = 'PUBLISHED'
+          and content_hash = #{before.contentHash}
+          and ((published_at = #{before.publishedAt}) or (published_at is null and #{before.publishedAt} is null))
+          and ((effective_at = #{before.effectiveAt}) or (effective_at is null and #{before.effectiveAt} is null))
+          and ((expires_at = #{before.expiresAt}) or (expires_at is null and #{before.expiresAt} is null))
+          and not exists (select 1 from knowledge_document_versions successor where successor.supersedes_document_id = #{before.id})
+    </update>
+
+    <update id="updateStatus">
+        update knowledge_documents set status = #{status}
+        where id = #{id} and school_id = #{schoolId} and status = #{expectedStatus}
+    </update>
+
+</mapper>

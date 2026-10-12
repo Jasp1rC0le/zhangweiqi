@@ -1,0 +1,60 @@
+/* Useful tools, separate conversation workspaces, restrained continuous motion. */
+html:root .workspace .workspace-scene { min-height: 100%; }
+html:root .workspace .welcome { animation: none; padding: clamp(25px, 4vh, 48px) 0 32px; }
+html:root .workspace .welcome-eyebrow { margin-bottom: 18px; }
+html:root .workspace .welcome h1 { font-size: clamp(25px, 2.4vw, 33px); }
+html:root .workspace .welcome-invitation { font-size: clamp(26px, 2.7vw, 36px); margin-top: 23px; }
+html:root .workspace .workspace-switcher::before { transition: transform 470ms cubic-bezier(.22,1,.36,1); }
+html:root .workspace .workspace-switcher button { transition: color 250ms; }
+html:root .workspace .workspace-switcher button:disabled { cursor: wait; opacity: .6; }
+html:root .workspace .fresh-conversation { display: flex; align-items: center; gap: 9px; min-height: 39px; padding: 8px 10px; margin: 4px 0 7px; border: 1px solid #d4dbc9; border-radius: 7px; background: #f7f8f1; color: #34483d; font-size: 12px; }
+html:root .workspace .fresh-conversation .workspace-icon { width: 16px; height: 16px; }
+html:root .workspace .fresh-conversation small { margin-left: auto; color: #737d6b; font-size: 9px; }
+html:root .workspace .quick-tools-label { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 23px; }
+html:root .workspace .quick-tools-label > span { font-size: 12px; color: #4d584c; font-weight: 550; }
+html:root .workspace .quick-tools-label small { font-size: 10px; color: #787e73; }
+html:root .workspace .suggestion-grid { margin-top: 13px; gap: 12px; }
+html:root .workspace .suggestion-card { display: flex; flex-direction: column; gap: 15px; min-height: 177px; padding: 17px 20px 14px; border-radius: 13px; justify-content: flex-start; background: #fffefa; box-shadow: 0 2px 3px #24312403; }
+html:root .workspace .suggestion-card::before { content: none; }
+html:root .workspace .suggestion-card:nth-child(2) { background: #f0f3e9; }
+html:root .workspace .suggestion-card:nth-child(3) { background: #eeeff8; }
+html:root .workspace .suggestion-card:hover { transform: translateY(-3px); border-color: #aab9a5; box-shadow: 0 8px 20px #293f2a08; }
+html:root .workspace .suggestion-card[aria-expanded='true'] { border-color: #9aac96; background: #f4f6ed; }
+html:root .workspace .quick-tool-icon { display: grid; place-items: center; width: 31px; height: 31px; color: #536b56; }
+html:root .workspace .quick-tool-icon svg { width: 27px; height: 27px; }
+html:root .workspace .suggestion-card:nth-child(3) .quick-tool-icon { color: #646bac; }
+html:root .workspace .suggestion-copy { gap: 6px; }
+html:root .workspace .suggestion-copy strong { font-size: 15px; color: #303d35; }
+html:root .workspace .suggestion-copy small { margin: 0; font-size: 11px; line-height: 1.65; }
+html:root .workspace .quick-tool-action { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding-top: 14px; margin-top: auto; border-top: 1px solid #7b886822; font-size: 10px; font-weight: 550; color: #53624f; }
+html:root .workspace .quick-tool-action > span { font-size: 17px; line-height: 1; transition: transform 200ms; }
+html:root .workspace .suggestion-card:hover .quick-tool-action > span { transform: translateX(2px); }
+html:root .workspace .campus-quick-lookups { margin-top: 14px; padding: 19px 20px; background: #fffefa; border: 1px solid #dce0d4; border-radius: 12px; transform-origin: top; }
+html:root .workspace .campus-quick-lookups > div:first-child { display: flex; justify-content: space-between; gap: 16px; align-items: center; }
+html:root .workspace .campus-quick-lookups strong { font-size: 13px; font-weight: 550; color: #374337; }
+html:root .workspace .campus-quick-lookups > div:first-child button { padding: 5px; font-size: 11px; color: #727b68; background: none; }
+html:root .workspace .lookup-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 14px 0; }
+html:root .workspace .lookup-options button { min-height: 39px; display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 9px 12px; border-radius: 6px; color: #43513c; background: #f2f4ed; font-size: 12px; }
+html:root .workspace .lookup-options button:hover { background: #e5eadc; }
+html:root .workspace .campus-quick-lookups > small { color: #79816f; font-size: 10px; line-height: 1.6; }
+.quick-disclosure-enter-active, .quick-disclosure-leave-active { transition: opacity 180ms, transform 220ms; }
+.quick-disclosure-enter-from, .quick-disclosure-leave-to { opacity: 0; transform: translateY(-6px); }
+@media (max-width: 760px) {
+  html:root .workspace .welcome { padding-top: 33px; }
+  html:root .workspace .welcome-eyebrow { margin-bottom: 20px; }
+  html:root .workspace .welcome-invitation { margin-top: 24px; font-size: 26px; }
+  html:root .workspace .quick-tools-label { margin-top: 26px; }
+  html:root .workspace .quick-tools-label small { font-size: 9px; }
+  html:root .workspace .suggestion-grid { grid-template-columns: 1fr; gap: 9px; }
+  html:root .workspace .suggestion-card { display: grid; grid-template-columns: 35px minmax(0, 1fr) auto; gap: 13px; align-items: center; min-height: 94px; padding: 17px 15px; }
+  html:root .workspace .suggestion-copy strong { font-size: 14px; }
+  html:root .workspace .suggestion-copy small { font-size: 11px; }
+  html:root .workspace .quick-tool-action { border: 0; padding: 0; margin: 0; font-size: 0; width: auto; }
+  html:root .workspace .quick-tool-action > span { font-size: 19px; }
+  html:root .workspace .campus-quick-lookups { padding: 16px; }
+  html:root .workspace .lookup-options { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html:root .workspace .workspace-switcher::before, html:root .workspace .suggestion-card, html:root .workspace .quick-tool-action > span, .quick-disclosure-enter-active, .quick-disclosure-leave-active { transition: none; }
+  html:root .workspace .suggestion-card:hover { transform: none; }
+}

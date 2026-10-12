@@ -1,0 +1,80 @@
+/* A compound field gets one focus ring on its outer surface, never on the inset text node. */
+html:root body :is(.auth-dialog, .contact-dialog) .el-input__inner:focus-visible,
+html:root body .auth-dialog .el-select__input:focus-visible { outline: none; box-shadow: none; }
+html:root body :is(.auth-dialog, .contact-dialog) .el-input__wrapper:focus-within,
+html:root body .auth-dialog .el-select__wrapper:focus-within {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--ct-blue) inset, 0 0 0 3px #334bdb12;
+}
+html:root body .contact-dialog .el-textarea__inner:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--ct-blue) inset, 0 0 0 3px #334bdb12;
+}
+
+/* Desktop reading sizes. Keep mobile density and large display headings unchanged. */
+@media (min-width: 1024px) {
+  html:root body .landing .nav-links { font-size: 14px; }
+  html:root body .landing .hero-eyebrow,
+  html:root body .landing .hero-start-guide,
+  html:root body .landing .hero-entry-tools small { font-size: 13px; }
+  html:root body .landing .hero-subtitle { font-size: 17px; }
+  html:root body .landing .hero-entry-tools strong { font-size: 15px; }
+  html:root body .landing .hero-entry-tools button { min-height: 68px; }
+  html:root body .landing .hero-actions > a,
+  html:root body .landing .nav-action { font-size: 14px; }
+  html:root body .landing .hero-demo-top > span,
+  html:root body .landing .hero-demo-details span,
+  html:root body .landing .hero-demo-hint { font-size: 13px; }
+  html:root body .landing .hero-demo-top small { font-size: 12px; }
+  html:root body .landing .hero-demo-question,
+  html:root body .landing .hero-demo-result { font-size: 15px; }
+  html:root body .landing .hero-demo-content { min-height: 175px; }
+  html:root body .landing .hero-visual { min-height: 500px; }
+  html:root body .landing .section-kicker,
+  html:root body .landing .card-head,
+  html:root body .landing .bridge-caption,
+  html:root body .landing .bridge-next small,
+  html:root body .landing .site-footer { font-size: 13px; }
+  html:root body .landing .capability-card p,
+  html:root body .landing .section-intro > p:last-child { font-size: 16px; }
+  html:root body .landing .capability-card button,
+  html:root body .landing .bridge-next strong,
+  html:root body .landing .life-status { font-size: 14px; }
+
+  html:root body :is(.auth-dialog, .contact-dialog) .form-lead { font-size: 16px; }
+  html:root body :is(.auth-dialog, .contact-dialog) label:not(.consent) { font-size: 15px; }
+  html:root body :is(.auth-dialog, .contact-dialog) .form-kicker { font-size: 13px; }
+  html:root body :is(.auth-dialog, .contact-dialog) :is(.auth-note, .consent) { font-size: 13px; line-height: 1.7; }
+  html:root body :is(.auth-dialog, .contact-dialog) :is(.el-input__inner, .el-textarea__inner, .el-select__wrapper) { font-size: 16px; }
+  html:root body :is(.auth-dialog, .contact-dialog) .el-input__wrapper { min-height: 48px; }
+  html:root body .contact-dialog .el-input__count { font-size: 13px; }
+  html:root body .chat-contact-dialog :is(input, textarea),
+  html:root body .chat-contact-dialog .contact-description { font-size: 16px; }
+  html:root body .chat-contact-dialog > small { font-size: 13px; }
+
+  html:root body .workspace :is(.brand-copy small, .nav-label, .connection-state, .workspace-switcher small, .welcome-eyebrow, .fresh-conversation small, .quick-tools-label small, .composer-meta, .message-role) { font-size: 12px; }
+  html:root body .workspace :is(.nav-item, .conversation-item, .fresh-conversation, .history-search input) { font-size: 14px; }
+  html:root body .workspace :is(.membership-entry small, .profile small) { font-size: 11px; }
+  html:root body .workspace .workspace-switcher span { font-size: 15px; }
+  html:root body .workspace .workspace-switcher button { min-height: 45px; }
+  html:root body .workspace .welcome-subtitle { font-size: 15px; }
+  html:root body .workspace :is(.suggestion-copy small, .quick-tool-action, .campus-quick-lookups > small) { font-size: 13px; }
+  html:root body .workspace :is(.quick-tools-label > span, .lookup-options button) { font-size: 14px; }
+  html:root body .workspace .suggestion-copy strong { font-size: 17px; }
+  html:root body .workspace .suggestion-card { min-height: 194px; }
+  html:root body .workspace :is(.answer-markdown, .message-row.user .message-content > p, .composer textarea) { font-size: 16px; }
+  html:root body .workspace .composer-meta { flex-wrap: wrap; row-gap: 5px; }
+  html:root body .workspace .citation-details summary { font-size: 13px; }
+
+  html:root body .pro-suite :is(.pro-kicker, .pro-launch > span, .pro-terms) { font-size: 12px; }
+  html:root body .pro-suite .pro-intro { font-size: 15px; }
+  html:root body .pro-suite .pro-benefits strong { font-size: 15px; }
+  html:root body .pro-suite :is(.pro-benefits small, .pro-launch p) { font-size: 13px; }
+  html:root body .pro-suite .pro-return { font-size: 14px; }
+
+  html:root body :is(.account-nav a, .account-card p, .action-card .description, .canteen-page .status-note) { font-size: 15px; }
+  html:root body :is(.account-card .card-index, .action-card .eyebrow, .canteen-page .page-kicker, .merchant-sort) { font-size: 13px; }
+  html:root body :is(.account-content .lede, .privacy-page .lead, .privacy-page section p) { font-size: 16px; }
+  html:root body .admin-page :is(.admin-sidebar nav button, main > header > span, .overview-metric small) { font-size: 14px; }
+  html:root body .admin-page :is(.admin-brand small, main > header p) { font-size: 12px; }
+}

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.campusai.mapper.KnowledgeEvaluationMapper">
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        insert into knowledge_eval_cases (school_id, question, expected_document_id)
+        values (#{schoolId}, #{question}, #{expectedDocumentId})
+    </insert>
+    <select id="findBySchoolId" resultType="com.campusai.knowledge.model.KnowledgeEvaluationCase">
+        select id, school_id, question, expected_document_id
+        from knowledge_eval_cases where school_id = #{schoolId}
+        order by id asc limit 200
+    </select>
+    <delete id="delete">
+        delete from knowledge_eval_cases where id = #{id} and school_id = #{schoolId}
+    </delete>
+</mapper>

@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+        <!DOCTYPE mapper
+                PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+                "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.campusai.mapper.UserMapper">
+
+<select id="findById"
+        resultType="com.campusai.user.entity.User">
+
+    select id,
+    username,
+    password_hash,
+    nickname,
+    school_id,
+    role,
+    status,
+    created_at,
+    updated_at
+    from users
+    where id = #{id}
+</select>
+
+<select id="findByUsername"
+        resultType="com.campusai.user.entity.User">
+
+    select id,
+    username,
+    password_hash,
+    nickname,
+    school_id,
+    role,
+    status,
+    created_at,
+    updated_at
+    from users
+    where username = #{username}
+</select>
+
+<insert id="insert"
+        parameterType="com.campusai.user.entity.User"
+        useGeneratedKeys="true"
+        keyProperty="id">
+
+    insert into users (
+    username,
+    password_hash,
+    nickname,
+    school_id,
+    role,
+    status
+    )
+    values (
+    #{username},
+    #{passwordHash},
+    #{nickname},
+    #{schoolId},
+    #{role},
+    #{status}
+    )
+</insert>
+
+</mapper>

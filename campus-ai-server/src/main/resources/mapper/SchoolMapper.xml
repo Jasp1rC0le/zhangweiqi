@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.campusai.mapper.SchoolMapper">
+
+    <select id="findAllActive"
+            resultType="com.campusai.school.entity.School">
+        select id,
+               name,
+               code,
+               status,
+               created_at,
+               updated_at
+        from schools
+        where status = 1
+        order by name
+    </select>
+
+    <select id="findActiveById"
+            resultType="com.campusai.school.entity.School">
+        select id,
+               name,
+               code,
+               status,
+               created_at,
+               updated_at
+        from schools
+        where id = #{id}
+          and status = 1
+        limit 1
+    </select>
+
+</mapper>

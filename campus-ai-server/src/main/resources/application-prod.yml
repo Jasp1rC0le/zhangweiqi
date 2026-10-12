@@ -1,0 +1,28 @@
+server:
+  # On a single-host deployment, only the local HTTPS reverse proxy may reach Java.
+  address: 127.0.0.1
+  forward-headers-strategy: framework
+  error:
+    include-message: never
+    include-binding-errors: never
+    include-stacktrace: never
+    include-exception: false
+
+# Migrations must be reviewed and executed by a separate migration account before release.
+spring:
+  sql:
+    init:
+      mode: never
+
+app:
+  ai:
+    daily-token-limit: ${AI_DAILY_TOKEN_LIMIT:20000}
+    max-concurrent: ${AI_MAX_CONCURRENT:4}
+    budget:
+      enabled: true
+  web-search:
+    enabled: ${WEB_SEARCH_ENABLED:false}
+  career:
+    seed-official-candidates: ${CAREER_SEED_OFFICIAL_CANDIDATES:false}
+  knowledge:
+    seed-official-school: ${KNOWLEDGE_SEED_OFFICIAL_SCHOOL:false}

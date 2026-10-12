@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.campusai.mapper.KnowledgeChunkMapper">
+    <insert id="insert"
+        parameterType="com.campusai.knowledge.entity.KnowledgeChunk"
+        useGeneratedKeys="true"
+        keyProperty="id">
+
+    insert into knowledge_chunks (
+    document_id,
+    chunk_index,
+    content,
+    char_count,
+    token_count
+    )
+    values (
+           #{documentId},
+           #{chunkIndex},
+           #{content},
+           #{charCount},
+           #{tokenCount}
+       )
+
+    </insert>
+
+    <select id="searchPublished"
+            resultType="com.campusai.knowledge.model.KnowledgeSearchResult">
+
+        select chunk.id as chunk_id,
+               document.id as document_id,
+               document.title,
+               document.category,
+               document.source_department,
+               document.source_url,
+               document.published_at,
+               chunk.content,
+               match(chunk.content)
+                     against(
+                             #{keyword}
+                             in natural language mode
+                     ) as score
+
+        from knowledge_chunks chunk
+
+                 inner join knowledge_documents document
+                            on document.id = chunk.document_id
+
+        where document.school_id = #{schoolId}
+
+          and document.status = 'PUBLISHED'
+
+          and (
+            document.effective_at is null
+                or document.effective_at
+                &lt;= current_timestamp
+            )
+
+          and (
+            document.expires_at is null
+                or document.expires_at
+                &gt; current_timestamp
+            )
+
+          and match(chunk.content)
+                    against(
+                            #{keyword}
+                            in natural language mode
+                    )
+
+        order by score desc,
+                 document.published_at desc,
+                 chunk.id asc
+
+        limit #{limit}
+
+    </select>
+
+    <select id="searchPublishedByTerms"
+            resultType="com.campusai.knowledge.model.KnowledgeSearchResult">
+
+        select chunk.id as chunk_id,
+               document.id as document_id,
+               document.title,
+               document.category,
+               document.source_department,
+               document.source_url,
+               document.published_at,
+               chunk.content,
+               (
+                   case when document.title like concat('%', #{keyword}, '%') then 6 else 0 end
+                   <foreach collection="terms" item="term">
+                       + case when document.title like concat('%', #{term}, '%') then 2.5 else 0 end
+                       + case when chunk.content like concat('%', #{term}, '%') then 1 else 0 end
+                       + case when document.category like concat('%', #{term}, '%') then 0.8 else 0 end
+                       + case when document.source_department like concat('%', #{term}, '%') then 0.4 else 0 end
+                   </foreach>
+               ) as score
+
+        from knowledge_chunks chunk
+
+                 inner join knowledge_documents document
+                            on document.id = chunk.document_id
+
+        where document.school_id = #{schoolId}
+
+          and document.status = 'PUBLISHED'
+
+          and (
+            document.effective_at is null
+                or document.effective_at &lt;= current_timestamp
+            )
+
+          and (
+            document.expires_at is null
+                or document.expires_at &gt; current_timestamp
+            )
+
+          and (
+            <foreach collection="terms" item="term" separator=" or ">
+                document.title like concat('%', #{term}, '%')
+                or chunk.content like concat('%', #{term}, '%')
+                or document.category like concat('%', #{term}, '%')
+                or document.source_department like concat('%', #{term}, '%')
+            </foreach>
+          )
+
+        order by score desc,
+                 document.published_at desc,
+                 chunk.id asc
+
+        limit #{limit}
+
+    </select>
+
+</mapper>

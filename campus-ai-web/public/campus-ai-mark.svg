@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Campus AI">
+  <defs>
+    <linearGradient id="surface" x1="8" y1="5" x2="57" y2="60" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#28596A"/>
+      <stop offset=".58" stop-color="#143E50"/>
+      <stop offset="1" stop-color="#0A2638"/>
+    </linearGradient>
+    <linearGradient id="roof" x1="17" y1="17" x2="45" y2="46" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFDF7"/>
+      <stop offset="1" stop-color="#E9F0ED"/>
+    </linearGradient>
+  </defs>
+  <rect x="3" y="3" width="58" height="58" rx="18" fill="url(#surface)"/>
+  <path d="M13 29.2 31.2 16a1.4 1.4 0 0 1 1.6 0L51 29.2c1.2.9.6 2.8-.9 2.8H13.9c-1.5 0-2.1-1.9-.9-2.8Z" fill="url(#roof)"/>
+  <circle cx="32" cy="25" r="3.4" fill="#E79A72"/>
+  <path d="M17 34h6v12h-6V34Zm12 0h6v12h-6V34Zm12 0h6v12h-6V34Z" fill="#F5F7F3"/>
+  <path d="M14 48.5c0-1.4 1.1-2.5 2.5-2.5h31c1.4 0 2.5 1.1 2.5 2.5S48.9 51 47.5 51h-31A2.5 2.5 0 0 1 14 48.5Z" fill="#E79A72"/>
+  <path d="M12 54h40" fill="none" stroke="#FFF" stroke-opacity=".3" stroke-width="2" stroke-linecap="round"/>
+  <rect x="3.5" y="3.5" width="57" height="57" rx="17.5" fill="none" stroke="#FFF" stroke-opacity=".15"/>
+</svg>

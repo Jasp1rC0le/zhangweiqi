@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.campusai.mapper.AiModelUsageMapper">
+
+    <insert id="insert">
+        insert into ai_model_usage (
+            message_id,
+            user_id,
+            provider,
+            model,
+            prompt_tokens,
+            completion_tokens,
+            total_tokens
+        ) values (
+            #{messageId},
+            #{userId},
+            #{provider},
+            #{model},
+            #{promptTokens},
+            #{completionTokens},
+            #{totalTokens}
+        )
+    </insert>
+
+    <select id="findRecentSummaryBySchoolId"
+            resultType="com.campusai.dto.ModelUsageSummaryResponse">
+        select model_usage.provider,
+               model_usage.model,
+               count(*) as request_count,
+               case when count(model_usage.prompt_tokens) = count(*) then sum(model_usage.prompt_tokens) end as prompt_tokens,
+               case when count(model_usage.completion_tokens) = count(*) then sum(model_usage.completion_tokens) end as completion_tokens,
+               case when count(model_usage.total_tokens) = count(*) then sum(model_usage.total_tokens) end as total_tokens
+        from ai_model_usage model_usage
+        join users account on account.id = model_usage.user_id
+        where account.school_id = #{schoolId}
+          and model_usage.created_at &gt;= now() - interval 24 hour
+        group by model_usage.provider, model_usage.model
+        order by total_tokens desc
+    </select>
+
+</mapper>

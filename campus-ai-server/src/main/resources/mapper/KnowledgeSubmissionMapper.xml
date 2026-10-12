@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.campusai.mapper.KnowledgeSubmissionMapper">
+
+    <sql id="submissionColumns">
+        id,
+        school_id,
+        user_id,
+        question,
+        content,
+        source_url,
+        status,
+        review_note,
+        reviewed_by,
+        reviewed_at,
+        knowledge_document_id,
+        created_at,
+        updated_at
+    </sql>
+
+    <insert id="insert"
+            parameterType="com.campusai.knowledge.submission.entity.KnowledgeSubmission"
+            useGeneratedKeys="true"
+            keyProperty="id">
+        insert into knowledge_submissions (
+            school_id,
+            user_id,
+            question,
+            content,
+            source_url,
+            status
+        ) values (
+            #{schoolId},
+            #{userId},
+            #{question},
+            #{content},
+            #{sourceUrl},
+            #{status}
+        )
+    </insert>
+
+    <select id="findByIdAndSchoolId"
+            resultType="com.campusai.knowledge.submission.entity.KnowledgeSubmission">
+        select <include refid="submissionColumns" />
+        from knowledge_submissions
+        where id = #{id}
+          and school_id = #{schoolId}
+        limit 1
+    </select>
+
+    <select id="findByUserId"
+            resultType="com.campusai.knowledge.submission.entity.KnowledgeSubmission">
+        select <include refid="submissionColumns" />
+        from knowledge_submissions
+        where user_id = #{userId}
+        order by created_at desc, id desc
+    </select>
+
+    <select id="findPendingBySchoolId"
+            resultType="com.campusai.knowledge.submission.entity.KnowledgeSubmission">
+        select <include refid="submissionColumns" />
+        from knowledge_submissions
+        where school_id = #{schoolId}
+          and status = 'PENDING'
+        order by created_at asc, id asc
+    </select>
+
+    <update id="markApproved">
+        update knowledge_submissions
+        set status = 'APPROVED',
+            review_note = #{reviewNote},
+            reviewed_by = #{reviewedBy},
+            reviewed_at = current_timestamp,
+            knowledge_document_id = #{knowledgeDocumentId}
+        where id = #{id}
+          and school_id = #{schoolId}
+          and status = 'PENDING'
+    </update>
+
+    <update id="markRejected">
+        update knowledge_submissions
+        set status = 'REJECTED',
+            review_note = #{reviewNote},
+            reviewed_by = #{reviewedBy},
+            reviewed_at = current_timestamp
+        where id = #{id}
+          and school_id = #{schoolId}
+          and status = 'PENDING'
+    </update>
+
+</mapper>

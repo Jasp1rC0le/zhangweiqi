@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.campusai.mapper.AiMessageMapper">
+
+    <insert id="insert"
+            parameterType="com.campusai.message.entity.AiMessage"
+            useGeneratedKeys="true"
+            keyProperty="id">
+
+        insert into ai_messages (
+            conversation_id,
+            role,
+            content,
+            token_count
+        )
+        values (
+                   #{conversationId},
+                   #{role},
+                   #{content},
+                   #{tokenCount}
+               )
+    </insert>
+
+    <select id="findById"
+            resultType="com.campusai.message.entity.AiMessage">
+
+        select id,
+               conversation_id,
+               role,
+               content,
+               token_count,
+               created_at
+        from ai_messages
+        where id = #{id}
+    </select>
+
+    <select id="findByIdAndConversationId"
+            resultType="com.campusai.message.entity.AiMessage">
+
+        select id,
+               conversation_id,
+               role,
+               content,
+               token_count,
+               created_at
+        from ai_messages
+        where id = #{id}
+          and conversation_id = #{conversationId}
+    </select>
+
+    <select id="findAllByConversationId"
+            resultType="com.campusai.message.entity.AiMessage">
+
+        select id,
+               conversation_id,
+               role,
+               content,
+               token_count,
+               created_at
+        from ai_messages
+        where conversation_id = #{conversationId}
+        order by created_at asc, id asc
+    </select>
+
+    <select id="findRecentByConversationId"
+            resultType="com.campusai.message.entity.AiMessage">
+
+        select recent.id,
+               recent.conversation_id,
+               recent.role,
+               recent.content,
+               recent.token_count,
+               recent.created_at
+        from (
+                 select id,
+                        conversation_id,
+                        role,
+                        content,
+                        token_count,
+                        created_at
+                 from ai_messages
+                 where conversation_id = #{conversationId}
+                 order by created_at desc, id desc
+                 limit #{limit}
+             ) recent
+        order by recent.created_at asc,
+                 recent.id asc
+    </select>
+
+</mapper>

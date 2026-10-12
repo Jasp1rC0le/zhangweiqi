@@ -1,0 +1,426 @@
+{
+  "school": "天津中德应用技术大学",
+  "checkedAt": "2026-10-09",
+  "image": "/campus-map/tsguas-handdrawn-2026-10-09.jpg",
+  "imageSha256": "efaf3005e08d520b64f94d608f3bfcb175b666c3dd40ebcd140549e77545a260",
+  "imageSource": "用户提供；图纸制作时间及版权归属未核实",
+  "coordinateSystem": "schematic-normalized-image-only",
+  "satelliteVerified": false,
+  "walkableGraphVerified": false,
+  "panorama": {
+    "url": "https://www.720yun.com/t/30vkie79r2w?scene_id=33330282",
+    "status": "title_only_scene_timeout",
+    "label": "校园VR全景（非卫星）"
+  },
+  "sources": [
+    "https://ev.tsguas.edu.cn/About_us/Maps_and_Travel.htm",
+    "https://jxcl.tsguas.edu.cn/xygk/lxwm.htm",
+    "https://zs.tsguas.edu.cn/info/1006/1847.htm",
+    "https://xxtx.tsguas.edu.cn/",
+    "https://xny.tsguas.edu.cn/lxwm.htm"
+  ],
+  "conflicts": [
+    "官网英文说明与手绘图对炎培大道、行知大道的左右位置描述相反，问路暂不用这两个路名",
+    "部分楼号只在手绘图出现；未核实具体楼门、台阶、无障碍入口、实时施工或校门通行"
+  ],
+  "answerPolicy": [
+    "先确定起点",
+    "用校门与楼座地标描述方位",
+    "不把归一化图坐标当经纬度",
+    "不估计米数、分钟数、最短路线",
+    "根据当前官网通知说明开放时段，不从图上推断"
+  ],
+  "points": [
+    {
+      "id": "north",
+      "name": "北门",
+      "aliases": [
+        "北门"
+      ],
+      "schematicPosition": [
+        0.406,
+        0.14
+      ],
+      "evidence": "图纸标注",
+      "note": "雅深路侧"
+    },
+    {
+      "id": "south",
+      "name": "南门",
+      "aliases": [
+        "南门"
+      ],
+      "schematicPosition": [
+        0.344,
+        0.821
+      ],
+      "evidence": "图纸标注",
+      "note": "雅润路侧"
+    },
+    {
+      "id": "west",
+      "name": "西门",
+      "aliases": [
+        "西门"
+      ],
+      "schematicPosition": [
+        0.109,
+        0.436
+      ],
+      "evidence": "图纸标注",
+      "note": "新慧路侧"
+    },
+    {
+      "id": "east",
+      "name": "东门",
+      "aliases": [
+        "东门"
+      ],
+      "schematicPosition": [
+        0.914,
+        0.423
+      ],
+      "evidence": "图纸标注",
+      "note": "南慧路侧"
+    },
+    {
+      "id": "A",
+      "name": "行政会议中心",
+      "aliases": [
+        "A座",
+        "行政楼"
+      ],
+      "schematicPosition": [
+        0.488,
+        0.454
+      ],
+      "evidence": "官网楼名+手绘位置",
+      "note": "B座东侧"
+    },
+    {
+      "id": "B",
+      "name": "图文信息中心",
+      "aliases": [
+        "B座",
+        "图书馆"
+      ],
+      "schematicPosition": [
+        0.399,
+        0.456
+      ],
+      "evidence": "官网楼名+手绘位置",
+      "note": "A座西侧、L座北侧"
+    },
+    {
+      "id": "C",
+      "name": "天津中西机床技术培训中心",
+      "aliases": [
+        "C座"
+      ],
+      "schematicPosition": [
+        0.691,
+        0.374
+      ],
+      "evidence": "官网楼名+手绘位置",
+      "note": "E4南侧"
+    },
+    {
+      "id": "D",
+      "name": "公共教学楼",
+      "aliases": [
+        "D座",
+        "D楼"
+      ],
+      "schematicPosition": [
+        0.292,
+        0.339
+      ],
+      "evidence": "官网楼名+手绘位置",
+      "note": "F2南侧"
+    },
+    {
+      "id": "F1",
+      "name": "综合教学楼F1",
+      "aliases": [
+        "F1"
+      ],
+      "schematicPosition": [
+        0.175,
+        0.212
+      ],
+      "evidence": "官网楼名+手绘位置",
+      "note": "西北教学区"
+    },
+    {
+      "id": "F2",
+      "name": "综合教学楼F2",
+      "aliases": [
+        "F2",
+        "软件与通信学院办公室"
+      ],
+      "schematicPosition": [
+        0.292,
+        0.216
+      ],
+      "evidence": "官网楼名+手绘位置",
+      "note": "D座北侧；软通办公地址F2-415（2026-10-09官网页脚核对）"
+    },
+    {
+      "id": "F3",
+      "name": "综合教学楼F3",
+      "aliases": [
+        "F3",
+        "机械工程学院办公室",
+        "机械学院学工办"
+      ],
+      "schematicPosition": [
+        0.518,
+        0.192
+      ],
+      "evidence": "官网楼名+手绘位置",
+      "note": "北门东侧教学区"
+    },
+    {
+      "id": "E1",
+      "name": "工业中心E1",
+      "aliases": [
+        "E1"
+      ],
+      "schematicPosition": [
+        0.517,
+        0.254
+      ],
+      "evidence": "官网楼名+手绘位置",
+      "note": "F3南侧"
+    },
+    {
+      "id": "E2",
+      "name": "工业中心E2",
+      "aliases": [
+        "E2",
+        "天津中德现代工业技术培训中心"
+      ],
+      "schematicPosition": [
+        0.515,
+        0.316
+      ],
+      "evidence": "官网楼名+手绘位置",
+      "note": "E1南侧"
+    },
+    {
+      "id": "E3",
+      "name": "工业中心E3",
+      "aliases": [
+        "E3",
+        "能源工程学院办公室"
+      ],
+      "schematicPosition": [
+        0.52,
+        0.376
+      ],
+      "evidence": "官网楼名+手绘位置",
+      "note": "E2南侧；能源学院联系地址E3-505（2026-10-09官网核对）"
+    },
+    {
+      "id": "E4",
+      "name": null,
+      "aliases": [
+        "E4"
+      ],
+      "schematicPosition": [
+        0.675,
+        0.307
+      ],
+      "evidence": "仅楼号",
+      "note": "C北侧"
+    },
+    {
+      "id": "E5",
+      "name": null,
+      "aliases": [
+        "E5"
+      ],
+      "schematicPosition": [
+        0.649,
+        0.256
+      ],
+      "evidence": "仅楼号",
+      "note": "E4北侧"
+    },
+    {
+      "id": "E6",
+      "name": null,
+      "aliases": [
+        "E6"
+      ],
+      "schematicPosition": [
+        0.622,
+        0.209
+      ],
+      "evidence": "仅楼号",
+      "note": "E5北侧"
+    },
+    {
+      "id": "G1",
+      "name": "体育中心暨大学生中心",
+      "aliases": [
+        "G1",
+        "体育馆",
+        "大学生中心"
+      ],
+      "schematicPosition": [
+        0.189,
+        0.456
+      ],
+      "evidence": "官网楼名+手绘位置",
+      "note": "西门内侧、田径场北侧"
+    },
+    {
+      "id": "K",
+      "name": "中德新天地",
+      "aliases": [
+        "K座"
+      ],
+      "schematicPosition": [
+        0.383,
+        0.657
+      ],
+      "evidence": "官网楼名+手绘位置",
+      "note": "L西南侧、球场东侧"
+    },
+    {
+      "id": "L",
+      "name": "餐饮中心",
+      "aliases": [
+        "L座",
+        "食堂",
+        "餐饮中心"
+      ],
+      "schematicPosition": [
+        0.488,
+        0.568
+      ],
+      "evidence": "官网楼名+手绘位置",
+      "note": "A/B南侧"
+    },
+    {
+      "id": "H1",
+      "name": "学生公寓H1",
+      "aliases": [
+        "H1"
+      ],
+      "schematicPosition": [
+        0.517,
+        0.674
+      ],
+      "evidence": "官网楼名+手绘位置",
+      "note": "L南侧"
+    },
+    {
+      "id": "H2",
+      "name": "学生公寓H2",
+      "aliases": [
+        "H2"
+      ],
+      "schematicPosition": [
+        0.469,
+        0.787
+      ],
+      "evidence": "官网楼名+手绘位置",
+      "note": "H1南侧"
+    },
+    {
+      "id": "H3",
+      "name": "学生公寓H3",
+      "aliases": [
+        "H3"
+      ],
+      "schematicPosition": [
+        0.566,
+        0.798
+      ],
+      "evidence": "官网楼名+手绘位置",
+      "note": "H2东侧"
+    },
+    {
+      "id": "H4",
+      "name": "学生公寓H4",
+      "aliases": [
+        "H4"
+      ],
+      "schematicPosition": [
+        0.666,
+        0.802
+      ],
+      "evidence": "官网楼名+手绘位置",
+      "note": "H3东侧"
+    },
+    {
+      "id": "H5",
+      "name": "H5（社区服务中心位于一楼AB厅）",
+      "aliases": [
+        "H5",
+        "住宿服务中心"
+      ],
+      "schematicPosition": [
+        0.665,
+        0.679
+      ],
+      "evidence": "2026住宿指南+手绘位置",
+      "note": "H4北侧；旧图培训公寓用途不作当前断言"
+    },
+    {
+      "id": "H6",
+      "name": null,
+      "aliases": [
+        "H6"
+      ],
+      "schematicPosition": [
+        0.666,
+        0.574
+      ],
+      "evidence": "仅楼号",
+      "note": "H5北侧"
+    },
+    {
+      "id": "M",
+      "name": null,
+      "aliases": [
+        "M座"
+      ],
+      "schematicPosition": [
+        0.788,
+        0.579
+      ],
+      "evidence": "仅楼号",
+      "note": "H6东侧"
+    },
+    {
+      "id": "track",
+      "name": "田径场",
+      "aliases": [
+        "操场",
+        "跑道"
+      ],
+      "schematicPosition": [
+        0.177,
+        0.619
+      ],
+      "evidence": "图纸标注",
+      "note": "G1南侧"
+    },
+    {
+      "id": "courts",
+      "name": "篮球场区",
+      "aliases": [
+        "篮球场"
+      ],
+      "schematicPosition": [
+        0.281,
+        0.615
+      ],
+      "evidence": "图纸标注",
+      "note": "田径场东侧"
+    }
+  ]
+}

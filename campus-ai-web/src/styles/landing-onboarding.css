@@ -1,0 +1,74 @@
+/* The cover explains the product before asking a visitor to sign in. */
+html:root .landing .hero { grid-template-columns: 1.12fr 1fr; gap: clamp(28px, 3.4vw, 56px); padding: 35px 0; }
+html:root .landing .hero h1 { font-size: clamp(37px, 4.2vw, 62px); margin-top: 25px; line-height: 1.35; letter-spacing: -.055em; }
+html:root .landing .hero-subtitle { margin-top: 20px; font-size: 15px; line-height: 1.9; max-width: none; }
+html:root .landing .hero-entry-tools { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; margin-top: 25px; max-width: 470px; }
+html:root .landing .hero-entry-tools button { display: grid; grid-template-columns: 23px 1fr; gap: 3px 9px; align-items: center; min-height: 61px; text-align: left; padding: 11px 13px; color: #677165; background: #eeeee7; border: 1px solid #dedfd6; border-radius: 9px; transition: background 250ms, border-color 250ms, color 250ms; }
+html:root .landing .hero-entry-tools button.selected { color: #334bdb; background: #fffefa; border-color: #aeb9eb; box-shadow: 0 2px 8px #334bdb08; }
+html:root .landing .hero-entry-tools button:hover { border-color: #aeb9eb; }
+html:root .landing .hero-entry-tools .workspace-icon { width: 23px; height: 23px; grid-row: span 2; }
+html:root .landing .hero-entry-tools strong { font-size: 13px; font-weight: 600; }
+html:root .landing .hero-entry-tools small { color: #747b70; font-size: 10px; }
+html:root .landing .hero-actions { margin-top: 28px; gap: 22px; }
+html:root .landing .hero-start-guide { display: flex; align-items: center; flex-wrap: wrap; gap: 11px; margin: 17px 0 0; color: #707a6d; font-size: 11px; }
+html:root .landing .hero-start-guide b { font-size: 12px; font-weight: 400; color: #a1a99a; }
+html:root .landing .hero-visual { height: clamp(455px, 58svh, 540px); pointer-events: auto; border-radius: 43% 43% 15px 15px; }
+html:root .landing .hero-orb-stage { position: absolute; inset: 12px 0 auto; height: 53%; display: grid; place-items: center; pointer-events: none; }
+html:root .landing .hero-orb-stage .intelligence-orb { width: min(21vw, 265px); }
+html:root .landing .hero-demo { position: absolute; z-index: 3; bottom: 24px; left: 24px; right: 24px; padding: 20px; border: 1px solid #fffefa; border-radius: 13px; background: #fffefaed; box-shadow: 0 12px 35px #48577e12; backdrop-filter: blur(18px); }
+html:root .landing .hero-demo-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-bottom: 14px; border-bottom: 1px solid #e6e7e1; }
+html:root .landing .hero-demo-top > span { font-size: 11px; color: #53624e; font-weight: 600; }
+html:root .landing .hero-demo-top small { font-size: 9px; color: #818478; }
+html:root .landing .hero-demo-content { min-height: 152px; }
+html:root .landing .hero-demo-question { display: flex; align-items: center; gap: 8px; width: fit-content; max-width: 100%; margin: 16px 0; padding: 11px 12px; border-radius: 8px 8px 3px 8px; color: #3a4b9a; background: #eaeefa; font-size: 13px; line-height: 1.55; }
+html:root .landing .hero-demo-question .workspace-icon { flex: none; width: 19px; height: 19px; }
+html:root .landing .hero-demo-result { display: block; color: #37413b; font-size: 13px; font-weight: 550; line-height: 1.6; }
+html:root .landing .hero-demo-details { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+html:root .landing .hero-demo-details span { color: #617058; font-size: 10px; background: #eef1e8; border-radius: 4px; padding: 4px 7px; }
+html:root .landing .hero-demo-hint { margin: 13px 0 0; color: #7a8175; font-size: 10px; line-height: 1.65; }
+.hero-demo-stage { display: grid; }
+.hero-demo-stage > .hero-demo-content { grid-area: 1 / 1; }
+.hero-example-enter-active { transition: opacity 300ms 100ms ease, transform 400ms cubic-bezier(.22,1,.36,1); }
+.hero-example-leave-active { transition: opacity 160ms ease, transform 220ms ease; pointer-events: none; }
+.hero-example-enter-from { opacity: 0; transform: translateY(8px); }
+.hero-example-leave-to { opacity: 0; transform: translateY(-5px); }
+@media (min-width: 1500px) {
+  html:root .landing .hero { padding-block: 48px; }
+  html:root .landing .hero-entry-tools { margin-top: 30px; }
+}
+@media (min-width: 761px) and (max-width: 1000px) {
+  html:root .landing .hero { grid-template-columns: 1.08fr 1fr; gap: 24px; width: calc(100% - 64px); }
+  html:root .landing .hero h1 { font-size: clamp(30px, 4.1vw, 41px); }
+  html:root .landing .hero-subtitle { font-size: 13px; }
+  html:root .landing .hero-entry-tools button { padding: 10px 8px; gap: 3px 5px; grid-template-columns: 19px 1fr; }
+  html:root .landing .hero-entry-tools .workspace-icon { width: 18px; height: 18px; }
+  html:root .landing .hero-visual { height: 455px; }
+  html:root .landing .hero-demo { left: 14px; right: 14px; bottom: 18px; padding: 15px; }
+  html:root .landing .hero-demo-top { flex-wrap: wrap; }
+  html:root .landing .hero-demo-question { font-size: 12px; padding: 10px; }
+}
+@media (max-width: 760px) {
+  html:root .landing .hero { grid-template-columns: 1fr; gap: 27px; padding: 29px 0 25px; }
+  html:root .landing .hero h1 { font-size: clamp(28px, 8.1vw, 52px); line-height: 1.4; margin-top: 18px; }
+  html:root .landing .hero-eyebrow { font-size: 10px; letter-spacing: 0; }
+  html:root .landing .hero-subtitle { margin-top: 16px; font-size: 13px; }
+  html:root .landing .hero-entry-tools { margin-top: 20px; gap: 7px; max-width: none; }
+  html:root .landing .hero-entry-tools button { padding: 10px 9px; gap: 3px 6px; grid-template-columns: 20px 1fr; }
+  html:root .landing .hero-entry-tools .workspace-icon { width: 20px; height: 20px; }
+  html:root .landing .hero-entry-tools strong { font-size: 12px; }
+  html:root .landing .hero-entry-tools small { font-size: 9px; }
+  html:root .landing .hero-actions { margin-top: 22px; gap: 18px; }
+  html:root .landing .hero-start-guide { font-size: 10px; margin-top: 15px; }
+  html:root .landing .hero-visual { height: 395px; border-radius: 35% 35% 13px 13px; }
+  html:root .landing .hero-orb-stage { top: 0; height: 46%; }
+  html:root .landing .hero-orb-stage .intelligence-orb { width: 160px; }
+  html:root .landing .hero-demo { left: 13px; right: 13px; bottom: 14px; padding: 15px; }
+  html:root .landing .hero-demo-top { gap: 8px; }
+  html:root .landing .hero-demo-top small { font-size: 8px; }
+  html:root .landing .hero-demo-question { font-size: 12px; }
+  html:root .landing .hero-demo-result { font-size: 12px; }
+  html:root .landing .hero-demo-content { min-height: 157px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-example-enter-active, .hero-example-leave-active, html:root .landing .hero-entry-tools button { transition: none; }
+}

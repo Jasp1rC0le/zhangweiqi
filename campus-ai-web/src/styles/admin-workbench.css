@@ -1,0 +1,32 @@
+/* Operate surface: preserve Campthink's paper/sage palette; make editing readable. */
+html:root body .admin-page > main > header h1 { font-size:2.25rem; letter-spacing:-.035em; }
+html:root body .admin-page > main > header > span { color:#596550; font-size:15px; }
+html:root body .admin-page .admin-sidebar nav button { font-size:14px; min-height:44px; }
+.admin-page .document-toolbar { display:grid; grid-template-columns:minmax(180px,1fr) minmax(150px,.42fr) auto; align-items:end; gap:16px; padding-bottom:18px; border-bottom:1px solid #d7ddce; }
+.admin-page .document-toolbar label { display:grid; gap:8px; color:#425038; font-size:14px; font-weight:600; }
+.admin-page .document-toolbar input,.admin-page .document-toolbar select { width:100%; min-width:0; min-height:46px; padding:10px 14px; font:inherit; border:1px solid #cad3c1; }
+.admin-page .document-toolbar button { min-height:46px; border-radius:14px; padding:10px 18px; background:#3548da; color:white; font:inherit; }
+.admin-page .document-results,.admin-page .editor-meta { display:block; margin:14px 0; font-size:14px; color:#596550; line-height:1.6; font-variant-numeric:tabular-nums; }
+.admin-page .editor-fields { border:0; min-width:0; margin:0; padding:0; }
+.admin-page .visually-hidden { position:absolute; width:1px; height:1px; padding:0; clip-path:inset(50%); overflow:hidden; white-space:nowrap; }
+.admin-page .editor-fields:disabled { opacity:.72; }
+html:root body .admin-page .editor-fields :is(input,textarea,select) { font-size:16px; line-height:1.65; }
+.admin-page .admin-load-error,.admin-page .editor-return,.admin-page .editor-success { display:flex; align-items:center; flex-wrap:wrap; gap:12px 20px; padding:16px 20px; margin-bottom:20px; border:1px solid #d5dccc; border-radius:16px; background:#f0f3e9; color:#425038; line-height:1.65; font-size:14px; }
+.admin-page .admin-load-error { border-color:#dfc7b6; background:#fcf5ee; color:#824328; }
+.admin-page .admin-load-error p,.admin-page .editor-success p { margin:0; }
+.admin-page :is(.admin-load-error,.editor-return,.editor-success) button { margin-inline-start:auto; padding:10px 14px; min-height:44px; border:1px solid currentColor; border-radius:12px; background:transparent; color:inherit; font:inherit; }
+.admin-page .editor-error { border:1px solid #e0bcb3; border-radius:14px; background:#fff5f1; color:#913e2c; padding:14px 18px; font-size:15px; line-height:1.65; }
+.admin-page :is(.document-toolbar,.editor-return,.admin-load-error,.editor-success) button:hover { filter:brightness(.97); }
+.admin-page :is(button,input,textarea,select):focus-visible { outline:2px solid #3548da; outline-offset:3px; }
+.admin-page button:disabled { cursor:not-allowed; opacity:.55; }
+.admin-page .review-card h2 { overflow-wrap:anywhere; }
+.admin-page .editor-meta { margin:8px 0 0; }
+.admin-identity-error { max-width:660px; margin:48px auto; padding:28px; line-height:1.8; color:#38472f; }
+.admin-identity-error h1 { font-size:28px; }.admin-identity-error button,.admin-identity-error a { display:inline-flex; min-height:44px; align-items:center; margin:10px 14px 0 0; padding:8px 16px; border-radius:14px; border:1px solid #cbd3c3; color:#3548da; background:#fffefa; text-decoration:none; font:inherit; cursor:pointer; }
+@media(max-width:760px) {
+  .admin-page .document-toolbar { grid-template-columns:minmax(0,1fr); gap:12px; }
+  .admin-page .document-toolbar button { width:100%; }
+  html:root body .admin-page > main > header h1 { font-size:1.8rem; }
+  .admin-page .admin-load-error,.admin-page .editor-return,.admin-page .editor-success { align-items:stretch; }
+  .admin-page :is(.admin-load-error,.editor-return,.editor-success) button { margin-inline-start:0; }
+}

@@ -1,0 +1,524 @@
+/* Campthink — Paper / Cobalt. Shared visual system; page logic stays in its views. */
+html:root {
+  --ct-paper: #f7f6f2;
+  --ct-white: #fffefa;
+  --ct-ink: #252e42;
+  --ct-muted: #72766e;
+  --ct-line: #dedfd7;
+  --ct-blue: #334bdb;
+  --ct-blue-soft: #e9edfc;
+  --ct-apricot: #edb98e;
+  --ct-ease: cubic-bezier(.22, 1, .36, 1);
+}
+html:root body { color: var(--ct-ink); background: var(--ct-paper); }
+html:root ::selection { background: #dbe2ff; color: #2438a8; }
+html:root button, html:root a, html:root input, html:root textarea, html:root select { -webkit-tap-highlight-color: transparent; }
+html:root :focus-visible { outline: 2px solid var(--ct-blue); outline-offset: 4px; }
+html:root .brand, html:root .wordmark, html:root .admin-login-brand { letter-spacing: -.055em; }
+html:root .brand-period { color: var(--ct-blue); }
+html:root .page-kicker { color: var(--ct-blue); font-size: 11px; font-weight: 650; letter-spacing: .15em; }
+
+/* 01 — The cover. An editorial composition, not another gradient landing page. */
+html:root .landing { --ink: var(--ct-ink); --paper: var(--ct-paper); --muted: var(--ct-muted); background: var(--ct-paper); color: var(--ct-ink); font-family: inherit; }
+html:root .landing .hero-wrap { color: var(--ct-ink); background: var(--ct-paper); min-height: 100svh; }
+html:root .landing .site-nav { width: min(1400px, calc(100% - 96px)); height: 94px; border-color: var(--ct-line); }
+html:root .landing .brand { font-size: 25px; font-weight: 720; gap: 11px; }
+html:root .landing .brand .camp-mark { width: 31px; height: 31px; }
+html:root .landing .nav-links { color: #626960; gap: 28px; font-size: 12px; }
+html:root .landing .nav-action { min-height: 42px; padding: 0 19px; border: 1px solid #bbc0c6; border-radius: 8px; color: var(--ct-ink); background: transparent; box-shadow: none; }
+html:root .landing .nav-action:hover { color: #fff; background: var(--ct-ink); border-color: var(--ct-ink); }
+html:root .landing .hero { width: min(1400px, calc(100% - 96px)); grid-template-columns: 1.05fr 1fr; gap: 48px; min-height: calc(100svh - 205px); padding: 52px 0; }
+html:root .landing .hero-eyebrow { color: #646b65; font-size: 11px; letter-spacing: .06em; gap: 10px; }
+html:root .landing .eyebrow-line { width: 8px; height: 8px; border-radius: 50%; background: var(--ct-blue); }
+html:root .landing .hero-chapter { margin-left: 10px; color: #757a79; border: 0; background: transparent; font-variant-numeric: tabular-nums; }
+html:root .landing .hero h1 { margin: 30px 0 0; font-size: clamp(68px, 7.6vw, 112px); font-weight: 620; line-height: 1.18; letter-spacing: -.075em; white-space: normal; }
+html:root .landing .hero h1 em { padding: 0; font-style: normal; color: var(--ct-blue); background: none; }
+html:root .landing .hero-subtitle { margin-top: 25px; max-width: 460px; font-size: 16px; line-height: 1.9; color: #686f72; text-wrap: initial; }
+html:root .landing .hero-actions { margin-top: 32px; gap: 24px; }
+html:root .landing .hero-cta { min-height: 54px; gap: 26px; padding: 8px 10px 8px 22px; border-radius: 9px; color: #fff; background: var(--ct-blue); box-shadow: 0 7px 15px #334bdb14; }
+html:root .landing .hero-cta:hover { background: #263dc5; box-shadow: 0 9px 22px #334bdb28; }
+html:root .landing .action-circle { background: #ffffff1f; color: #fff; border-radius: 5px; width: 34px; height: 34px; }
+html:root .landing .hero-actions > a { color: #555e68; font-size: 12px; }
+html:root .landing .hero-visual { width: 100%; min-height: 0; height: clamp(400px, 57svh, 600px); aspect-ratio: auto; overflow: hidden; border-radius: 48% 48% 12px 12px; border: 1px solid #dce0eb; background: #eceefa; }
+html:root .landing .hero-visual::after { content: ''; position: absolute; left: 14%; right: 14%; bottom: 12%; height: 8%; background: #7a83a426; filter: blur(15px); border-radius: 50%; z-index: -1; }
+html:root .landing .orb-ambient { width: 240px; height: 240px; opacity: .14; }
+html:root .landing .orb-orbit { width: 95%; border-color: #cbd1e259; transform: rotate(-28deg) scaleY(.76); }
+html:root .landing .orb-orbit-inner { width: 120%; transform: rotate(38deg) scaleY(.73); }
+html:root .landing .intelligence-orb { width: min(26vw, 345px); border-radius: 48% 52% 48% 52%; box-shadow: inset 0 0 40px #ffffffa6, 14px 34px 55px #57609627; background: radial-gradient(circle at 31% 22%, #fff 0 9%, transparent 36%), radial-gradient(circle at 73% 72%, #efad72 0, transparent 43%), radial-gradient(circle at 26% 72%, #5878e2 0, transparent 49%), radial-gradient(circle at 73% 26%, #b3a6ef 0, transparent 49%), #dfe8fa; }
+html:root .landing .intelligence-orb::after { inset: 8%; border: 0; background: transparent; box-shadow: none; backdrop-filter: none; }
+html:root .landing .orb-caption { position: absolute; z-index: 2; font-size: 10px; line-height: 1.6; letter-spacing: .12em; color: #64708a; }
+html:root .landing .orb-caption-top { top: 15%; left: 15%; }
+html:root .landing .orb-caption-bottom { bottom: 14%; right: 8%; letter-spacing: .08em; }
+html:root .landing .visual-label { bottom: 22px; font-size: 9px; letter-spacing: .12em; color: #6d7690; }
+html:root .landing .chapter-bridge { width: min(1400px, calc(100% - 96px)); min-height: 110px; padding: 22px 0 26px; border-color: var(--ct-line); color: #626960; }
+html:root .landing .bridge-caption { display: flex; gap: 22px; align-items: center; font-size: 11px; }
+html:root .landing .bridge-caption b { font-family: Georgia, serif; font-size: 36px; font-weight: 400; color: var(--ct-blue); }
+html:root .landing .bridge-next strong { color: var(--ct-ink); font-size: 12px; font-weight: 550; }
+html:root .landing .bridge-next small { color: #717970; }
+html:root .landing .bridge-arrow { color: var(--ct-blue); border-color: #cbd0c3; border-radius: 50%; }
+html:root .landing .page-index { border-radius: 8px; background: #fffefaeb; border-color: #d6d9cd; box-shadow: 0 4px 20px #232e4210; backdrop-filter: blur(16px); }
+html:root .landing .page-index button { border-radius: 4px; color: #666f75; }
+html:root .landing .page-index button.active { background: var(--ct-blue); color: #fff; }
+html:root .landing .page-index button.active span { color: #fff; }
+@media (min-width: 761px) {
+  html:root .landing .page-index { inset: 50% 5px auto auto; transform: translateY(-50%); display: flex; flex-direction: column; padding: 3px; gap: 7px; width: 30px; border: 0; box-shadow: none; background: transparent; backdrop-filter: none; }
+  html:root .landing .page-index button { min-width: 24px; min-height: 29px; padding: 0; justify-content: center; }
+  html:root .landing .page-index button b, html:root .landing .page-index button.active b, html:root .landing .page-index small { display: none; }
+  html:root .landing .page-index button span { font-size: 9px; }
+  html:root .landing .page-index button::after { display: none; }
+}
+html:root .landing .story-page:not(.hero-wrap) { border-radius: 24px 24px 0 0; box-shadow: 0 -8px 35px #252e4205; }
+html:root .landing .experience { padding: 90px max(48px, calc((100vw - 1400px) / 2)) 100px; background: #e9edfc; border-top: 1px solid #d6dcf1; }
+html:root .landing .section-intro { gap: 32px; align-items: start; }
+html:root .landing .section-kicker { color: #5a68a2; font-size: 11px; letter-spacing: .1em; }
+html:root .landing .section-intro h2 { font-size: clamp(36px, 4.2vw, 60px); line-height: 1.32; font-weight: 560; letter-spacing: -.055em; color: #252e42; }
+html:root .landing .section-intro > p:last-child { color: #667092; font-size: 14px; line-height: 1.9; }
+html:root .landing .capability-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; border: 0; margin-top: 56px; }
+html:root .landing .capability-card { position: relative; padding: 25px 28px; min-height: 335px; border: 1px solid #ffffffa3; border-radius: 13px; background: #ffffff82; transition: transform 400ms var(--ct-ease), background 250ms; }
+html:root .landing .capability-card + .capability-card { padding-left: 28px; border: 1px solid #ffffffa3; }
+html:root .landing .capability-card:hover { transform: translateY(-7px); background: #fffefa; }
+html:root .landing .card-head { color: #7b83a0; font-size: 10px; letter-spacing: .12em; }
+html:root .landing .capability-icon { width: 42px; height: 42px; color: var(--ct-blue); margin-top: 32px; }
+html:root .landing .capability-card h3 { margin: 18px 0 14px; color: var(--ct-ink); font-size: 34px; font-weight: 550; letter-spacing: -.05em; }
+html:root .landing .capability-card p { color: #697187; max-width: 270px; line-height: 1.8; font-size: 13px; }
+html:root .landing .capability-card button { margin-top: 24px; padding: 9px 0; color: var(--ct-blue); font-size: 12px; }
+html:root .landing .life-section { padding: 72px max(48px, calc((100vw - 1400px) / 2)); gap: 72px; background: #f2e9dd; border-top: 1px solid #e4d5c5; align-items: center; }
+html:root .landing .life-image { min-height: 500px; border-radius: 12px 100px 12px 12px; overflow: hidden; background-image: linear-gradient(180deg, #24342600 20%, #1a302b88), url('/campus-architecture.jpg'); background-position: center; background-size: cover; }
+html:root .landing .life-image::before { display: none; }
+html:root .landing .life-glass { width: calc(100% - 64px); align-self: end; margin: 32px; padding: 0; gap: 18px; color: #fff; background: none; backdrop-filter: none; border: 0; border-radius: 0; box-shadow: none; }
+html:root .landing .life-glass strong { font-weight: 500; font-size: 44px; }
+html:root .landing .life-content { padding: 0; }
+html:root .landing .life-content h2 { font-size: clamp(36px, 4vw, 60px); line-height: 1.4; font-weight: 550; letter-spacing: -.06em; color: #3b4136; }
+html:root .landing .life-content h2 i { font-style: normal; color: #827454; }
+html:root .landing .life-content p:not(.section-kicker), html:root .landing .life-status { color: #737364; }
+html:root .landing .life-content button { color: #3f4836; border-color: #a5a48b; border-radius: 6px; }
+html:root .landing .closing { display: flex; min-height: 85svh; align-items: center; justify-content: center; flex-direction: column; background: #f7f6f2; padding: 100px 24px 140px; border-top: 1px solid var(--ct-line); }
+html:root .landing .closing::before { content: 'A little clarity. Every day.'; margin-bottom: 35px; color: #969c97; font: italic 26px Georgia, serif; letter-spacing: -.03em; }
+html:root .landing .closing h2 { margin: 22px 0 40px; text-align: center; font-size: clamp(38px, 6.4vw, 90px); font-weight: 550; line-height: 1.35; letter-spacing: -.07em; }
+html:root .landing .closing h2 i { color: var(--ct-blue); font-style: normal; }
+html:root .landing .closing button { color: white; background: var(--ct-blue); border: 0; border-radius: 9px; }
+html:root .landing .site-footer { background: #eeeee7; border-color: var(--ct-line); padding: 30px max(48px, calc((100vw - 1400px) / 2)); color: #657062; font-size: 11px; }
+
+/* 02 — Authentication. The same cover, opening into a workspace. */
+html:root .intro-curtain { background: #202735; }
+html:root .intro-brand { --mark-color: #f7f6f2; }
+html:root .overlay { background: #303a4c57; backdrop-filter: blur(10px); }
+html:root .auth-dialog, html:root .auth-dialog.is-register { background: var(--ct-white); border: 1px solid #ffffffa6; border-radius: 18px; box-shadow: 0 35px 120px #15223b38; }
+html:root .auth-dialog .auth-art { min-height: 570px; background: #e6eafa; color: var(--ct-ink); overflow: hidden; }
+html:root .auth-dialog.is-register .auth-art { background: #eee6dc; }
+html:root .auth-dialog .art-brand { display: flex; align-items: center; gap: 10px; font-size: 21px; font-weight: 650; letter-spacing: -.05em; }
+html:root .auth-dialog .art-brand .camp-mark { width: 27px; height: 27px; }
+html:root .auth-dialog .auth-mini-orb { width: 215px; top: 28%; right: 18%; background: radial-gradient(circle at 28% 24%, #fff 0 5%, transparent 46%), radial-gradient(circle at 70% 76%, #edb98e, transparent 55%), radial-gradient(circle at 28% 75%, #6481e6, transparent 55%), #c4b7ee; box-shadow: inset 0 0 25px #ffffffb3, 0 25px 40px #6a76a536; }
+html:root .auth-dialog .auth-art p { bottom: 44px; left: 34px; color: #313d61; font-size: 30px; font-weight: 550; line-height: 1.4; letter-spacing: -.05em; }
+html:root .auth-dialog .auth-art p small { display: block; margin-top: 18px; color: #6f7994; font: italic 15px Georgia, serif; letter-spacing: 0; }
+html:root .auth-dialog .auth-tabs { background: #eeeee8; border-radius: 8px; }
+html:root .auth-dialog .auth-tabs::before { border-radius: 5px; background: #fffefa; border-color: #dedfd7; box-shadow: 0 2px 4px #252e4208; }
+html:root .auth-dialog .auth-form h2 { color: var(--ct-ink); letter-spacing: -.05em; font-weight: 550; }
+html:root .auth-dialog .el-input__wrapper, html:root .auth-dialog .el-select__wrapper, html:root .contact-dialog .el-input__wrapper { border-radius: 8px; background: #f8f8f4; }
+html:root .auth-dialog .el-input__inner:focus-visible { outline: none; }
+html:root .auth-dialog .el-input__wrapper:focus-within { box-shadow: 0 0 0 1px var(--ct-blue), 0 0 0 4px #334bdb12; }
+html:root .auth-dialog .form-submit, html:root .contact-dialog .form-submit { border-radius: 8px; background: var(--ct-blue); }
+html:root .auth-dialog .form-submit:hover:not(:disabled) { background: #253ccb; }
+html:root .auth-dialog .dialog-close { background: #eaece580; color: #566173; }
+html:root .contact-dialog, html:root .chat-contact-dialog, html:root .membership-dialog, html:root .delete-dialog { background: var(--ct-white); border-radius: 18px; border: 1px solid #e0e1d9; box-shadow: 0 25px 90px #25324624; }
+
+/* 03 — A quiet desk. Framed paper against a soft, clearly separate rail. */
+html:root .workspace { display: grid; grid-template-columns: 254px minmax(0, 1fr); background: #e9ebe5; color: var(--ct-ink); padding: 10px 10px 10px 0; gap: 0; height: 100dvh; }
+html:root .workspace .sidebar { padding: 23px 16px 12px; background: #e9ebe5; border: 0; }
+html:root .workspace .brand { padding: 0 6px; gap: 10px; }
+html:root .workspace .brand .camp-mark { width: 29px; height: 29px; }
+html:root .workspace .brand-copy strong { font-size: 21px; font-weight: 680; letter-spacing: -.055em; color: var(--ct-ink); }
+html:root .workspace .brand-copy small { margin-top: 7px; color: #707b70; font-size: 9px; }
+html:root .workspace .compose-button { justify-content: flex-start; gap: 10px; margin-top: 29px; height: 44px; padding: 0 14px; border: 1px solid #d2d8cb; border-radius: 8px; color: var(--ct-ink); background: #fffefa; box-shadow: 0 2px 3px #252e4204; }
+html:root .workspace .compose-button:hover { background: #f8faf4; border-color: #b7c0b1; }
+html:root .workspace .compose-button kbd { margin-left: auto; font: 18px inherit; color: #7a8576; }
+html:root .workspace .nav-label { margin-left: 12px; color: #697161; font-size: 10px; font-weight: 550; letter-spacing: .08em; }
+html:root .workspace .nav-item { color: #5f6a60; font-size: 13px; border-radius: 7px; }
+html:root .workspace .nav-item.active { color: #334bcb; background: #dce2f1; box-shadow: none; }
+html:root .workspace .nav-item:hover:not(.active), html:root .workspace .conversation-row:hover .conversation-item { background: #dfe3d9; box-shadow: none; }
+html:root .workspace .history-search { margin: 0 0 10px; background: transparent; border-color: #cfd5ca; border-radius: 7px; }
+html:root .workspace .conversation-item { height: 39px; font-size: 12px; color: #62705f; border-radius: 7px; }
+html:root .workspace .conversation-row.active .conversation-item { color: #2d4030; background: #d9dfd2; box-shadow: none; }
+html:root .workspace .sidebar-account { border-color: #ced5c8; }
+html:root .workspace .profile { background: transparent; border-radius: 8px; }
+html:root .workspace .avatar { color: #5d674b; background: #d4ddc8; border: 1px solid #c8d1bd; border-radius: 9px; }
+html:root .workspace .chat-main { background: var(--ct-paper); border: 1px solid #d9ddd3; border-radius: 15px; overflow: hidden; box-shadow: 0 2px 4px #263c2704; }
+html:root .workspace .chat-header { background: #f7f6f2ed; min-height: 78px; border-bottom-color: #e6e5de; padding: 0 26px; grid-template-columns: minmax(0, 1fr) auto; }
+html:root .workspace .connection-state { max-width: 195px; color: #7d847a; font-size: 10px; line-height: 1.6; }
+html:root .workspace .workspace-switcher { border: 1px solid #dddfd5; background: #eeeee7; border-radius: 9px; }
+html:root .workspace .workspace-switcher::before { border: 1px solid #d8dccc; background: #fffefa; border-radius: 6px; box-shadow: 0 1px 4px #263c2710; }
+html:root .workspace .workspace-switcher button { border-radius: 6px; }
+html:root .workspace .workspace-switcher button.active, html:root .workspace .workspace-switcher button.active .workspace-icon { color: var(--ct-blue); }
+html:root .workspace .workspace-switcher small { font-size: 9px; color: #7c8176; }
+html:root .workspace .message-scroller { background: var(--ct-paper); scrollbar-color: #d0d3ca transparent; scrollbar-width: thin; }
+html:root .workspace .welcome { width: min(770px, calc(100% - 80px)); padding: clamp(55px, 9vh, 105px) 0 60px; }
+html:root .workspace .welcome-eyebrow { margin: 0 0 27px; color: #7f897a; font-size: 10px; letter-spacing: .15em; }
+html:root .workspace .welcome-heading { gap: 16px; align-items: flex-start; }
+html:root .workspace .welcome-mode-icon { color: var(--ct-blue); width: 45px; height: 45px; flex-basis: 45px; border-radius: 50% 50% 7px 7px; background: #e6eafb; border-color: #dce0f0; }
+html:root .workspace .welcome-mode-icon .workspace-icon { width: 23px; height: 23px; }
+html:root .workspace .welcome h1 { font-size: clamp(28px, 3vw, 40px); font-weight: 550; letter-spacing: -.045em; line-height: 1.3; }
+html:root .workspace .welcome-subtitle { font-size: 13px; color: #69715f; margin-top: 9px; }
+html:root .workspace .welcome-invitation { margin: 35px 0 0; color: #3d493f; font-size: clamp(25px, 3.2vw, 43px); line-height: 1.4; letter-spacing: -.05em; font-weight: 450; }
+html:root .workspace .suggestion-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 30px; border: 0; counter-reset: suggestion; }
+html:root .workspace .suggestion-card { min-height: 154px; justify-content: space-between; padding: 19px 18px 29px; border: 1px solid #e0e1d8; border-radius: 9px; background: #fffefa; counter-increment: suggestion; transition: transform 250ms var(--ct-ease), border-color 200ms, background 200ms; }
+html:root .workspace .suggestion-card::before { content: none; }
+html:root .workspace .suggestion-card:nth-child(2) { background: #f0f2e9; }
+html:root .workspace .suggestion-card:nth-child(3) { background: #eeeefa; }
+html:root .workspace .suggestion-card:hover { transform: translateY(-4px); border-color: #aab8d1; }
+html:root .workspace .suggestion-copy strong { font-size: 14px; font-weight: 560; color: #374338; }
+html:root .workspace .suggestion-copy small { color: #69715f; line-height: 1.7; font-size: 11px; }
+html:root .workspace .suggestion-card .card-arrow { top: 20px; right: 17px; color: #86917b; width: 15px; }
+html:root .workspace .message-list { width: min(800px, calc(100% - 64px)); padding-top: 40px; }
+html:root .workspace .message-row { gap: 12px; }
+html:root .workspace .assistant-avatar { --mark-color: #63705e; height: 24px; width: 24px; flex-basis: 24px; }
+html:root .workspace .message-role { color: #7c8678; font-size: 10px; letter-spacing: .04em; }
+html:root .workspace .answer-bubble { background: #fffefa; border: 1px solid #e0e2d7; box-shadow: 0 3px 12px #25302203; color: #303b33; border-radius: 3px 16px 16px 16px; padding: 20px 23px; }
+html:root .workspace .message-row.user .message-content > p { color: #fff; background: var(--ct-blue); border-radius: 16px 3px 16px 16px; padding: 12px 18px; box-shadow: 0 4px 15px #334bdb12; }
+html:root .workspace .answer-markdown { color: #384138; font-size: 15px; line-height: 1.85; }
+html:root .workspace .answer-markdown pre { background: #f1f2eb; border: 1px solid #e0e3d8; border-radius: 8px; color: #303d36; }
+html:root .workspace .answer-markdown a { color: var(--ct-blue); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+html:root .workspace .answer-markdown blockquote { border-left-color: #bcc8a9; color: #707d65; }
+html:root .workspace .composer-wrap { padding: 16px 28px 17px; background: linear-gradient(0deg, #f7f6f2 80%, #f7f6f200); }
+html:root .workspace .composer { max-width: 800px; border: 1px solid #cdd4c5; border-radius: 13px; background: #fffefa; padding: 12px 12px 12px 19px; box-shadow: 0 4px 18px #26342206; }
+html:root .workspace .composer:focus-within { border-color: #8c9ee2; box-shadow: 0 4px 22px #334bdb09, 0 0 0 3px #334bdb08; background: #fff; }
+html:root .workspace .composer textarea { color: #344036; background: transparent; }
+html:root .workspace .composer textarea::placeholder { color: #8c9585; }
+html:root .workspace .send-button { border-radius: 8px; background: var(--ct-blue); width: 36px; height: 36px; }
+html:root .workspace .send-button:disabled { color: #889482; background: #e8ecdf; }
+html:root .workspace .composer-meta { max-width: 800px; color: #69715f; font-size: 10px; }
+html:root .workspace .citation-details { border-color: #e0e3d8; }
+html:root .workspace .citation-details summary { color: #707d65; }
+html:root .workspace .profile-menu { background: var(--ct-white); border: 1px solid #d3d9cc; border-radius: 12px; }
+
+/* 04 — Campus table. Real content takes the stage; no fabricated ratings. */
+html:root .canteen-page { background: var(--ct-paper); color: var(--ct-ink); }
+html:root .canteen-header { height: 80px; background: transparent; border-color: var(--ct-line); }
+html:root .canteen-page .wordmark { font-size: 21px; gap: 10px; }
+html:root .canteen-page .wordmark .camp-mark { width: 28px; height: 28px; }
+html:root .canteen-page main { width: min(1180px, calc(100% - 80px)); padding-top: 64px; }
+html:root .canteen-page .page-intro { grid-template-columns: minmax(0, 1fr) 275px; padding-bottom: 48px; gap: 54px; }
+html:root .canteen-page .title-group .page-kicker { margin: 0 0 24px; color: #8a704e; font-size: 11px; }
+html:root .canteen-page h1 { font-size: clamp(44px, 5.5vw, 76px); font-weight: 550; line-height: 1.2; letter-spacing: -.06em; }
+html:root .canteen-page h1 em { color: #887344; font-style: normal; }
+html:root .canteen-page .title-group > p:not(.page-kicker) { margin-top: 24px; color: #7e8171; font-size: 14px; }
+html:root .canteen-page .rating-note { border: 1px solid #e3dbca; border-radius: 45% 45% 10px 10px; padding: 25px 30px; min-height: 230px; background: #eee6d6; text-align: center; }
+html:root .canteen-page .rating-note .table-symbol { display: block; font: 70px Georgia, serif; line-height: 1; color: #958661; margin-bottom: 22px; }
+html:root .canteen-page .rating-note strong { color: #6f624a; font-weight: 600; }
+html:root .canteen-page .rating-note span { color: #887b63; }
+html:root .canteen-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 20px 0; border-top: 1px solid var(--ct-line); }
+html:root .merchant-search { display: flex; align-items: center; gap: 12px; width: min(380px, 60%); }
+html:root .merchant-search > span { color: #727c67; font-size: 27px; }
+html:root .merchant-search input { border: 0; outline-offset: 5px; background: transparent; font: inherit; font-size: 13px; width: 100%; min-width: 0; height: 40px; color: var(--ct-ink); }
+html:root .merchant-sort { display: flex; gap: 8px; align-items: center; color: #7c8275; font-size: 11px; }
+html:root .merchant-sort select { border: 1px solid #d7dacc; background: #fffefa; border-radius: 6px; height: 36px; color: #49543c; padding: 0 8px; font: inherit; }
+html:root .canteen-page .canteen-filters { padding-bottom: 20px; margin-bottom: 20px; border-color: var(--ct-line); }
+html:root .canteen-page .canteen-filters { scrollbar-width: none; }
+html:root .canteen-page .canteen-filters::-webkit-scrollbar { display: none; }
+html:root .canteen-page .canteen-filters button { border-radius: 6px; background: transparent; border-color: #d7dacc; color: #6f7961; }
+html:root .canteen-page .canteen-filters button.selected { color: #fff; background: #536647; border-color: #536647; }
+html:root .canteen-page .merchant-row { padding: 22px; grid-template-columns: 26px 150px minmax(0,1fr) 168px; border: 1px solid #e0e1d6; border-radius: 10px; background: #fffefa; box-shadow: none; }
+html:root .canteen-page .merchant-photo { width: 150px; height: 165px; border-radius: 6px; background: #e9ecdf; }
+html:root .canteen-page .merchant-photo > span { color: #8c967c; }
+html:root .canteen-page .merchant-heading h2 { color: #34452c; font-size: 24px; font-weight: 600; }
+html:root .canteen-page .rating-summary strong { color: #66784c; font-family: Georgia, serif; font-weight: 400; font-size: 48px; }
+html:root .canteen-page .rating-scale { color: #8a947c; font: 12px -apple-system, sans-serif; letter-spacing: 0; }
+html:root .canteen-page .rate-submit { background: #536647; border-radius: 5px; min-height: 34px; }
+html:root .canteen-page .rate-submit:disabled { background: #e3e8dc; color: #86917a; }
+html:root .canteen-page .star-buttons button { width: 32px; height: 36px; }
+html:root .canteen-page .star-buttons button.filled { color: #b28e45; }
+html:root .canteen-page .review-toggle { color: #617845; }
+html:root .canteen-page .empty-state { padding: 65px 20px; border: 1px dashed #d5dacb; border-radius: 10px; background: #f0f1e9; }
+html:root .canteen-page .empty-mark { color: #7b8968; background: #e2e7d6; border-radius: 50%; }
+html:root .canteen-page .empty-state h2 { color: #4c5a41; font-size: 23px; font-weight: 500; }
+html:root .canteen-page .empty-state p { color: #858c77; font-size: 13px; }
+
+/* 05 — Your space, security and the public privacy document. */
+html:root .account-page, html:root .action-page, html:root .privacy-page { background: var(--ct-paper); color: var(--ct-ink); }
+html:root .account-header, html:root .privacy-page header { background: transparent; height: 80px; border-color: var(--ct-line); padding: 0 max(32px, calc((100vw - 1180px) / 2)); }
+html:root .account-header .brand, html:root .action-page .brand, html:root .privacy-page header a { display: flex; align-items: center; gap: 10px; font-size: 21px; color: var(--ct-ink); }
+html:root .account-header .camp-mark, html:root .action-page .brand .camp-mark, html:root .privacy-page header .camp-mark { width: 26px; height: 26px; }
+html:root .account-content { display: grid; grid-template-columns: minmax(240px, .75fr) minmax(0, 1.25fr); gap: 80px; max-width: 1180px; padding: 65px 32px 100px; }
+html:root .account-intro { position: sticky; top: 40px; height: fit-content; }
+html:root .account-content .eyebrow { font-size: 10px; letter-spacing: .11em; color: #7a876b; }
+html:root .account-content h1, html:root .privacy-page h1 { font-size: clamp(40px, 4.5vw, 62px); line-height: 1.25; font-weight: 550; letter-spacing: -.06em; margin: 24px 0; }
+html:root .account-content h1 em, html:root .privacy-page h1 em { color: #6b7c58; font-style: normal; }
+html:root .account-content .lede { font-size: 14px; color: #697460; line-height: 1.8; margin-bottom: 34px; }
+html:root .account-nav { display: flex; flex-direction: column; gap: 4px; border-top: 1px solid var(--ct-line); padding-top: 20px; }
+html:root .account-nav a { padding: 12px 0; color: #78856e; font-size: 12px; text-decoration: none; }
+html:root .account-nav a:hover { color: var(--ct-blue); }
+html:root .account-card { padding: 32px; border: 1px solid #dfe2d5; border-radius: 12px; box-shadow: none; background: #fffefa; scroll-margin-top: 25px; }
+html:root .account-card .card-index { font-size: 10px; color: #8a957e; letter-spacing: .08em; }
+html:root .account-card h2 { font-weight: 550; font-size: 24px; color: #3d4b36; }
+html:root .account-card p { font-size: 13px; color: #66735d; }
+html:root .account-card input, html:root .account-card textarea { background: #f7f8f2; border-color: #d9dfd0; border-radius: 7px; }
+html:root .account-card button { border-radius: 7px; background: #536647; font-size: 13px; }
+html:root .account-card button:hover:not(:disabled) { background: #405438; }
+html:root .account-card button.secondary { color: #4c633f; background: #e9eede; }
+html:root .account-card button.secondary:hover:not(:disabled) { color: #344b2b; background: #dfe7d2; }
+html:root .account-card.danger-card { border-color: #e6dcd0; background: #f9f5ee; }
+html:root .account-card button.danger { background: #a4584b; }
+html:root .account-card button.danger:hover:not(:disabled) { background: #934638; }
+html:root .action-page { padding: 32px max(24px, calc((100vw - 1180px) / 2)); background-image: linear-gradient(90deg, transparent calc(50% - 1px), #e8e8de calc(50% - 1px), #e8e8de 50%, transparent 50%); }
+html:root .action-card { position: relative; background: #fffefa; border: 1px solid #dfe2d5; border-radius: 12px; box-shadow: 0 12px 50px #334b2610; margin-top: 70px; }
+html:root .action-card .eyebrow { font-size: 10px; color: #849274; }
+html:root .action-symbol { display: grid; place-items: center; width: 46px; height: 46px; margin: 25px 0; background: #e8eddf; color: #637b4f; border-radius: 50% 50% 7px 7px; font-size: 27px; }
+html:root .action-card h1 { font-weight: 550; color: #35472d; }
+html:root .action-card input { background: #f7f8f2; border-color: #d9dfd0; border-radius: 7px; color: #35472d; font-size: 16px; }
+html:root .action-card button { background: #536647; border-radius: 7px; }
+html:root .action-card .return-link { color: #647b50; }
+html:root .privacy-page article { max-width: 850px; padding-top: 65px; }
+html:root .privacy-page .eyebrow { color: #859378; font-size: 10px; }
+html:root .privacy-page .lead { padding: 22px 24px; margin: 30px 0 32px; border-radius: 20px; background: #eeefe6; color: #58634e; font-size: 16px; }
+html:root .privacy-page section { position: relative; padding: 30px 0 35px; border-color: var(--ct-line); }
+html:root .privacy-page h2 { font-size: 22px; font-weight: 550; color: #45543d; }
+html:root .privacy-page section p { font-size: 16px; color: #515d49; line-height: 1.9; }
+
+/* 06 — The campus desk. Dense enough for work, still unmistakably Campthink. */
+html:root .admin-login-page { background: var(--ct-paper); color: var(--ct-ink); }
+html:root .admin-login-header { padding-bottom: 25px; border-bottom: 1px solid var(--ct-line); }
+html:root .admin-login-brand { font-size: 23px; }
+html:root .admin-login-intro h1 { font-weight: 550; font-size: clamp(38px, 5vw, 66px); line-height: 1.3; }
+html:root .admin-login-intro h1 em { color: var(--ct-blue); font-style: normal; }
+html:root .admin-login-intro > p { color: #6d78aa; }
+html:root .admin-login-intro > span { color: #7b8375; font-size: 15px; }
+html:root .admin-login-card { background: #fffefa; border-color: #dee1d4; border-radius: 12px; box-shadow: 9px 9px 0 #e6e9dd; }
+html:root .admin-login-card h2 { font-weight: 550; }
+html:root .admin-login-card input { background: #f4f5ee; border: 1px solid #dce1d2; border-radius: 7px; }
+html:root .admin-login-card button { background: var(--ct-blue); border-radius: 7px; }
+html:root .admin-page { background: var(--ct-paper); color: var(--ct-ink); grid-template-columns: 240px minmax(0, 1fr); }
+html:root .admin-page .admin-sidebar { background: #e9ebe5; backdrop-filter: none; border-color: #d6dbcd; padding-top: 20px; overflow-y: auto; }
+html:root .admin-page .admin-brand { margin: 24px 8px 32px; gap: 10px; }
+html:root .admin-page .admin-brand .camp-mark { width: 30px; height: 30px; }
+html:root .admin-page .admin-brand strong { font-size: 22px; letter-spacing: -.055em; }
+html:root .admin-page .admin-brand small { color: #8b9482; font-size: 8px; }
+html:root .admin-mobile-section { display: none; }
+html:root .admin-page .admin-sidebar nav { gap: 3px; }
+html:root .admin-page .admin-sidebar nav button { min-height: 41px; border-radius: 7px; color: #66735d; font-size: 12px; }
+html:root .admin-page .admin-sidebar nav button.active { color: #334bcb; background: #dce2f1; box-shadow: none; }
+html:root .admin-page .admin-sidebar nav i { background: #dce1d4; border-radius: 4px; font-size: 9px; font-variant-numeric: tabular-nums; }
+html:root .admin-page > main { width: min(1120px, calc(100% - 80px)); padding-top: 52px; }
+html:root .admin-page > main > header { padding-bottom: 30px; border-bottom: 1px solid #dbdfd2; margin-bottom: 30px; }
+html:root .admin-page > main > header p { color: #7c8970; font-size: 10px; }
+html:root .admin-page > main > header h1 { font-size: clamp(36px, 4vw, 52px); font-weight: 550; }
+html:root .admin-page > main > header > span { font-size: 13px; color: #7e8875; line-height: 1.8; max-width: 720px; }
+html:root .admin-page .overview-metric { background: #fffefa; border: 1px solid #dfe3d5; border-radius: 10px; box-shadow: none; }
+html:root .admin-page .overview-metric-action { border-top: 3px solid #9cabd5; }
+html:root .admin-page .overview-metric strong { color: #3c4a31; font-family: Georgia, serif; font-weight: 400; font-size: 42px; }
+html:root .admin-page .overview-panel { margin-top: 0; }
+html:root .admin-page .overview-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+html:root .admin-page .overview-metric { min-height: 142px; padding: 20px; }
+html:root .admin-page .overview-metric small { color: #69755e; line-height: 1.7; font-size: 10px; }
+html:root .admin-page .admin-sidebar .el-icon { font-size: 16px; background: transparent; }
+html:root .admin-page .review-card, html:root .admin-page .usage-card, html:root .admin-page .career-column, html:root .admin-page .source-update-section { background: #fffefa; border-color: #dfe3d5; border-radius: 10px; box-shadow: none; }
+html:root .admin-page .career-form { background: #f1f3e9; border-radius: 7px; }
+html:root .admin-page .career-actions button, html:root .admin-page .row-actions button { border-radius: 5px; }
+html:root .admin-page .overview-section-heading h2, html:root .admin-page .batch-heading h2 { font-weight: 550; }
+html:root .admin-page .overview-section, html:root .admin-page .editor, html:root .admin-page .candidate-panel, html:root .admin-page .batch-panel, html:root .admin-page .import-panel, html:root .admin-page .detail-panel { border-color: #dfe3d5; border-radius: 10px; background: #fffefa; box-shadow: none; }
+html:root .admin-page .overview-toolbar { margin-bottom: 22px; color: #7e8874; }
+html:root .admin-page .overview-queue-row { border-color: #e5e8dc; }
+html:root .admin-page .editor-grid, html:root .admin-page .career-grid { gap: 20px; }
+html:root .admin-page .batch-sources > *, html:root .admin-page .batch-draft, html:root .admin-page .candidate-item, html:root .admin-page .admin-row { border-color: #dce2d0; border-radius: 8px; box-shadow: none; }
+html:root .admin-page .batch-file { background: #edf0e5; border-style: dashed; }
+html:root .admin-page input:not([type=checkbox]):not([type=file]), html:root .admin-page textarea, html:root .admin-page select { color: #38482f; border-color: #d4dcc9; border-radius: 6px; background: #fafbf5; }
+html:root .admin-page .empty-state { border-radius: 10px; border: 1px dashed #d2dbc5; background: #f0f2e9; color: #7e8b6e; }
+
+/* Responsive layouts are compositions, not scaled desktop screenshots. */
+@media (min-width: 761px) {
+  html:root .workspace .sidebar { position: relative; inset: auto; width: auto; transform: none; z-index: 1; }
+  html:root .workspace .mobile-menu-button, html:root .workspace .mobile-sidebar-mask { display: none; }
+  html:root .workspace .composer-meta { display: flex; }
+}
+@media (min-width: 1500px) {
+  html:root .workspace { grid-template-columns: 275px minmax(0, 1fr); }
+  html:root .workspace .sidebar { padding-left: 24px; padding-right: 24px; }
+}
+@media (max-width: 1100px) {
+  html:root .admin-page .overview-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  html:root .landing .site-nav, html:root .landing .hero, html:root .landing .chapter-bridge { width: calc(100% - 64px); }
+  html:root .landing .hero { gap: 24px; }
+  html:root .landing .hero h1 { font-size: 74px; }
+  html:root .landing .hero-visual { height: 430px; }
+  html:root .landing .life-section { gap: 40px; padding-inline: 32px; }
+  html:root .landing .experience { padding-inline: 32px; }
+  html:root .workspace .connection-state { display: none; }
+  html:root .workspace .chat-header { display: flex; justify-content: center; }
+  html:root .workspace .welcome { width: calc(100% - 56px); }
+  html:root .account-content { gap: 40px; }
+}
+@media (max-width: 900px) {
+  html:root .landing .site-nav { display: flex; justify-content: space-between; }
+  html:root .landing .nav-links { display: none; }
+  html:root .landing .hero { grid-template-columns: 1fr 1fr; min-height: 610px; }
+  html:root .landing .hero h1 { font-size: clamp(48px, 8vw, 70px); }
+  html:root .landing .hero-subtitle { font-size: 14px; }
+  html:root .landing .hero-actions { flex-wrap: wrap; gap: 20px; }
+  html:root .landing .intelligence-orb { width: 30vw; }
+  html:root .landing .hero-visual { height: 380px; }
+  html:root .landing .experience { padding-block: 65px; }
+  html:root .landing .section-intro { display: block; }
+  html:root .landing .section-intro h2 { margin: 20px 0; }
+  html:root .landing .life-image { min-height: 430px; }
+  html:root .landing .life-glass strong { font-size: 36px; }
+  html:root .admin-page { grid-template-columns: 200px minmax(0, 1fr); }
+  html:root .admin-page > main { width: calc(100% - 40px); }
+}
+@media (max-width: 760px) {
+  html:root .landing .site-nav { width: calc(100% - 40px); height: 77px; }
+  html:root .landing .brand { font-size: 22px; }
+  html:root .landing .nav-action { min-height: 36px; padding: 0 12px; font-size: 11px; }
+  html:root .landing .hero { width: calc(100% - 48px); grid-template-columns: 1fr; min-height: 0; padding: 44px 0 24px; gap: 30px; }
+  html:root .landing .hero h1 { font-size: clamp(54px, 13.8vw, 82px); margin-top: 23px; line-height: 1.14; }
+  html:root .landing .hero-subtitle { margin-top: 20px; font-size: 14px; line-height: 1.85; }
+  html:root .landing .hero-eyebrow { font-size: 10px; }
+  html:root .landing .hero-actions { margin-top: 24px; flex-direction: row; align-items: center; gap: 19px; }
+  html:root .landing .hero-cta { min-height: 47px; padding-left: 16px; gap: 18px; font-size: 12px; }
+  html:root .landing .hero-actions > a { font-size: 11px; }
+  html:root .landing .hero-visual { height: 290px; min-height: 0; width: 100%; border-radius: 46% 46% 8px 8px; }
+  html:root .landing .intelligence-orb { width: 180px; }
+  html:root .landing .orb-orbit { width: 80%; }
+  html:root .landing .orb-orbit-inner { width: 105%; }
+  html:root .landing .orb-caption { font-size: 8px; }
+  html:root .landing .orb-caption-top { left: 11%; top: 21%; }
+  html:root .landing .orb-caption-bottom { bottom: 20%; right: 7%; }
+  html:root .landing .visual-label { font-size: 7px; bottom: 16px; }
+  html:root .landing .chapter-bridge { width: calc(100% - 48px); min-height: 92px; padding: 20px 0; }
+  html:root .landing .bridge-caption { font-size: 10px; gap: 12px; }
+  html:root .landing .bridge-caption b { font-size: 28px; }
+  html:root .landing .bridge-next { display: none; }
+  html:root .landing .experience { padding: 50px 24px 60px; }
+  html:root .landing .section-intro h2 { font-size: 35px; }
+  html:root .landing .capability-grid { grid-template-columns: 1fr; gap: 12px; margin-top: 30px; }
+  html:root .landing .capability-card, html:root .landing .capability-card + .capability-card { min-height: 230px; padding: 23px; }
+  html:root .landing .capability-icon { position: absolute; top: 46px; right: 28px; width: 45px; height: 45px; margin: 0; }
+  html:root .landing .capability-card h3 { margin-top: 26px; font-size: 30px; }
+  html:root .landing .capability-card p { max-width: 240px; }
+  html:root .landing .capability-card button { margin-top: 10px; }
+  html:root .landing .life-section { display: flex; flex-direction: column; padding: 36px 24px 55px; gap: 35px; }
+  html:root .landing .life-image { width: 100%; min-height: 360px; border-radius: 8px 70px 8px 8px; }
+  html:root .landing .life-glass { margin: 25px; width: calc(100% - 50px); }
+  html:root .landing .life-content { width: 100%; }
+  html:root .landing .life-content h2 { font-size: 36px; margin-top: 20px; }
+  html:root .landing .closing { padding: 80px 24px 110px; min-height: 75svh; }
+  html:root .landing .closing h2 { font-size: clamp(32px, 8vw, 48px); }
+  html:root .landing .closing::before { font-size: 20px; }
+  html:root .landing .site-footer { padding: 25px 24px 85px; gap: 18px; }
+  html:root .auth-dialog, html:root .auth-dialog.is-register { grid-template-columns: 1fr; border-radius: 18px 18px 0 0; }
+  html:root .auth-dialog .auth-art, html:root .auth-dialog.is-register .auth-art { min-height: 145px; height: 145px; padding: 22px 25px; }
+  html:root .auth-dialog .auth-mini-orb { width: 100px; right: 55px; top: 22px; }
+  html:root .auth-dialog .auth-art p { bottom: 20px; left: 25px; font-size: 20px; line-height: 1.3; }
+  html:root .auth-dialog .auth-art p small { display: none; }
+  html:root .auth-dialog .art-brand { font-size: 16px; }
+  html:root .auth-dialog .art-brand .camp-mark { width: 20px; height: 20px; }
+  html:root .workspace { grid-template-columns: 1fr; padding: 0; background: var(--ct-paper); }
+  html:root .workspace .sidebar { width: 270px; padding: 25px 18px; border-right: 1px solid #ccd3c3; }
+  html:root .workspace .chat-main { border: 0; border-radius: 0; }
+  html:root .workspace .chat-header { display: grid; grid-template-columns: 34px minmax(0, 1fr); min-height: 70px; padding: 0 16px; gap: 8px; }
+  html:root .workspace .header-center { justify-self: end; }
+  html:root .workspace .mobile-menu-button { font-size: 19px; color: #506046; }
+  html:root .workspace .workspace-switcher { grid-template-columns: repeat(3, minmax(58px, 1fr)); }
+  html:root .workspace .workspace-switcher button { padding: 5px 7px; grid-template-columns: 18px auto; gap: 5px; min-height: 33px; }
+  html:root .workspace .workspace-switcher small { display: none; }
+  html:root .workspace .workspace-switcher .workspace-icon { width: 17px; height: 17px; }
+  html:root .workspace .workspace-switcher span { font-size: 11px; }
+  html:root .workspace .welcome { width: calc(100% - 44px); padding: 50px 0 35px; }
+  html:root .workspace .welcome-eyebrow { font-size: 9px; margin-bottom: 23px; }
+  html:root .workspace .welcome h1 { font-size: 28px; }
+  html:root .workspace .welcome-mode-icon { flex-basis: 38px; width: 38px; height: 38px; }
+  html:root .workspace .welcome-subtitle { font-size: 12px; }
+  html:root .workspace .welcome-invitation { font-size: 27px; margin-top: 30px; }
+  html:root .workspace .suggestion-grid { grid-template-columns: 1fr; gap: 8px; margin-top: 24px; }
+  html:root .workspace .suggestion-card { min-height: 79px; padding: 14px 35px 14px 52px; justify-content: center; }
+  html:root .workspace .suggestion-card::before { position: absolute; left: 17px; top: 17px; font-size: 18px; }
+  html:root .workspace .suggestion-copy strong { font-size: 13px; }
+  html:root .workspace .suggestion-copy small { font-size: 10px; }
+  html:root .workspace .message-list { width: calc(100% - 26px); padding-top: 25px; }
+  html:root .workspace .message-row { gap: 8px; }
+  html:root .workspace .answer-bubble { padding: 14px 15px; }
+  html:root .workspace .answer-markdown { font-size: 14px; line-height: 1.8; }
+  html:root .workspace .composer-wrap { padding: 12px 12px max(12px, env(safe-area-inset-bottom)); }
+  html:root .workspace .composer { padding: 10px 10px 10px 14px; }
+  html:root .workspace .composer textarea { font-size: 16px; }
+  html:root .workspace .composer-meta { font-size: 9px; }
+  html:root .canteen-header { height: 70px; padding: 0 22px; }
+  html:root .canteen-page main { width: calc(100% - 44px); padding-top: 40px; }
+  html:root .canteen-page .page-intro { grid-template-columns: 1fr; gap: 26px; padding-bottom: 32px; }
+  html:root .canteen-page h1 { font-size: 49px; }
+  html:root .canteen-page .rating-note { border-radius: 8px; min-height: 0; padding: 18px; text-align: left; }
+  html:root .canteen-page .rating-note .table-symbol { display: none; }
+  html:root .canteen-page .merchant-row { padding: 15px; grid-template-columns: 95px minmax(0, 1fr); gap: 13px; }
+  html:root .canteen-page .merchant-photo { width: 95px; height: 120px; }
+  html:root .canteen-page .merchant-heading h2 { font-size: 21px; }
+  html:root .canteen-page .merchant-rating { flex-direction: row; align-items: center; }
+  html:root .canteen-page .rating-summary strong { font-size: 34px; }
+  html:root .canteen-page .rating-controls { align-items: flex-end; }
+  html:root .merchant-sort { font-size: 10px; }
+  html:root .merchant-search input { font-size: 16px; }
+  html:root .merchant-search input::placeholder { font-size: 11px; }
+  html:root .account-header, html:root .privacy-page header { height: 70px; padding: 0 22px; }
+  html:root .account-content { display: block; padding: 40px 22px 70px; }
+  html:root .account-intro { position: static; }
+  html:root .account-nav { flex-direction: row; flex-wrap: wrap; gap: 12px; margin-bottom: 25px; padding-top: 7px; }
+  html:root .account-nav a { font-size: 11px; }
+  html:root .account-card { padding: 24px; }
+  html:root .action-page { padding: 25px 22px; }
+  html:root .action-card { margin-top: 48px; padding: 28px; }
+  html:root .privacy-page article { padding: 38px 22px 70px; }
+  html:root .privacy-page h1 { font-size: 43px; }
+  html:root .admin-login-brand { font-size: 20px; }
+  html:root .admin-login-brand .camp-mark { width: 28px; height: 28px; }
+  html:root .admin-login-content { padding: 40px 0; }
+  html:root .admin-login-card { box-shadow: 5px 5px 0 #e6e9dd; }
+  html:root .admin-page { display: block; }
+  html:root .admin-page .admin-sidebar { position: relative; height: auto; padding: 18px; }
+  html:root .admin-page .admin-brand { display: flex; margin: 15px 0 20px; }
+  html:root .admin-page .admin-sidebar nav { display: none; }
+  html:root .admin-mobile-section { display: flex; align-items: center; gap: 14px; color: #66735d; font-size: 12px; }
+  html:root .admin-mobile-section select { flex: 1; min-width: 0; height: 42px; padding: 0 13px; border: 1px solid #cbd5bf; }
+  html:root .admin-page .admin-sidebar nav button { flex: 0 0 auto; min-height: 38px; display: flex; gap: 8px; padding: 0 11px; border: 1px solid #d3dacb; }
+  html:root .admin-page .admin-sidebar nav i { display: none; }
+  html:root .admin-page .admin-user { display: flex; flex-direction: row; align-items: center; gap: 16px; padding: 12px 0 0; }
+  html:root .admin-page .admin-user small { display: none; }
+  html:root .admin-page .admin-exit { margin: 0 0 0 auto; padding: 5px; }
+  html:root .admin-page > main { width: calc(100% - 36px); padding-top: 30px; }
+  html:root .admin-page .overview-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  html:root .admin-page input:not([type=checkbox]):not([type=file]), html:root .admin-page textarea, html:root .admin-page select { font-size: 16px; }
+}
+@media (max-width: 360px) {
+  html:root .landing .hero-actions { gap: 14px; }
+  html:root .landing .hero-actions > a { font-size: 10px; }
+  html:root .landing .hero-cta { gap: 10px; }
+  html:root .landing .hero h1 { font-size: 48px; }
+  html:root .workspace .welcome h1 { font-size: 24px; }
+  html:root .canteen-page .merchant-rating { gap: 10px; }
+  html:root .canteen-page .star-buttons button { width: 27px; }
+}
+/* Shared soft surfaces. Preserve circular icons and full-bleed mobile shells. */
+html:root {
+  --ct-radius-control: 16px;
+  --ct-radius-panel: 24px;
+}
+html:root body .workspace :is(.compose-button,.nav-item,.history-search,.conversation-item,.profile,.fresh-conversation,.lookup-options button,.send-button),
+html:root body :is(.account-card,.action-card,.admin-login-card) :is(input,textarea,button),
+html:root body .canteen-page :is(.merchant-search,.merchant-sort select,.canteen-filters button,.rate-submit,.merchant-photo) { border-radius:var(--ct-radius-control); }
+html:root body .workspace :is(.suggestion-card,.campus-quick-lookups,.composer,.profile-menu),
+html:root body :is(.account-card,.action-card,.admin-login-card),
+html:root body .canteen-page :is(.merchant-row,.empty-state,.rating-note) { border-radius:var(--ct-radius-panel); }
+/* 3 px inset + 1 px outer border gives concentric 22/18 px curves. */
+html:root body .workspace .workspace-switcher { border-radius:22px; }
+html:root body .workspace .workspace-switcher::before,
+html:root body .workspace .workspace-switcher button { border-radius:18px; }
+html:root body .workspace .answer-bubble { border-radius:10px 24px 24px 24px; }
+html:root body .workspace .message-row.user .message-content > p { border-radius:24px 10px 24px 24px; }
+html:root body .workspace .answer-markdown pre { border-radius:16px; }
+html:root body :is(.chat-contact-dialog,.delete-dialog) { border-radius:28px; }
+html:root body .chat-contact-dialog :is(.el-input__wrapper,.el-textarea__inner,.form-submit) { border-radius:16px; }
+html:root body .landing .page-index { border-radius:20px; }
+html:root body .landing .page-index button { border-radius:14px; }
+html:root body .admin-page :is(.overview-metric,.review-card,.usage-card,.career-column,.source-update-section,.overview-section,.editor,.candidate-panel,.batch-panel,.import-panel,.detail-panel,.empty-state) { border-radius:20px; }
+html:root body .admin-page :is(.career-form,.batch-draft,.candidate-item,.admin-row,.career-actions button,.row-actions button,.admin-sidebar nav button),
+html:root body .admin-page :is(input:not([type=checkbox]):not([type=file]),textarea,select) { border-radius:12px; }
+
+@media (prefers-reduced-motion: reduce) {
+  html:root .landing .capability-card, html:root .workspace .suggestion-card { transition: none; }
+  html:root .landing .capability-card:hover, html:root .workspace .suggestion-card:hover { transform: none; }
+}

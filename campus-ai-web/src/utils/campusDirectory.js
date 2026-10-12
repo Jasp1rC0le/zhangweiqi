@@ -1,0 +1,25 @@
+// Links use school domains; details distinguish official facts from user-supplied evidence.
+export const campusDirectory = {
+  school: '天津中德应用技术大学', checkedAt: '2026-10-04',
+  entries: [
+    { title: '学校地址与官方电话', detail: '天津海河教育园区雅深路 2 号 · 邮编 300350；党委办公室、校长办公室：022-28776000', url: 'https://www.tsguas.edu.cn/xxgk/jgsz.htm', group: '常用办事' },
+    { title: '招生咨询', detail: '本专科：022-28776099、022-28776655；研究生：022-28776599。本专科号码以招生部门官网为准', url: 'https://zs.tsguas.edu.cn/', group: '常用办事' },
+    { title: '历年录取分数查询', detail: '按省份、年份和招生类型查询；普通高考、高职分类考试、专升本分别查看，咨询预估分不等于实际录取线', url: 'https://zs.tsguas.edu.cn/lnfscx.htm', group: '常用办事' },
+    { title: '教务通知与课程事务', detail: '官方教务通知入口；联系电话 022-28776658。具体办理时间、条件以对应通知为准', url: 'https://jwc.tsguas.edu.cn/', group: '常用办事' },
+    { title: '教务系统登录入口', detail: '用户2026-10-09提供的学校域名入口，本次访问未验证；请在学校系统自行登录，本站不收取密码或同步个人成绩课表', url: 'https://zdjw.tsguas.edu.cn/app-web/#/tabs/home', group: '常用办事' },
+    { title: '校企合作与就业', detail: '查看学校公开的招聘与就业通知；已结束的双选会不代表岗位仍在招聘', url: 'https://xqhzc.tsguas.edu.cn/', group: '常用办事' },
+    { title: '图书馆开放时间', detail: '2026-10-09核对规则图：二三楼自习空间平日7:30—22:00、周末7:30—21:00；四至六楼书库周末不开放。临时调整以公告为准，不保证实时开放', url: 'https://tsg.tsguas.edu.cn/info/5756/7893.htm', group: '图书馆' },
+    { title: '文献借阅规则', detail: '2026-10-09核对规则图：学生可外借10册、30天，无人预约可续借1次、自应还日起15天；馆内每次取阅5册不是外借额度', url: 'https://tsg.tsguas.edu.cn/info/4253/2205.htm', group: '图书馆' },
+    { title: '图书馆楼层指引', detail: '2026-09-22分布：B座二三楼自习空间，四楼文社、五楼专业、六楼科技；小组讨论室在五六楼，具体使用规则须另行确认', url: 'https://tsg.tsguas.edu.cn/info/5496/3609.htm', group: '图书馆' },
+    { title: '校园楼宇与地图', detail: 'B座图书馆、L座餐饮中心、G1体育中心；问路请告诉助手你的校门或楼座。官网旧图和手绘图存在部分路名冲突，不作实时导航', url: 'https://ev.tsguas.edu.cn/About_us/Maps_and_Travel.htm', group: '常用办事' },
+    { title: '机械学院办公室与学工办', detail: '2026-10-09核对：办公室F3-213、022-28776510；学工办F3-209/211、022-28776680，出发前可电话确认', url: 'https://jxcl.tsguas.edu.cn/xygk/lxwm.htm', group: '学院与学习' },
+    { title: '馆藏与座位预约入口', detail: '从图书馆官网进入馆藏查询、数字资源和座位预约；部分服务需校园网络或学校账号，本站不收取学校密码', url: 'https://tsg.tsguas.edu.cn/', group: '图书馆' },
+    { title: '图书馆座位预约流程', detail: '2026-04-13流程：提前一天20:00放号，单次3小时；须签到、暂离登记和退座。临时调整以官方通知为准，本站不代预约', url: 'https://tsg.tsguas.edu.cn/info/5829/8398.htm', group: '图书馆' },
+    { title: '宿舍电费与住宿服务', detail: '2026级指南：支付宝学校生活号→缴费大厅→电费，照明和空调分开；住宿咨询可到H5一楼AB厅社区服务中心', url: 'https://zs.tsguas.edu.cn/info/1006/1847.htm', group: '常用办事' },
+    { title: '教学区公共设施报修', detail: '教学区公共区域：022-28771116；部门：022-28776001。不作为宿舍或24小时报修承诺', url: 'https://hqjj.tsguas.edu.cn/lxwm.htm', group: '常用办事' },
+    { title: '户籍与保卫处办事', detail: '从学校安全工作部进入官方业务；户籍咨询：B座1楼西侧警务室，022-28776878。本站不代收证件', url: 'https://aqbw.tsguas.edu.cn/', group: '常用办事' },
+    { title: '体育馆开放与预约核对', detail: '用户2026-10-09截图：微信小程序zdtiyuguanyuyue，20:59准备、21:00排队预约次日场次；以“我的”结果为准。链接指向体育部公告，非小程序直达；本站尚未接入代预约', url: 'https://tyjxb.tsguas.edu.cn/index/tzgg.htm', group: '常用办事' },
+    { title: '实验实训咨询', detail: '基础实验实训中心：022-28776330；设备使用须满足学校准入要求并由教师指导', url: 'https://jcsysxzx.tsguas.edu.cn/', group: '学院与学习' },
+    { title: '学院与部门目录', detail: '官网列有机械、智能制造、航空航天、汽车与轨道交通、软件与通信、经贸管理、艺术等教学机构', url: 'https://www.tsguas.edu.cn/xxgk/jgsz.htm', group: '学院与学习' },
+  ],
+}

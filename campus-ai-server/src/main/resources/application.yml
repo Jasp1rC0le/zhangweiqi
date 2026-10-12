@@ -1,0 +1,111 @@
+spring:
+  application:
+    name: campus-ai-server
+  mvc:
+    async:
+      request-timeout: 180s
+  servlet:
+    multipart:
+      max-file-size: 8MB
+      max-request-size: 40MB
+  datasource:
+    url: jdbc:mysql://${DB_HOST:127.0.0.1}:${DB_PORT:3306}/${DB_NAME:campus_ai}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  sql:
+    init:
+      mode: always
+  mail:
+    host: ${SMTP_HOST:}
+    port: ${SMTP_PORT:465}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      "[mail.smtp.auth]": true
+      "[mail.smtp.ssl.enable]": true
+      "[mail.smtp.ssl.checkserveridentity]": true
+      "[mail.smtp.connectiontimeout]": 5000
+      "[mail.smtp.timeout]": 5000
+      "[mail.smtp.writetimeout]": 5000
+
+server:
+  port: ${SERVER_PORT:8080}
+
+mybatis:
+  mapper-locations: classpath:mapper/**/*.xml
+  type-aliases-package: com.campusai
+  configuration:
+    map-underscore-to-camel-case: true
+app:
+  jobs:
+    initial-delay-millis: ${JOB_INITIAL_DELAY_MILLIS:5000}
+    poll-millis: ${JOB_POLL_MILLIS:2000}
+  career:
+    seed-official-candidates: ${CAREER_SEED_OFFICIAL_CANDIDATES:true}
+  privacy:
+    approved: ${PRIVACY_POLICY_APPROVED:false}
+  contact:
+    school-id: ${CONTACT_SCHOOL_ID:0}
+    recipient-email: ${CONTACT_RECIPIENT_EMAIL:contact@campthinkhub.cn}
+
+  jwt:
+    secret: ${JWT_SECRET}
+    expiration-millis: ${JWT_EXPIRATION_MILLIS:900000}
+
+  auth:
+    refresh-days: ${AUTH_REFRESH_DAYS:30}
+    secure-cookies: ${AUTH_SECURE_COOKIES:false}
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+    public-web-url: ${PUBLIC_WEB_URL:http://localhost:5173}
+    mail-from: ${SMTP_FROM:}
+
+  ai:
+    budget:
+      enabled: ${AI_BUDGET_ENABLED:false}
+      daily-cny: ${AI_PLATFORM_DAILY_CNY:10}
+      monthly-cny: ${AI_PLATFORM_MONTHLY_CNY:200}
+      max-input-bytes: ${AI_MAX_INPUT_BYTES:48000}
+      admin-user-id: ${AI_COST_ADMIN_USER_ID:0}
+    daily-token-limit: ${AI_DAILY_TOKEN_LIMIT:60000}
+    max-concurrent: ${AI_MAX_CONCURRENT:16}
+    circuit-cooldown-seconds: ${AI_CIRCUIT_COOLDOWN_SECONDS:30}
+    pricing:
+      deepseek-flash-input: ${DEEPSEEK_FLASH_INPUT_CNY_PER_MILLION:}
+      deepseek-flash-output: ${DEEPSEEK_FLASH_OUTPUT_CNY_PER_MILLION:}
+      deepseek-pro-input: ${DEEPSEEK_PRO_INPUT_CNY_PER_MILLION:}
+      deepseek-pro-output: ${DEEPSEEK_PRO_OUTPUT_CNY_PER_MILLION:}
+      kimi-input: ${KIMI_INPUT_CNY_PER_MILLION:}
+      kimi-output: ${KIMI_OUTPUT_CNY_PER_MILLION:}
+      glm-input: ${GLM_INPUT_CNY_PER_MILLION:}
+      glm-output: ${GLM_OUTPUT_CNY_PER_MILLION:}
+    deepseek:
+      base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com}
+      api-key: ${DEEPSEEK_API_KEY}
+      max-tokens: ${DEEPSEEK_MAX_TOKENS:4000}
+    kimi:
+      base-url: ${KIMI_BASE_URL:https://api.moonshot.cn/v1}
+      api-key: ${KIMI_API_KEY:}
+      model: ${KIMI_MODEL:kimi-k3}
+      max-tokens: ${KIMI_MAX_TOKENS:6000}
+    glm:
+      base-url: ${GLM_BASE_URL:https://open.bigmodel.cn/api/paas/v4}
+      api-key: ${GLM_API_KEY:}
+      model: ${GLM_MODEL:glm-5.3}
+      max-tokens: ${GLM_MAX_TOKENS:5000}
+
+  web-search:
+    enabled: ${WEB_SEARCH_ENABLED:true}
+    base-url: ${WEB_SEARCH_BASE_URL:https://api.bochaai.com}
+    api-key: ${BOCHA_API_KEY:}
+    max-results: ${WEB_SEARCH_MAX_RESULTS:5}
+
+  knowledge:
+    seed-official-school: ${KNOWLEDGE_SEED_OFFICIAL_SCHOOL:true}
+    import-allowed-hosts: ${KNOWLEDGE_IMPORT_ALLOWED_HOSTS:tsguas.edu.cn}
+    semantic-enabled: ${KNOWLEDGE_SEMANTIC_ENABLED:false}
+    semantic-base-url: ${KNOWLEDGE_SEMANTIC_BASE_URL:https://open.bigmodel.cn/api/paas/v4}
+    semantic-api-key: ${KNOWLEDGE_SEMANTIC_API_KEY:}
+    embedding-model: ${KNOWLEDGE_EMBEDDING_MODEL:embedding-3}
+    embedding-dimensions: ${KNOWLEDGE_EMBEDDING_DIMENSIONS:256}
+    rerank-enabled: ${KNOWLEDGE_RERANK_ENABLED:false}

@@ -1,0 +1,10 @@
+# Activate together with prod. This release does not open payments or unmetered paid tools.
+app:
+  ai:
+    budget:
+      enabled: true
+  web-search:
+    enabled: false
+  knowledge:
+    semantic-enabled: false
+    rerank-enabled: false
