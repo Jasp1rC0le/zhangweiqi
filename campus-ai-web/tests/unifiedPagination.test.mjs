@@ -73,7 +73,7 @@ test('calendar first-load controls are outside the week success branch and real 
       assert.match(source, /readUnifiedScopesPage/); assert.match(source, /readUnifiedTimetablePage/); assert.match(source, /课程明细分页/)
       assert.match(source, /<form v-if="classFinderVisible"/)
       assert.doesNotMatch(source, /<form v-if="[^"]*\|\| classSearch"/)
-      assert.match(source, /v-else-if="\['STUDENT','TEACHER'\].includes\(state.week.view\) && \(!state.pagination \|\| state.pagination.totalPages <= 1\)" class="calendar-no-next"/)
+      assert.match(source, /v-else-if="state.week.entries.length && \['STUDENT','TEACHER'\].includes\(state.week.view\) && \(!state.pagination \|\| state.pagination.totalPages <= 1\)" class="calendar-no-next"/)
     }
     if (path.includes('TimetableView')) { assert.match(source, /@click="openImport"/); assert.equal((source.match(/<CourseSchedulePanel\b/g) || []).length, 1) }
   }

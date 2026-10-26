@@ -1,4 +1,5 @@
 <script setup>
+import NavigationIcon from './NavigationIcon.vue'
 import DateField from '@/components/DateField.vue'
 import { computed, onBeforeUnmount, onMounted, reactive, ref, useId, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
@@ -295,7 +296,7 @@ onBeforeUnmount(() => {
       正在读取课程安排…
     </p>
     <template v-if="scopeState.data">
-      <header class="calendar-controls">
+      <div class="calendar-toolbar"><header class="calendar-controls">
         <label v-if="scopeState.data.scopes.views.length > 1"
           >查看<select
             v-model="view"
@@ -335,8 +336,8 @@ onBeforeUnmount(() => {
       <form class="calendar-date-jump" novalidate @submit.prevent="jumpDate">
         <label>查看日期<DateField v-model="dateDraft" aria-label="查看课表日期" :aria-describedby="dateHintId" :aria-invalid="!!dateError" :min="CALENDAR_DATE_MIN" :max="CALENDAR_DATE_MAX" required :disabled="state.loading || scopeState.loading || noticeBusy" @input="dateError = ''"  /></label>
         <button type="submit" :disabled="state.loading || scopeState.loading || noticeBusy">查看</button>
-      </form>
-      <p :id="dateHintId" class="calendar-date-hint" :class="{ 'calendar-error': dateError }" :role="dateError ? 'alert' : 'status'">{{ dateError || dateHint }}</p>
+      </form></div>
+      <p :id="dateHintId" class="calendar-date-hint" :class="{ 'calendar-error': dateError, 'calendar-quiet-hint': !dateError && dateDraft === selectedDay && !state.loading && !state.error && !state.stale && (!state.pagination || state.pagination.totalPages <= 1) }" :role="dateError ? 'alert' : 'status'">{{ dateError || dateHint }}</p>
       <form v-if="classFinderVisible" class="calendar-class-search" @submit.prevent="searchClasses">
         <label>找班级<input v-model="classSearch" maxlength="100" placeholder="班级或学院名称" :disabled="state.loading || scopeState.loading" /></label>
         <button type="submit" :disabled="state.loading || scopeState.loading">搜索</button>
@@ -353,7 +354,7 @@ onBeforeUnmount(() => {
         <button type="button" :disabled="state.loading || state.pagination.page === 0" @click="stepCourse(-1)">上一页</button>
         <button type="button" :disabled="state.loading || state.pagination.page + 1 >= state.pagination.totalPages" @click="stepCourse(1)">下一页</button>
       </nav>
-      <p v-if="state.pagination" class="calendar-footnote">统计：{{ state.pagination.summaryScope }}</p>
+
       <p v-if="state.stale" class="calendar-footnote" role="status">
         {{
           state.loading
@@ -361,11 +362,12 @@ onBeforeUnmount(() => {
             : '暂时显示上次读取的安排；重新读取成功后可打开记录。'
         }}
       </p>
-      <div
+      <details
         v-if="state.week.notices.some((n) => !n.readAt)"
         class="calendar-notices"
         aria-label="未读课前通知"
       >
+        <summary>{{ state.week.notices.filter(n=>!n.readAt).length }} 条课前提醒</summary>
         <button
           v-for="notice in state.week.notices.filter((n) => !n.readAt)"
           :key="notice.id"
@@ -377,7 +379,7 @@ onBeforeUnmount(() => {
           ><span>{{ notice.course }} · {{ notice.room }}</span
           ><small>打开记录并标为已读</small>
         </button>
-      </div>
+      </details>
       <section v-if="focus" class="calendar-focus" aria-label="当前需要关注的课程">
         <div>
           <h2>{{ focus.name }}</h2>
@@ -400,7 +402,7 @@ onBeforeUnmount(() => {
           {{ state.week.view === 'TEACHER' ? (focus.canMark ? '去点名' : '查看名单') : '查看记录' }}
         </button>
       </section>
-      <p v-else-if="['STUDENT','TEACHER'].includes(state.week.view) && (!state.pagination || state.pagination.totalPages <= 1)" class="calendar-no-next">当前已保存安排中没有下一节。临时调课请核对教务通知。</p>
+      <p v-else-if="state.week.entries.length && ['STUDENT','TEACHER'].includes(state.week.view) && (!state.pagination || state.pagination.totalPages <= 1)" class="calendar-no-next">暂无下一节</p>
       <AttendanceCockpit v-if="leadership" :counts="state.week.summary.attendance"
         :planned="state.week.summary.plannedClasses" :absent-students="state.week.summary.absentStudents"
         :from="state.week.monday" :to="state.week.sunday" :stale="state.stale" :summary-context="summaryContext">
@@ -412,16 +414,16 @@ onBeforeUnmount(() => {
         <span
           >本周 <strong>{{ state.week.summary.plannedClasses }}</strong
           >项安排</span
-        ><span :class="{ 'calendar-pending': state.week.summary.attendance.unknown > 0 }"
+        ><span v-if="state.week.view !== 'STUDENT' || state.week.summary.attendance.unknown > 0" :class="{ 'calendar-pending': state.week.summary.attendance.unknown > 0 }"
           >待点名 <strong>{{ state.week.summary.attendance.unknown }}</strong
           >{{ state.week.view === 'STUDENT' ? '次' : '人次' }}</span
         ><span v-if="state.week.view !== 'STUDENT'" :class="{ 'calendar-recorded-absence': state.week.summary.absentStudents > 0 }"
           >已记录旷课 <strong>{{ state.week.summary.absentStudents }}</strong
           >人</span
-        ><span :class="{ 'calendar-pending': state.week.summary.attendance.late > 0 }"
+        ><span v-if="state.week.view !== 'STUDENT' || state.week.summary.attendance.late > 0" :class="{ 'calendar-pending': state.week.summary.attendance.late > 0 }"
           >已记录迟到 <strong>{{ state.week.summary.attendance.late }}</strong
           >人次</span
-        ><span :class="{ 'calendar-pending': state.week.summary.attendance.earlyLeave > 0 }">早退 <strong>{{ state.week.summary.attendance.earlyLeave || 0 }}</strong>人次</span
+        ><span v-if="state.week.view !== 'STUDENT' || state.week.summary.attendance.earlyLeave > 0" :class="{ 'calendar-pending': state.week.summary.attendance.earlyLeave > 0 }">早退 <strong>{{ state.week.summary.attendance.earlyLeave || 0 }}</strong>人次</span
         ><span v-if="state.week.summary.conflicts" class="calendar-warning"
           >{{ state.week.summary.conflicts }}项时间冲突待核对</span
         ><small v-if="state.week.summary.mergedDuplicates"
@@ -472,9 +474,7 @@ onBeforeUnmount(() => {
           </button>
         </li>
       </ul>
-      <p v-if="!displayed.length" class="calendar-empty">
-        这天没有已保存的安排。不代表学校停课，可核对教务或导入课表。
-      </p>
+      <section v-if="!displayed.length" class="calendar-empty"><NavigationIcon name="timetable" /><h2>当天暂无已保存课程</h2><p>切换日期，或导入课表</p></section>
       <button
         v-if="state.week.gridSafe"
         type="button"
@@ -537,9 +537,7 @@ onBeforeUnmount(() => {
         <summary>{{ state.week.warnings.length }}条安排需要核对</summary>
         <p v-for="warning in state.week.warnings" :key="warning">{{ warning }}</p>
       </details>
-      <p class="calendar-footnote">
-        {{ state.week.clockSource }}。来自本人导入及授权教学安排，不是实时教务同步。
-      </p>
+      <details class="calendar-reading-notes"><summary>来源与统计口径</summary><p v-if="state.pagination" class="calendar-footnote">统计：{{ state.pagination.summaryScope }}</p><p class="calendar-footnote">{{ state.week.clockSource }}。来自本人导入及授权教学安排，不是实时教务同步。</p></details>
       <p v-if="noticeError" class="calendar-footnote" role="status">
         {{ noticeError
         }}<button type="button" :disabled="state.loading" @click="load">重新读取</button>
@@ -548,6 +546,9 @@ onBeforeUnmount(() => {
   </section>
 </template>
 <style scoped>
+.calendar-notices>summary{min-height:44px;align-content:center;cursor:pointer;font-size:14px}.calendar-toolbar{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px}.calendar-toolbar .calendar-controls{flex:1;min-width:0;margin:0}.calendar-toolbar .calendar-date-jump{margin:0;flex:none;gap:8px}.calendar-toolbar .calendar-date-jump>label{font-size:0}.calendar-toolbar .calendar-date-jump :deep(.date-field){width:180px}.calendar-quiet-hint{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}.calendar-reading-notes{margin-top:24px;color:var(--assistant-muted);font-size:13px}.calendar-reading-notes summary{min-height:44px;align-content:center;cursor:pointer}.calendar-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;min-height:30vh;text-align:center}.calendar-empty .navigation-icon{width:38px;height:38px;color:var(--assistant-accent)}.calendar-empty h2{font-size:22px;letter-spacing:-.02em;font-weight:500;margin:0;color:var(--assistant-ink)}.calendar-empty p{font-size:14px;margin:0;color:var(--assistant-muted)}
+@media(max-width:760px){.calendar-toolbar{align-items:stretch;gap:14px}.calendar-toolbar .calendar-controls{flex-basis:100%}.calendar-toolbar .calendar-date-jump{width:100%}.calendar-toolbar .calendar-date-jump>label{flex:1}.calendar-toolbar .calendar-date-jump :deep(.date-field){width:100%}.calendar-empty{min-height:25vh}.calendar-empty h2{font-size:20px}}
+
 .leadership-records-heading { margin: 30px 0 16px; font-size: 20px; font-weight: 600; letter-spacing: -.025em; }
 .unified-calendar {
   color: var(--assistant-ink, #29323c);

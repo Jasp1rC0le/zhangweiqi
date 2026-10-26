@@ -79,6 +79,7 @@ import '@/styles/workspace-navigation.css'
 import '@/styles/apple-workspace.css'
 import '@/styles/workspace-refinement.css'
 import '@/styles/chat-refinement.css'
+import '@/styles/workspace-composition.css'
 
 const router = useRouter()
 const route = useRoute()
@@ -193,7 +194,7 @@ async function submitActionFollowup(content){
   }catch{if(sequence===actionFollowupSequence&&owner===scheduleScope.value)answerNotice.value='补充处理未完成，请核对原面板；输入保留，没有自动保存或发给模型。'}
   finally{if(sequence===actionFollowupSequence)actionFollowupBusy.value=false}
 }
-function actionPrompt(text){if(pendingChatAction())return;if(draft.value.trim()){answerNotice.value='输入框已有草稿，请先处理；没有覆盖你的内容。';return}closeChatTools();draft.value=text;nextTick(()=>{resizeComposer();composerInput.value?.focus()})}
+async function actionPrompt(text){if(pendingChatAction()||sending.value||loadingMessages.value||switchingWorkspace.value)return;if(draft.value.trim()){answerNotice.value='先处理输入框中的草稿';return}closeChatTools();draft.value=text;const local=resolveMaterialIntake(text)||resolveChatAction(text)||resolveTeachingWorkflow(text,{today:chinaDate(),scope:scheduleScope.value});if(local&&scheduleScope.value){await submitPrompt();return}await nextTick();resizeComposer();composerInput.value?.focus()}
 onBeforeRouteUpdate((to,from)=>{if(to.path!==from.path&&authStore.user&&pendingChatAction())return false})
 const activeConversationId = ref(null)
 const loadingConversations = ref(false)
@@ -1304,7 +1305,7 @@ async function submitPrompt() {
     const clarify=action.kind==='CLARIFY_ACTION'
     messages.value.push({id:`${id}-request`,role:'user',content,sources:[],webSources:[],localAction:true})
     messages.value.push({id,role:'assistant',content:clarify?(action.seed?.message||'先明确要改哪类记录：本人的课表、班级教学安排、考勤，还是本校知识资料？请重新说明一种操作和具体对象。这条请求没有执行，也没有发给模型；不会把他人的课表当作你的课表修改。'):'请核对操作对象与变更内容；确认之前不会保存。',action:clarify?null:action,actionScope:scheduleScope.value,actionClarification:clarify&&action.seed?.pendingAttendance?{...action.seed.pendingAttendance,scope:scheduleScope.value}:null,sources:[],webSources:[],localAction:true})
-    activeChatAction.value=clarify?null:id;draft.value='';answerNotice.value='授权业务操作 · 不调用模型；具体权限由服务器校验。'
+    activeChatAction.value=clarify?null:id;draft.value='';answerNotice.value='本地操作 · 确认后保存'
     workspaceDrafts.clear(selectedModelKey.value,activeConversationId.value)
     await nextTick();resizeComposer();if(stickToBottom.value)await scrollToBottom('smooth');return
   }
@@ -1745,12 +1746,12 @@ onBeforeUnmount(() => {
           <button class="work-button primary" type="button" @click="selectConversation(activeConversationId)">重新读取对话</button>
           <button class="work-button" type="button" @click="startNewConversation">另开新对话</button>
         </section>
-        <section v-else-if="messages.length === 0" class="welcome" :class="{ 'welcome--expressive': selectedModelKey === 'standard', 'welcome--mode': selectedModelKey !== 'standard' }">
+        <section v-else-if="messages.length === 0" :key="selectedModelKey" class="welcome" :class="{ 'welcome--expressive': selectedModelKey === 'standard', 'welcome--mode': selectedModelKey !== 'standard' }">
           <ChatStart v-if="selectedModelKey === 'standard'" :active="isChatRoute" :suggestions="suggestions" :campus-open="selectedQuickAction === 'campus'" :disabled="sending || switchingWorkspace || loadingMessages || Boolean(activeChatAction)" @activate="activateQuickAction" />
           <template v-else>
           <div class="welcome-heading">
-            <div>
-              <h1>{{ selectedModelKey === 'standard' ? '今天想聊什么？' : selectedModelKey === 'kimi' ? '一起把想法写清楚' : '一起把问题理顺' }}</h1>
+            <WorkspaceIcon :mode="selectedModelKey" class="welcome-current-icon" /><div>
+              <h1>{{ selectedModelKey === 'standard' ? '今天想聊什么？' : selectedModelKey === 'kimi' ? '论文与写作' : '代码与调试' }}</h1>
               <p class="welcome-subtitle">{{ selectedModelKey === 'standard' ? '校园里的小事，或是卡住你的难题，都可以从这里说起。' : activeWorkspace.subtitle }}</p>
             </div>
           </div>
@@ -2028,16 +2029,16 @@ onBeforeUnmount(() => {
             <summary aria-label="附件、模式和草稿设置"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg><span>{{ activeWorkspace.label }}</span><el-icon><ArrowDown /></el-icon></summary>
             <section class="chat-tools-panel" aria-label="聊天工具">
               <header><strong>聊天工具</strong><button type="button" @click="closeChatTools">收起</button></header>
-              <button class="composer-upload" type="button" aria-describedby="chat-upload-hint" :disabled="sending || switchingWorkspace || loadingMessages || Boolean(activeChatAction)" @click="closeChatTools(); chatAttachment.open()"><el-icon><DocumentCopy /></el-icon><span>上传资料<small>图片、视频文字、文档 · 10 MB 内</small></span></button>
-              <button class="composer-upload" type="button" :disabled="sending || switchingWorkspace || loadingMessages || Boolean(activeChatAction)" @click="closeChatTools(); chatAttachment.openLibrary()"><el-icon><Clock /></el-icon><span>我的原件<small>读取或下载本人保留的资料</small></span></button>
+              <button class="composer-upload" type="button" aria-describedby="chat-upload-hint" :disabled="sending || switchingWorkspace || loadingMessages || Boolean(activeChatAction)" @click="closeChatTools(); chatAttachment.open()"><el-icon><DocumentCopy /></el-icon><span>上传资料<small>最大 10MB</small></span></button>
+              <button class="composer-upload" type="button" :disabled="sending || switchingWorkspace || loadingMessages || Boolean(activeChatAction)" @click="closeChatTools(); chatAttachment.openLibrary()"><el-icon><Clock /></el-icon><span>我的原件</span></button>
               <span id="chat-upload-hint" class="composer-upload-hint">图片、视频文字、文档 · 核对后使用</span>
-              <p>资料与商家 · 整理后人工确认</p><div class="chat-mode-options"><button v-for="prompt in ['上传资料','新增商家']" :key="prompt" type="button" :disabled="sending || loadingMessages || switchingWorkspace || !!activeChatAction" @click="actionPrompt(prompt)">{{ prompt }}</button></div>
-              <template v-if="selectedModelKey==='standard'"><p>校园操作 · 发送请求后核对，不直接保存</p><div class="chat-mode-options"><button v-for="prompt in ['新增课程','记录考勤','修改知识库','查考勤']" :key="prompt" type="button" :disabled="sending || loadingMessages || switchingWorkspace || chatActionBusy || !!activeChatAction" @click="actionPrompt(prompt)">{{ prompt }}</button></div></template>
-              <p>选择模式 · 切换后开始独立对话</p>
+              <p>资料整理</p><div class="chat-mode-options"><button v-for="prompt in ['上传资料','新增商家']" :key="prompt" type="button" :disabled="sending || loadingMessages || switchingWorkspace || !!activeChatAction" @click="actionPrompt(prompt)">{{ prompt }}</button></div>
+              <template v-if="selectedModelKey==='standard'"><p>校园操作</p><div class="chat-mode-options"><button v-for="prompt in ['新增课程','记录考勤','修改知识库','查考勤']" :key="prompt" type="button" :disabled="sending || loadingMessages || switchingWorkspace || chatActionBusy || !!activeChatAction" @click="actionPrompt(prompt)">{{ prompt }}</button></div></template>
+              <p>模式</p>
               <div class="chat-mode-options">
                 <button v-for="workspace in workspaceOptions" :key="workspace.key" type="button" :disabled="sending || loadingMessages || switchingWorkspace" :aria-pressed="workspace.key === selectedModelKey" @click="closeChatTools(); chooseWorkspace(workspace)"><WorkspaceIcon :mode="workspace.key" /><span>{{ workspace.label }}<small>{{ workspace.model?.configured === false || !workspace.model ? '暂未配置' : workspace.provider }}</small></span></button>
               </div>
-              <ChatDraftRecovery :state="chatDraftRecoveryState" :busy="!draftsReady || pendingDrafts.length > 0 || sending || switchingWorkspace || loadingMessages || Boolean(deletingConversationId)" @toggle="toggleDraftRecovery" />
+              <details class="chat-draft-settings"><summary>草稿设置</summary><ChatDraftRecovery :state="chatDraftRecoveryState" :busy="!draftsReady || pendingDrafts.length > 0 || sending || switchingWorkspace || loadingMessages || Boolean(deletingConversationId)" @toggle="toggleDraftRecovery" /></details>
               <p v-if="quotaDisplay" :title="quotaDisplay.hint">{{ quotaDisplay.label }}</p>
             </section>
           </details>
@@ -3056,7 +3057,7 @@ a:focus-visible {
   margin: 16px 0;
   padding: 2px 0 2px 16px;
   color: #6e6e73;
-  border-left: 3px solid rgba(0, 113, 227, 0.35);
+  border-left: 1px solid rgba(0, 113, 227, 0.35);
 }
 
 .answer-markdown :deep(code) {
@@ -4645,7 +4646,7 @@ a:focus-visible {
 @media (prefers-reduced-motion:reduce) { .typing-indicator b { animation:none; } }
 .answer-markdown :deep(p) { margin-bottom:12px; }
 .answer-markdown :deep(h1),.answer-markdown :deep(h2),.answer-markdown :deep(h3) { color:#171d2a; }
-.answer-markdown :deep(blockquote) { border-left:2px solid #b5cceb; color:#526273; }
+.answer-markdown :deep(blockquote) { border-left:1px solid #b5cceb; color:#526273; }
 .answer-markdown :deep(pre) { border-radius:15px; }
 .composer-wrap { padding:16px 28px 20px; background:linear-gradient(180deg,#f8f9fc00,#f8f9fc 30%); }
 .composer { border:1px solid #d9e0eb; border-radius:24px; background:#fff; box-shadow:0 8px 28px #233b6010,inset 0 1px 0 #fff; }

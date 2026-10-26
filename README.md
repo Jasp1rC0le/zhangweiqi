@@ -21,7 +21,9 @@ Campthink 是面向校园学习与日常事务的全栈应用：把带来源的�
 
 最新版本：截图上传后由后台本地 OCR 识别，校园墙只需一个正文框。见[运行和验证说明](docs/local-timetable-ocr.md)。
 
-![单框校园墙，合成内容](docs/images/local-ocr-20261026/wall-desktop.png)
+![分栏校园墙，合成内容](docs/images/visual-rework-20261027/wall-desktop.png)
+
+右上角发布入口、课表紧凑工具栏和模式切换排版见[2026-10-27 更新](docs/visual-rework-2026-10-27.md)。
 
 ![专注课表截图导入 合成场景](docs/images/usability-20261026/import.png)
 

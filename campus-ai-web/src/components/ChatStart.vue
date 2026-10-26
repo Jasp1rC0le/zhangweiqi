@@ -27,8 +27,8 @@ const emit = defineEmits(['activate'])
       </button>
     </nav>
     <HomeAgenda :disabled="disabled" :active="active" @activate="emit('activate', $event)" />
-    <HomeCourseCue :disabled="disabled" :active="active" @activate="emit('activate', $event)" />
-    <ProductUpdates :disabled="disabled" @activate="emit('activate', $event)" />
+    <details class="chat-home-notes"><summary>课表设置与产品更新</summary><HomeCourseCue :disabled="disabled" :active="active" @activate="emit('activate', $event)" />
+    <ProductUpdates :disabled="disabled" @activate="emit('activate', $event)" /></details>
   </div>
 </template>
 

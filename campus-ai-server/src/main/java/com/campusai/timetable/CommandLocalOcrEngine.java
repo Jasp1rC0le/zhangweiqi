@@ -42,7 +42,9 @@ public class CommandLocalOcrEngine implements LocalOcrEngine,AutoCloseable {
         try(InputStream source=getClass().getResourceAsStream("/ocr/macos-ocr.swift")){
             if(source==null)throw unavailable();Files.copy(source,script,StandardCopyOption.REPLACE_EXISTING);
         }
-        run(List.of(command,"-O",script.toString(),"-o",target.toString()),runtime(),Math.min(deadline,System.nanoTime()+Duration.ofSeconds(40).toNanos()));
+        String sdk=run(List.of("/usr/bin/xcrun","--sdk","macosx","--show-sdk-path"),runtime(),deadline).trim();
+        if(!Path.of(sdk).isAbsolute()||!Files.isDirectory(Path.of(sdk)))throw unavailable();
+        run(List.of(command,"-sdk",sdk,"-O",script.toString(),"-o",target.toString()),runtime(),Math.min(deadline,System.nanoTime()+Duration.ofSeconds(40).toNanos()));
         if(!Files.isExecutable(target))throw unavailable();binary=target;return binary;
     }
     public List<Line> read(BufferedImage image,long deadline){
@@ -104,7 +106,11 @@ public class CommandLocalOcrEngine implements LocalOcrEngine,AutoCloseable {
     private String run(List<String> args,Path job,long deadline)throws IOException,InterruptedException{
         long millis=Math.min(60000,TimeUnit.NANOSECONDS.toMillis(deadline-System.nanoTime()));if(millis<=0)throw timeout();
         Path stdout=privateFile(job,"stdout-"+UUID.randomUUID()),stderr=privateFile(job,"stderr-"+UUID.randomUUID());
-        Process process=new ProcessBuilder(args).redirectOutput(stdout.toFile()).redirectError(stderr.toFile()).start();processes.add(process);
+        ProcessBuilder builder=new ProcessBuilder(args).redirectOutput(stdout.toFile()).redirectError(stderr.toFile());
+        // A GUI-launched JVM may inherit a CLT SDK newer than xcode-select's Swift.
+        // Resolve the SDK with the selected toolchain instead of trusting that override.
+        if(mac)builder.environment().remove("SDKROOT");
+        Process process=builder.start();processes.add(process);
         try{
             if(!process.waitFor(millis,TimeUnit.MILLISECONDS)){process.descendants().forEach(ProcessHandle::destroyForcibly);process.destroyForcibly();process.waitFor(3,TimeUnit.SECONDS);throw timeout();}
             if(process.exitValue()!=0||Files.size(stdout)>MAX_OUTPUT)throw unavailable();

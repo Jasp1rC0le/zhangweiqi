@@ -57,14 +57,6 @@ const title = computed(
     ({ TEACHER: '课表与点名', COUNSELOR: '班级考勤', SECRETARY: '学院考勤' })[scope.value] ||
     '我的课表',
 )
-const hint = computed(
-  () =>
-    ({
-      TEACHER: '任课课程和对应名单，一处处理',
-      COUNSELOR: '负责班级的到课情况，按周查看',
-      SECRETARY: '负责学院的考勤汇总，按班级查看',
-    })[scope.value] || '今天的课程、教师和地点，放在一起看',
-)
 function loadLegacy(event) {
   if (event.target.open) legacy.load()
 }
@@ -72,8 +64,8 @@ function loadLegacy(event) {
 <template>
   <main class="work-page timetable-page">
     <header class="timetable-heading">
-      <h1>{{ title }}</h1>
-      <p v-if="!importAction">{{ hint }}</p>
+      <h1>{{ importAction ? '导入课表' : title }}</h1>
+
       <div class="timetable-actions" v-if="!importAction" aria-label="课表操作">
       <button v-if="!['COUNSELOR','SECRETARY'].includes(scope)" class="timetable-import-action" type="button" :disabled="importPanel?.dirty||importPanel?.unavailable" @click="openImport">{{ personal.schedule ? '更新课表' : '导入课表' }}</button>
       <button class="timetable-import-action timetable-export-action" type="button" :disabled="!calendarExportContext" @click="openCalendarExport">导出课表</button>

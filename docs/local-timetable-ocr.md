@@ -11,6 +11,7 @@
 ## 运行环境
 
 - macOS：使用系统 Apple Vision，通过 `/usr/bin/swiftc` 将随 JAR 的 Swift 源码编译为本机程序。需要可用的 Xcode Command Line Tools；已在当前 Mac 运行实测。
+- 2026-10-27 修复运行环境差异：编译前用 `xcrun --sdk macosx --show-sdk-path` 解析当前选定工具链的 SDK，并在本机 OCR 子进程中排除继承的 `SDKROOT`。避免 GUI 启动的 Java 进程把另一套 Command Line Tools SDK 交给 Xcode Swift。没有修改系统开发工具选择或永久环境变量。
 - Linux：可配置 `app.timetable.ocr.command` 为 Tesseract 的绝对路径，并安装 `chi_sim`、`eng` 语言数据。该分支尚未完成实际 Linux 图像验收。缺引擎或语言数据会拒绝识别，不回退外部服务。
 - Spring 环境变量形式：`APP_TIMETABLE_OCR_COMMAND=/usr/bin/tesseract`。不接收用户提供的命令或 Shell 参数。
 
