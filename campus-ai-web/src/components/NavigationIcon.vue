@@ -3,7 +3,7 @@ defineProps({
   name: {
     type: String,
     required: true,
-    validator: (value) => ['sources', 'canteen', 'admin', 'feedback', 'projects', 'wall', 'study', 'instruments', 'timetable'].includes(value),
+    validator: (value) => ['sources', 'canteen', 'admin', 'feedback', 'projects', 'wall', 'study', 'instruments', 'timetable', 'updates'].includes(value),
   },
 })
 </script>
@@ -19,7 +19,10 @@ defineProps({
     stroke-linejoin="round"
     aria-hidden="true"
   >
-    <template v-if="name === 'timetable'">
+    <template v-if="name === 'updates'">
+      <path d="M5 4h14v16H5V4ZM8 8h8M8 12h8M8 16h4" />
+    </template>
+    <template v-else-if="name === 'timetable'">
       <rect x="3" y="5" width="18" height="16" rx="3" /><path d="M7 3v4M17 3v4M3 10h18M7 14h2m3 0h2m3 0h1M7 17h2m3 0h2" />
     </template>
     <template v-else-if="name === 'wall'">

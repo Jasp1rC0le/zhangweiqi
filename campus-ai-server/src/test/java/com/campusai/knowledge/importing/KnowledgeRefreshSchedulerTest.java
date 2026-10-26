@@ -3,6 +3,7 @@ package com.campusai.knowledge.importing;
 import com.campusai.jobs.BackgroundJobRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
@@ -12,6 +13,7 @@ import java.util.UUID;
 
 import static org.mockito.Mockito.*;
 
+@Timeout(10)
 class KnowledgeRefreshSchedulerTest {
     JdbcTemplate jdbc;
     BackgroundJobRepository jobs;
@@ -25,7 +27,7 @@ class KnowledgeRefreshSchedulerTest {
                 + "source_url VARCHAR(255), updated_at TIMESTAMP, effective_at TIMESTAMP, expires_at TIMESTAMP)");
         jdbc.execute("CREATE TABLE knowledge_document_versions(supersedes_document_id BIGINT)");
         jdbc.execute("CREATE TABLE background_jobs(school_id BIGINT, ref_id BIGINT, job_type VARCHAR(30), "
-                + "dedupe_key VARCHAR(150), created_at TIMESTAMP)");
+                + "dedupe_key VARCHAR(150), created_at TIMESTAMP, status VARCHAR(20) DEFAULT 'DONE')");
         jobs = mock(BackgroundJobRepository.class);
         scheduler = new KnowledgeRefreshScheduler(jdbc, jobs);
     }
@@ -36,7 +38,8 @@ class KnowledgeRefreshSchedulerTest {
     }
 
     void checked(long id, String key, String created) {
-        jdbc.update("INSERT INTO background_jobs VALUES(1,?,'KNOWLEDGE_REFRESH',?,?)", id, key, created);
+        jdbc.update("INSERT INTO background_jobs(school_id,ref_id,job_type,dedupe_key,created_at) "
+                + "VALUES(1,?,'KNOWLEDGE_REFRESH',?,?)", id, key, created);
     }
 
     @Test
@@ -72,6 +75,30 @@ class KnowledgeRefreshSchedulerTest {
         jdbc.update("UPDATE knowledge_documents SET source_url='http://www.tsguas.edu.cn/' WHERE id=5");
         scheduler.enqueueRefreshes();
         verify(jobs).enqueueKnowledgeRefresh(1L,6L);
+        verifyNoMoreInteractions(jobs);
+    }
+
+    @Test void unfinishedRefreshFromAnEarlierDayIsNotQueuedAgain() {
+        for (long id = 1; id <= 3; id++) add(id);
+        checked(1,"1:1:old","2000-01-01 00:00:00");
+        checked(2,"1:2:old","2000-01-01 00:00:00");
+        jdbc.update("UPDATE background_jobs SET status='PENDING' WHERE ref_id=1");
+        jdbc.update("UPDATE background_jobs SET status='RUNNING' WHERE ref_id=2");
+        scheduler.enqueueRefreshes();
+        verify(jobs).enqueueKnowledgeRefresh(1L,3L);
+        verifyNoMoreInteractions(jobs);
+    }
+
+    @Test void anotherSchoolOrDifferentTypeDoesNotBlockARefreshAndOldFailedJobsRemainRecheckable() {
+        for (long id = 1; id <= 3; id++) add(id);
+        checked(1,"1:1:old","2000-01-01 00:00:00");
+        jdbc.update("UPDATE background_jobs SET status='PENDING', school_id=2 WHERE ref_id=1");
+        checked(2,"1:2:old","2000-01-01 00:00:00");
+        jdbc.update("UPDATE background_jobs SET status='RUNNING', job_type='KNOWLEDGE_INDEX' WHERE ref_id=2");
+        checked(3,"1:3:old","2000-01-01 00:00:00");
+        jdbc.update("UPDATE background_jobs SET status='FAILED' WHERE ref_id=3");
+        scheduler.enqueueRefreshes();
+        for(long id=1;id<=3;id++) verify(jobs).enqueueKnowledgeRefresh(1L,id);
         verifyNoMoreInteractions(jobs);
     }
 }

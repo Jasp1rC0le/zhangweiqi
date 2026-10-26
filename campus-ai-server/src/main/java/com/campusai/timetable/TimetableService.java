@@ -107,7 +107,7 @@ public class TimetableService {
     static SafeImage sanitize(byte[] bytes) {
         if (bytes == null || bytes.length == 0 || bytes.length > MAX_IMAGE_BYTES)
             throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "课表图片应小于2MB，请压缩或裁剪后重试");
-        try (var stream = ImageIO.createImageInputStream(new ByteArrayInputStream(bytes))) {
+        try (var stream = new javax.imageio.stream.MemoryCacheImageInputStream(new ByteArrayInputStream(bytes))) {
             var readers = ImageIO.getImageReaders(stream);
             if (!readers.hasNext()) throw invalidImage();
             var reader = readers.next();
@@ -121,7 +121,10 @@ public class TimetableService {
                 // Decode then encode fresh pixels. Uploaded metadata and trailing payload are discarded.
                 var pixels = reader.read(0);
                 var output = new ByteArrayOutputStream();
-                if (!ImageIO.write(pixels, format, output)) throw invalidImage();
+                try (var encoded = new javax.imageio.stream.MemoryCacheImageOutputStream(output)) {
+                    if (!ImageIO.write(pixels, format, encoded)) throw invalidImage();
+                    encoded.flush();
+                }
                 byte[] safe = output.toByteArray();
                 if (safe.length > MAX_IMAGE_BYTES) throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "处理后的图片超过2MB，请缩小或改为JPG");
                 return new SafeImage(safe, format.equals("png") ? "image/png" : "image/jpeg",

@@ -71,6 +71,17 @@
         select * from knowledge_documents where id = #{id} and school_id = #{schoolId} for update
     </select>
 
+    <sql id="editableWhere">
+        where d.school_id=#{schoolId} and d.status='PUBLISHED'
+        and not exists(select 1 from knowledge_document_versions v where v.supersedes_document_id=d.id)
+        <if test="pattern != null">and (d.title like #{pattern} escape '!' or d.category like #{pattern} escape '!')</if>
+    </sql>
+    <select id="countEditable" resultType="int">select count(*) from knowledge_documents d <include refid="editableWhere"/></select>
+    <select id="pageEditable" resultType="com.campusai.knowledge.entity.KnowledgeDocument">
+        select d.id,d.title,d.category from knowledge_documents d <include refid="editableWhere"/>
+        order by d.id desc limit #{size} offset #{offset}
+    </select>
+
     <select id="findPotentialConflicts" resultType="com.campusai.knowledge.entity.KnowledgeDocument">
         select id, school_id, title, source_department, source_url, status, content_hash
         from knowledge_documents

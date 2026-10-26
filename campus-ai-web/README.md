@@ -1,27 +1,44 @@
-# Campthink 前端
+# campus-ai-web
 
-Vue 3 / Vite 应用，包含校园问答、个人项目、学习工具、校园社区和管理页面。完整依赖、后端配置与启动步骤见 [项目 README](../README.md)。
+This template should help get you started developing with Vue 3 in Vite.
 
-## 开发
+## Recommended IDE Setup
 
-Node.js 要求 `^22.18.0` 或 `>=24.12.0`。
+[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
 
-```bash
-cp .env.example .env.development
-npm ci
+## Recommended Browser Setup
+
+- Chromium-based browsers (Chrome, Edge, Brave, etc.):
+  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd)
+  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
+- Firefox:
+  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
+  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
+
+## Customize configuration
+
+See [Vite Configuration Reference](https://vite.dev/config/).
+
+## Project Setup
+
+```sh
+npm install
+```
+
+### Compile and Hot-Reload for Development
+
+```sh
 npm run dev
 ```
 
-本机默认通过 `VITE_API_BASE_URL=http://localhost:8080` 访问后端。生产使用同源反向代理时，将该变量设为空再构建；所有 `VITE_` 配置都会进入浏览器，不能写入秘密。
+### Compile and Minify for Production
 
-## 检查与构建
-
-```bash
-node --test tests/*.test.js tests/*.test.mjs
-npx eslint src
+```sh
 npm run build
 ```
 
-`npm run lint` 会自动修复代码；只读检查用 `npx eslint src`。构建输出在 `dist/`，不提交生成文件。
+### Lint with [ESLint](https://eslint.org/)
 
-`design-review.html` 与 `design/` 提供开发环境内存演示，不代表真实账号或后端持久化流程通过验收。真实联调需启动对应版本后端。
+```sh
+npm run lint
+```

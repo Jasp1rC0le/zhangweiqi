@@ -7,13 +7,16 @@ import { submitContactMessage } from '@/api/contact'
 import { getSchools } from '@/api/school'
 import { useAuthStore } from '@/stores/auth'
 import { loginFailureMessage } from '@/utils/loginFeedback'
+import { createExamplePlayback } from '@/utils/examplePlayback'
 import CampMark from '@/components/CampMark.vue'
+import { IDENTITY_ROLES } from '@/utils/teachingIdentity'
 import LegalNotice from '@/components/LegalNotice.vue'
 import WorkspaceIcon from '@/components/WorkspaceIcon.vue'
 import NavigationIcon from '@/components/NavigationIcon.vue'
 import CanteenPreview from '@/components/CanteenPreview.vue'
 import '@/styles/landing-onboarding.css'
 import '@/styles/landing-polish.css'
+import '@/styles/landing-apple.css'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -71,6 +74,20 @@ const heroExamples = [
   { key: 'glm', label: '代码', purpose: '解报错', question: '这段 Java 代码为什么报错？', output: '顺着错误找原因，再一起验证修改', details: ['解释关键逻辑', '给出验证步骤'], hint: '粘贴报错和相关代码，说明预期结果就能开始' },
 ]
 const heroExample = computed(() => heroExamples.find((item) => item.key === entryMode.value) || heroExamples[0])
+const heroDemo = ref()
+const demoInView = ref(false)
+const demoPlaying = ref(false)
+let demoVisibilityObserver
+const canPlayDemo = () => demoInView.value && !showIntro.value && !reducedMotion.value && !documentHidden.value && !loginPresent.value && !contactPresent.value && activePage.value === 0
+const demoPlayback = createExamplePlayback({
+  canPlay: canPlayDemo,
+  onPlayingChange: playing => { demoPlaying.value = playing },
+  onStep: () => { entryMode.value = heroExamples[(heroExamples.findIndex(item => item.key === entryMode.value) + 1) % heroExamples.length].key },
+})
+function selectExample(key) { demoPlayback.stop(); entryMode.value = key }
+watch([demoInView, showIntro, reducedMotion, documentHidden, loginPresent, contactPresent, activePage], () => {
+  if (!canPlayDemo()) demoPlayback.stop()
+}, { flush: 'sync' })
 let introTimer
 let introFallbackTimer
 let introMinimumTimer
@@ -94,6 +111,7 @@ const registerForm = reactive({
   password: '',
   confirmPassword: '',
   privacyAccepted: false,
+  teachingIdentity: 'STUDENT',
 })
 const contactForm = reactive({ name: '', contact: '', subject: '', message: '' })
 
@@ -275,12 +293,13 @@ async function submitRegistration() {
       registerForm.password,
       registerForm.schoolId,
       registerForm.privacyAccepted,
+      registerForm.teachingIdentity,
     )
     form.username = username
     form.password = ''
     registerForm.password = ''
     registerForm.confirmPassword = ''
-    ElMessage.success('账户创建成功，请登录')
+    ElMessage.success(registerForm.teachingIdentity === 'STUDENT' ? '账户创建成功，请登录' : '账户已创建，教学身份待管理员审核。可先登录使用基础功能')
     authDirection.value = -1
     authMode.value = 'login'
     await nextTick()
@@ -399,6 +418,8 @@ function updateMotionPreference(event) { reducedMotion.value = event.matches }
 function updateVisibility() { documentHidden.value = document.hidden }
 
 onMounted(() => {
+  demoVisibilityObserver = new IntersectionObserver(entries => { demoInView.value = entries.some(entry => entry.isIntersecting && entry.intersectionRatio >= .2) }, { threshold: [0, .2] })
+  if (heroDemo.value) demoVisibilityObserver.observe(heroDemo.value)
   motionPreference.addEventListener('change', updateMotionPreference)
   document.addEventListener('visibilitychange', updateVisibility)
   window.addEventListener('keydown', handleEscape)
@@ -410,6 +431,8 @@ onMounted(() => {
   trackChapter()
 })
 onBeforeUnmount(() => {
+  demoPlayback.stop()
+  demoVisibilityObserver?.disconnect()
   disposed = true
   document.removeEventListener('visibilitychange', updateVisibility)
   motionPreference.removeEventListener('change', updateMotionPreference)
@@ -428,7 +451,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <main class="landing" :class="{ 'is-ready': !showIntro, 'motion-paused': documentHidden || loginPresent || contactPresent }" :inert="loginPresent || contactPresent">
+  <main class="landing apple-home" :class="{ 'is-ready': !showIntro, 'motion-paused': documentHidden || loginPresent || contactPresent || activePage !== 0 || !demoInView }" :inert="loginPresent || contactPresent">
     <Transition name="intro">
       <div v-if="showIntro" class="intro-curtain" :class="{ 'is-ready': introReady }" aria-hidden="true">
         <div class="intro-brand"><CampMark /><span>Campthink.</span></div>
@@ -463,15 +486,9 @@ onBeforeUnmount(() => {
 
       <section class="hero" aria-labelledby="hero-title">
         <div class="hero-copy">
-          <div class="hero-eyebrow">
-            <span class="eyebrow-line"></span> 面向大学生的校园与学习 AI 助手
-          </div>
+          <div class="hero-intro">
           <h1 id="hero-title">校园问题，随时问<br /><em>论文代码，一起解</em></h1>
-          <p class="hero-subtitle">查校内信息、梳理论文、调试代码。<br />不用研究提示词，把遇到的问题说出来就好。</p>
-          <div class="hero-entry-tools" aria-label="选择功能并查看使用示例">
-            <button v-for="item in heroExamples" :key="item.key" type="button" :aria-pressed="entryMode === item.key" :class="{ selected: entryMode === item.key }" @click="entryMode = item.key">
-              <WorkspaceIcon :mode="item.key" /><strong>{{ item.label }}</strong><small>{{ item.purpose }}</small>
-            </button>
+          <p class="hero-subtitle">查校内信息、梳理论文、调试代码。</p>
           </div>
           <div class="hero-actions">
             <button class="hero-cta" type="button" @click="openLogin('login', $event)">
@@ -479,10 +496,9 @@ onBeforeUnmount(() => {
             </button>
             <button class="explore-cue" type="button" @click="goToPage(1)">
               <span>向下探索 <small>看看它能帮你做什么</small></span>
-              <span class="explore-cue-arrow" aria-hidden="true">↓</span>
+              <span class="explore-cue-arrow" aria-hidden="true"><ArrowRight /></span>
             </button>
           </div>
-          <p class="hero-start-guide"><span>选功能</span><b aria-hidden="true">→</b><span>登录后提问</span><b aria-hidden="true">→</b><span>继续追问</span></p>
         </div>
         <div class="hero-visual">
           <span class="orb-ambient orb-ambient-blue" aria-hidden="true"></span>
@@ -490,39 +506,42 @@ onBeforeUnmount(() => {
           <span class="orb-orbit orb-orbit-outer" aria-hidden="true"></span>
           <span class="orb-orbit orb-orbit-inner" aria-hidden="true"></span>
           <div class="hero-orb-stage" aria-hidden="true"><span class="intelligence-orb"><span class="orb-light"></span></span></div>
-          <div class="hero-demo" aria-live="polite" aria-atomic="true">
-            <div class="hero-demo-top"><span>可以这样开始</span><small>使用示例 · 非实时回答</small></div>
+        </div>
+          <div ref="heroDemo" class="hero-demo" :class="{ 'demo-playing': demoPlaying }">
+            <div class="hero-demo-choice">
+              <div class="hero-demo-toolbar">
+              <div class="hero-example-modes" role="group" aria-label="选择使用示例" aria-describedby="home-example-note">
+                <button v-for="item in heroExamples" :key="item.key" type="button" :aria-pressed="entryMode === item.key" @click="selectExample(item.key)">{{ item.label }}</button>
+              </div>
+              <button v-if="!reducedMotion" type="button" class="hero-demo-play" :aria-pressed="demoPlaying" :aria-label="demoPlaying ? '暂停示例演示' : '播放一次三种能力演示'" @click="demoPlayback.toggle()">
+                <svg viewBox="0 0 20 20" aria-hidden="true"><path v-if="demoPlaying" d="M7 5v10M13 5v10" /><path v-else d="m7 4 9 6-9 6Z" /></svg>{{ demoPlaying ? '暂停' : '播放演示' }}
+              </button>
+              </div>
+              <div class="hero-question-stage"><Transition name="hero-question"><p :key="heroExample.key" class="hero-example-question"><WorkspaceIcon :mode="heroExample.key" /><span>{{ heroExample.question }}</span></p></Transition></div>
+              <small id="home-example-note" class="hero-demo-note">使用示例 · 非实时回答</small>
+            </div>
+            <div class="hero-demo-answer" :aria-live="demoPlaying ? 'off' : 'polite'" aria-atomic="true">
             <div class="hero-demo-stage"><Transition name="hero-example">
               <div :key="heroExample.key" class="hero-demo-content">
-                <p class="hero-demo-question"><WorkspaceIcon :mode="heroExample.key" />{{ heroExample.question }}</p>
                 <strong class="hero-demo-result">{{ heroExample.output }}</strong>
-                <div class="hero-demo-details"><span v-for="detail in heroExample.details" :key="detail">{{ detail }}</span></div>
+                <ul class="hero-demo-details"><li v-for="detail in heroExample.details" :key="detail"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 8 3 3 7-7" /></svg>{{ detail }}</li></ul>
                 <p class="hero-demo-hint">{{ heroExample.hint }}</p>
               </div>
             </Transition></div>
+            </div>
+            <div v-if="demoPlaying" :key="entryMode" class="hero-demo-progress" aria-hidden="true"><span></span></div>
           </div>
-        </div>
       </section>
-      <button class="chapter-bridge" type="button" @click="goToPage(1)">
-        <span class="bridge-caption"><span>不止于一个聊天框</span><strong>继续向下，探索你的校园工作台</strong></span>
-        <span class="bridge-next"><small>下一章 / 02</small><strong>问答 · 论文 · 代码</strong></span>
-        <span class="bridge-arrow" aria-hidden="true">↓</span>
-      </button>
     </div>
 
     <span id="chapter-experience" class="story-anchor" aria-hidden="true"></span>
     <section id="experience" class="experience story-page" :class="{ 'is-current': activePage === 1, 'is-tall': tallPages.includes('experience') }" aria-labelledby="experience-title">
       <div class="section-intro">
-        <p class="section-kicker">02 / 探索能力 · 问答、论文、代码</p>
-        <h2 id="experience-title">每一种好奇，<br />都有它的工作台</h2>
+        <h2 id="experience-title">每一种好奇，都有它的工作台</h2>
         <p>问清楚，想深入，做出来。<br />三种入口，始终由你选择。</p>
       </div>
       <div class="capability-grid">
         <article v-for="item in capabilities" :key="item.number" class="capability-card">
-          <div class="card-head">
-            <span>{{ item.number }}</span
-            ><span>{{ item.english }}</span>
-          </div>
           <WorkspaceIcon class="capability-icon" :mode="item.number === '01' ? 'standard' : item.number === '02' ? 'kimi' : 'glm'" />
           <h3>{{ item.title }}</h3>
           <p>{{ item.description }}</p>
@@ -546,7 +565,6 @@ onBeforeUnmount(() => {
     <section id="canteen" class="life-section story-page" :class="{ 'is-current': activePage === 2, 'is-tall': tallPages.includes('canteen') }" aria-labelledby="life-title">
       <CanteenPreview />
       <div class="life-content">
-        <p class="section-kicker">03 / 校园生活</p>
         <h2 id="life-title">认真学习<br /><i>也好好吃饭</i></h2>
         <p>
           商家资料由管理员核实发布。查看同学们的真实评分，也留下自己的体验。
@@ -562,7 +580,6 @@ onBeforeUnmount(() => {
 
     <span id="chapter-closing" class="story-anchor" aria-hidden="true"></span>
     <section id="closing" class="closing story-page" :class="{ 'is-current': activePage === 3, 'is-tall': tallPages.includes('closing') }" aria-labelledby="closing-title">
-      <p class="section-kicker">04 / 下一页，由你写</p>
       <h2 id="closing-title">带上好奇心<br /><i>剩下的，一起想</i></h2>
       <button type="button" @click="openLogin('login', $event)">
         开始我的第一段对话 <ArrowRight aria-hidden="true" />
@@ -700,6 +717,9 @@ onBeforeUnmount(() => {
                       <span>{{ schoolsError }}</span>
                       <button type="button" :disabled="schoolsLoading || registerLoading" @click="loadSchools">{{ schoolsLoading ? '正在重试…' : '重新加载学校' }}</button>
                     </div>
+                    <label for="register-identity">你的身份</label>
+                    <el-form-item><el-select id="register-identity" v-model="registerForm.teachingIdentity" size="large" :teleported="false" aria-describedby="register-identity-help"><el-option v-for="(label, value) in IDENTITY_ROLES" :key="value" :label="label" :value="value" /></el-select></el-form-item>
+                    <p id="register-identity-help" class="identity-registration-help">{{ registerForm.teachingIdentity === 'STUDENT' ? '学生可直接使用基础功能；教学课表由管理员绑定本人账号。' : '此项为身份申请。管理员审核后，仍需单独配置课程、班级或学院范围。' }}</p>
                     <div class="form-columns">
                       <div>
                         <label for="register-username">用户名</label
@@ -856,6 +876,12 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.identity-registration-help{font-size:13px;line-height:1.65;margin:-4px 0 18px;color:#59646f;max-width:65ch}
+/* The longer registration form scrolls independently; the existing close control
+   and animated art stay inside the viewport instead of scrolling out of reach. */
+.auth-dialog.is-register { overflow:hidden; }
+.auth-dialog.is-register .auth-body { min-height:0; box-sizing:border-box; overflow-y:auto; overscroll-behavior:contain; max-height:calc(min(94svh,900px) - 2px); }
+@media(max-width:760px) { .auth-dialog.is-register .auth-body { max-height:calc(min(94svh,900px) - 147px); } }
 .landing {
   --ink: #111311;
   --paper: #f6f5f0;

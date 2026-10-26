@@ -28,12 +28,13 @@ export const useAuthStore = defineStore('auth', () => {
     })
   }
 
-  async function register(username, nickname, password, schoolId, privacyAccepted) {
+  async function register(username, nickname, password, schoolId, privacyAccepted, teachingIdentity = 'STUDENT') {
     const response = await http.post('/api/users', {
       username,
       nickname,
       password,
       schoolId,
+      teachingIdentity,
       privacyAccepted,
       policyVersion: PRIVACY_POLICY_VERSION,
     })

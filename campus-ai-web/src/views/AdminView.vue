@@ -1,7 +1,9 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute,useRouter } from 'vue-router'
 import CampMark from '@/components/CampMark.vue'
+import TeachingIdentityPanel from '@/components/TeachingIdentityPanel.vue'
+import OperationsCockpit from '@/components/OperationsCockpit.vue'
 import { ElMessage } from 'element-plus'
 import { isSessionExpired, userSessionGeneration } from '@/api/http'
 import {
@@ -49,18 +51,21 @@ import { useAdminAuthStore } from '@/stores/adminAuth'
 import AdminBatchImportPanel from '@/views/AdminBatchImportPanel.vue'
 import AdminCareerPanel from '@/views/AdminCareerPanel.vue'
 import AdminCanteenPanel from '@/views/AdminCanteenPanel.vue'
+import MaterialIntakePanel from '@/components/MaterialIntakePanel.vue'
 import AdminWallPanel from '@/views/AdminWallPanel.vue'
 import AiBudgetPanel from '@/components/AiBudgetPanel.vue'
 import { createDraftCheckpoint } from '@/utils/draftCheckpoint'
 import { useUnsavedChanges } from '@/utils/useUnsavedChanges'
-import { filterAdminDocuments, knowledgeFormIssue, loadAdminSections } from '@/utils/adminWorkbench'
+import { canShowEmptySourceReview, filterAdminDocuments, formatAdminDate, knowledgeFormIssue, loadAdminSections } from '@/utils/adminWorkbench'
 import { createAdminEditorScope, publishScopedKnowledge, snapshotKnowledgePublication } from '@/utils/adminEditorScope'
 import { useScopedConfirmation } from '@/utils/useScopedConfirmation'
 import { createScopedAdminActions } from '@/utils/scopedAdminActions'
 import { evaluationTargetLabel } from '@/utils/evaluationTarget'
 import '@/styles/admin-workbench.css'
+import {focusWorkflowElement} from '@/utils/teachingWorkflows'
 
 const router = useRouter()
+const route = useRoute(),identityReviewElement=ref()
 const adminAuth = useAdminAuthStore()
 const activeTab = ref('overview')
 const loading = ref(true)
@@ -70,6 +75,7 @@ const documentQuery = ref(''), documentStatus = ref('ALL')
 const editorLoading = ref(false), importError = ref(''), importSuccess = ref('')
 let disposed = false, inboxSequence = 0, editorSequence = 0, mergeReadSequence = 0
 const versionReads = new Map()
+const sourceReads = new Map(), sourceComparisons = reactive({})
 onBeforeUnmount(() => { disposed = true; inboxSequence++; editorSequence++ })
 const processingKey = ref('')
 const rejectionId = ref(null)
@@ -78,6 +84,8 @@ const mergeDocumentId = ref('')
 const mergeDraft = ref(null)
 const submissions = ref([])
 const contacts = ref([])
+const contactMerchantDraft = ref(null), contactMerchantPanel = ref(), contactMerchantTarget = ref()
+const contactMerchantState = reactive({busy:false,pending:false})
 const feedback = ref([])
 const modelUsage = ref([])
 const overview = ref(null)
@@ -86,6 +94,10 @@ const overviewUpdatedAt = ref(null)
 const failedBackgroundJobs = ref([])
 const documents = ref([])
 const updateCandidates = ref([])
+const sourceReviewIsEmpty = computed(() => canShowEmptySourceReview({
+  loading: loading.value, identityError: identityError.value,
+  updatesError: sectionErrors.updates, updates: updateCandidates.value,
+}))
 const evaluationCases = ref([])
 const evaluationReport = ref(null)
 const evaluationForm = reactive({ question: '', expectedDocumentId: '' })
@@ -113,6 +125,14 @@ const importForm = reactive({
 const importCheckpoint = createDraftCheckpoint(() => ({ ...importForm, revisionOf: revisionOf.value }))
 const editorOwner = computed(() => adminAuth.isLoggedIn && adminAuth.user?.schoolId
   ? `${adminAuth.user.id}:${adminAuth.user.schoolId}:${userSessionGeneration.value}` : '')
+let lastIdentityWorkflow=''
+async function focusIdentityWorkflow(){
+  const owner=editorOwner.value,key=`${owner}:${route.query.tool}`
+  if(!owner||route.query.tool!=='identity-review'||identityError.value||loading.value||key===lastIdentityWorkflow)return
+  await nextTick();if(disposed||owner!==editorOwner.value||route.query.tool!=='identity-review'||loading.value)return
+  if(focusWorkflowElement(identityReviewElement.value,()=>!disposed&&owner===editorOwner.value&&route.query.tool==='identity-review'&&!loading.value))lastIdentityWorkflow=key
+}
+watch(()=>route.query.tool,focusIdentityWorkflow,{flush:'post'})
 const editorScope = createAdminEditorScope(() => editorOwner.value,
   () => ({ ...importForm, revisionOf: revisionOf.value, previewUrl: previewUrl.value }))
 watch(() => ({ ...importForm, revisionOf: revisionOf.value, previewUrl: previewUrl.value }),
@@ -128,9 +148,10 @@ const actionBusy = computed(() => actionRunning.value || actionConfirming.value)
 onBeforeUnmount(editorScope.dispose)
 onBeforeUnmount(adminActions.dispose)
 watch(editorOwner, () => {
+  contactMerchantDraft.value=null;contactMerchantState.busy=false;contactMerchantState.pending=false
   editorScope.invalidate(); inboxSequence++; editorSequence++
   adminActions.invalidate(); actionRunning.value = false; qualityBusy.value = false; processingKey.value = ''
-  mergeReadSequence++; versionReads.clear()
+  mergeReadSequence++; versionReads.clear(); sourceReads.clear()
   rejectionId.value = null; mergeSubmissionId.value = null; mergeDocumentId.value = ''; mergeDraft.value = null
   evaluationForm.question = ''; evaluationForm.expectedDocumentId = ''
   resetImportForm(); importSuccess.value = ''
@@ -138,15 +159,37 @@ watch(editorOwner, () => {
   for (const target of [submissions, contacts, feedback, modelUsage, failedBackgroundJobs,
     documents, updateCandidates, evaluationCases]) target.value = []
   overview.value = null; evaluationReport.value = null; overviewUpdatedAt.value = null
-  for (const state of [sectionErrors, versionHistories, resolutionDrafts, rejectionNotes]) {
+  for (const state of [sectionErrors, versionHistories, resolutionDrafts, rejectionNotes, sourceComparisons]) {
     for (const key of Object.keys(state)) delete state[key]
   }
   loading.value = false
   identityError.value = '登录身份已变化，请刷新页面重新核验后加载后台'
 }, { flush: 'sync' })
 const batchImport = ref(null)
-useUnsavedChanges(() => importCheckpoint.isDirty() || Boolean(batchImport.value?.dirty),
-  () => actionBusy.value || importLoading.value || previewLoading.value || editorLoading.value || importConfirming.value || Boolean(batchImport.value?.busy))
+const careerPanel = ref(null), canteenPanel = ref(null)
+const catalogMounted = reactive({ career: false, canteens: false })
+watch(activeTab, (tab) => {
+  if (Object.hasOwn(catalogMounted, tab)) catalogMounted[tab] = true
+}, { flush: 'sync' })
+const catalogPanels = computed(() => [
+  { tab: 'career', label: '企业与招聘', panel: careerPanel.value },
+  { tab: 'canteens', label: '食堂与商家', panel: canteenPanel.value },
+  { tab: 'contact', label: '商家申请草稿', panel: contactMerchantPanel.value },
+])
+const catalogReturns = computed(() => catalogPanels.value.filter(item => item.tab !== activeTab.value && (item.panel?.dirty || item.panel?.busy)))
+const catalogsDirty = () => catalogPanels.value.some(item => item.panel?.dirty)
+const catalogsBusy = () => catalogPanels.value.some(item => item.panel?.busy)
+const routeScope = () => editorOwner.value ? JSON.stringify([
+  editorScope.key(), batchImport.value?.draftKey?.(), careerPanel.value?.draftKey?.(), canteenPanel.value?.draftKey?.(),
+]) : null
+const { confirming: leaveConfirming, confirm: confirmLeave } = useScopedConfirmation(routeScope,
+  () => !disposed && Boolean(editorOwner.value))
+// One aggregate route decision covers every mounted editor, including hidden modules.
+useUnsavedChanges(() => importCheckpoint.isDirty() || Boolean(batchImport.value?.dirty) || catalogsDirty(),
+  () => actionBusy.value || importLoading.value || previewLoading.value || editorLoading.value || importConfirming.value || Boolean(batchImport.value?.busy) || catalogsBusy() || leaveConfirming.value,
+  () => false,
+  () => confirmLeave('当前后台有未保存的填写。离开后会放弃单条资料、批量资料、食堂或招聘中的未保存内容；已经提交的记录不会撤销。',
+    { title: '保留后台填写？', confirmText: '放弃填写并离开', cancelText: '继续编辑' }))
 const filteredDocuments = computed(() => filterAdminDocuments(documents.value, documentQuery.value, documentStatus.value))
 const tabSectionKeys = {
   overview: ['jobs', 'usage'], knowledge: ['submissions'], contact: ['contacts'],
@@ -165,10 +208,9 @@ const negativeFeedbackCount = computed(
 const overviewActions = computed(() => overview.value ? [
   { label: '待审核资料', count: overview.value.pendingSubmissions, tab: 'knowledge', hint: '来自学生的资料补充' },
   { label: '待跟进差评', count: overview.value.unresolvedFeedback, tab: 'feedback', hint: '需要核实的回答' },
-  { label: '未处理意见', count: overview.value.openContactMessages, tab: 'contact', hint: '全站意见收件箱' },
+  { label: '未处理意见', count: overview.value.openContactMessages, tab: 'contact', hint: '本校意见与商家申请' },
   { label: '待核验企业', count: overview.value.pendingEmployerCandidates, tab: 'career', hint: '联网发现的企业线索' },
 ] : [])
-const maxProviderCalls = computed(() => Math.max(1, ...modelUsage.value.map((item) => Number(item.requestCount || 0))))
 
 function resolveErrorMessage(error, fallback) {
   const response = error.response?.data
@@ -176,15 +218,7 @@ function resolveErrorMessage(error, fallback) {
   return response?.message || fieldError || response?.error || fallback
 }
 
-function formatDate(value) {
-  if (!value || !Number.isFinite(new Date(value).getTime())) return '时间未知'
-  return new Intl.DateTimeFormat('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(value))
-}
+const formatDate = formatAdminDate
 
 function providerName(provider) {
   return { deepseek: 'DeepSeek', kimi: 'Kimi', glm: 'GLM' }[provider] || provider
@@ -325,6 +359,29 @@ async function dismissDetectedUpdate(item) {
   }, { label: '忽略更新', refresh: async () => {}, targetCurrent: () => updateCandidates.value.some(entry => entry.id === id) })
 }
 
+async function comparePublishedSource(item) {
+  const id = item.id
+  if (sourceReads.has(id)) return
+  const ticket = editorScope.capture({ abortable: true }), operation = Symbol('source-comparison')
+  sourceReads.set(id, operation)
+  const current = () => ticket.current() && sourceReads.get(id) === operation
+    && updateCandidates.value.some(entry => entry.id === id && entry.documentId === item.documentId && entry.sourceUrl === item.sourceUrl)
+  sourceComparisons[id] = { loading: true }
+  try {
+    const document = await getKnowledgeDocument(item.documentId, { signal: ticket.signal })
+    if (!current()) return
+    if (document.id !== item.documentId || document.sourceUrl !== item.sourceUrl || document.status !== 'PUBLISHED' || !document.rawContent) {
+      throw new Error('对应资料或来源已变化，请重新读取后核对')
+    }
+    sourceComparisons[id] = { title: document.title, content: document.rawContent, version: document.versionNumber || 1 }
+  } catch (error) {
+    if (current()) sourceComparisons[id] = { error: resolveErrorMessage(error, error.message || '读取已发布资料失败，请重试') }
+  } finally {
+    if (sourceReads.get(id) === operation) sourceReads.delete(id)
+    ticket.release()
+  }
+}
+
 async function approve(item) {
   const id = item.id
   await runInboxAction(`approve-${id}`, signal => approveKnowledgeSubmission(id, { signal }), () => {
@@ -413,6 +470,20 @@ async function markHandled(item) {
     contacts.value = contacts.value.map(contact => contact.id === id ? updated : contact)
     ElMessage.success('已标记为已处理')
   }, { label: '意见处理', targetCurrent: () => contacts.value.some(contact => contact.id === id && contact.status !== 'HANDLED') })
+}
+async function organizeMerchantApplication(item) {
+  if(!editorOwner.value || actionBusy.value || contactMerchantState.busy || item.subject!=='商家资料申请')return
+  const owner=editorOwner.value, snapshot={id:item.id,message:item.message}
+  if(contactMerchantDraft.value?.id!==item.id && contactMerchantPanel.value?.dirty){
+    if(!await confirmAction('当前商家申请草稿尚未提交。改为整理另一份申请会放弃当前草稿；原申请和已保存记录仍保留。',{title:'切换商家申请？',confirmText:'放弃草稿并切换',cancelText:'继续当前草稿'}))return
+  }
+  if(owner!==editorOwner.value || !contacts.value.some(c=>c.id===snapshot.id&&c.message===snapshot.message&&c.subject==='商家资料申请'))return
+  if(contactMerchantDraft.value?.id!==snapshot.id)contactMerchantDraft.value={id:snapshot.id,seed:{mode:'merchant',text:snapshot.message}}
+  await nextTick();if(owner===editorOwner.value)contactMerchantTarget.value?.scrollIntoView({block:'start',behavior:'auto'})
+}
+function finishMerchantApplication(result){
+  contactMerchantDraft.value=null;contactMerchantState.pending=false;contactMerchantState.busy=false
+  if(result?.saved)ElMessage.success('商家草稿已提交；请到食堂与商家核实、补照片并另行发布。申请不会自动标记已处理。')
 }
 
 function resetImportForm() {
@@ -712,6 +783,7 @@ async function initializeAdmin() {
   if (disposed || generation !== userSessionGeneration.value) return
   identityError.value = ''
   await loadInbox()
+  await focusIdentityWorkflow()
 }
 onMounted(initializeAdmin)
 
@@ -843,7 +915,7 @@ async function exitAdmin() {
         <span>
           {{
             activeTab === 'wall' ? '发布前审核、举报处理与隐藏记录，仅管理本校内容' : activeTab === 'overview'
-              ? '掌握待处理事项与最近 24 小时模型使用情况。所有数字都来自当前后台数据。'
+              ? '本校待处理事项、资料索引与最近24小时模型用量。'
               : activeTab === 'knowledge'
               ? '用户在聊天中补充的校园信息，通过审核后才会进入正式知识库。'
               : activeTab === 'contact'
@@ -865,6 +937,8 @@ async function exitAdmin() {
         </span>
       </header>
 
+      <details ref="identityReviewElement" class="identity-review-disclosure"><summary>教学身份审核</summary><TeachingIdentityPanel admin /></details>
+
       <div v-if="!loading && visibleLoadErrors.length" class="admin-load-error" role="alert">
         <div><p v-for="message in visibleLoadErrors" :key="message">{{ message }}</p></div>
         <button type="button" :disabled="actionBusy" @click="loadInbox">重新读取</button>
@@ -874,6 +948,10 @@ async function exitAdmin() {
         <span>{{ batchImport?.busy ? '批量资料仍在处理中，可返回查看结果' : '有未发布的资料填写，仅保留在当前页面' }}</span>
         <button type="button" @click="activeTab = 'import'">继续编辑</button>
       </div>
+      <div v-for="item in catalogReturns" :key="item.tab" class="editor-return" role="status">
+        <span>{{ item.panel.busy ? `${item.label}仍在处理中，可返回查看结果` : `${item.label}有未保存的填写，仅保留在当前页面` }}</span>
+        <button type="button" @click="activeTab = item.tab">返回{{ item.label }}</button>
+      </div>
 
       <section v-if="loading" class="empty-state loading-state">
         <i></i><strong>正在读取审核任务</strong>
@@ -881,71 +959,20 @@ async function exitAdmin() {
 
       <section v-else-if="activeTab === 'overview'" class="overview-panel">
         <div class="overview-toolbar">
-          <span>{{ overviewUpdatedAt ? `更新于 ${formatDate(overviewUpdatedAt)}` : '实时统计' }} · 本校数据，意见为全站</span>
-          <button type="button" @click="loadInbox">刷新数据 ↻</button>
+          <span>{{ overviewUpdatedAt ? `读取于 ${formatDate(overviewUpdatedAt)}` : '尚未读取' }} · 仅本校授权数据</span>
+          <button type="button" @click="loadInbox">刷新数据</button>
         </div>
         <div v-if="overviewLoadFailed || !overview" class="empty-state overview-unavailable">
           <strong>暂时无法读取统计数据</strong>
           <span>其他管理功能仍可使用。请确认服务已更新后重试。</span>
-          <button type="button" @click="refreshOverview">重试</button>
+          <button type="button" @click="refreshOverview()">重试</button>
         </div>
         <template v-else>
-          <div class="overview-metrics">
-            <button v-for="item in overviewActions" :key="item.tab" type="button"
-              class="overview-metric overview-metric-action" @click="activeTab = item.tab">
-              <span>{{ item.label }}</span>
-              <strong>{{ formatCount(item.count) }}</strong>
-              <small>{{ item.hint }} <span aria-hidden="true">↗</span></small>
-            </button>
-            <div class="overview-metric overview-metric-secondary">
-              <span>当前可检索资料</span>
-              <strong>{{ formatCount(overview.searchableDocuments) }}</strong>
-              <small>本校已发布且在有效期内</small>
-            </div>
-            <div class="overview-metric overview-metric-secondary">
-              <span>近 24 小时调用</span>
-              <strong>{{ formatCount(overview.recentModelCalls) }}</strong>
-              <small>本校已保存回答，不含失败与重试</small>
-            </div>
-            <div class="overview-metric overview-metric-secondary">
-              <span>近 24 小时 Token</span>
-              <strong>{{ formatTokens(overview.recentModelTokens) }}</strong>
-              <small>仅统计服务商返回的用量</small>
-            </div>
-            <div class="overview-metric overview-metric-secondary">
-              <span>后台任务</span>
-              <strong>{{ formatCount(overview.pendingBackgroundJobs) }}</strong>
-              <small v-if="overview.failedBackgroundJobs">另有 {{ formatCount(overview.failedBackgroundJobs) }} 项失败，需检查服务配置</small>
-              <small v-else>索引任务运行正常</small>
-            </div>
-          </div>
-          <div class="overview-bottom">
-            <section class="overview-section" aria-labelledby="overview-actions-title">
-              <div class="overview-section-heading">
-                <div><span>WORK QUEUE</span><h2 id="overview-actions-title">待办事项</h2></div>
-                <small>按处理环节查看</small>
-              </div>
-              <button v-for="item in overviewActions" :key="item.tab" type="button"
-                class="overview-queue-row" @click="activeTab = item.tab">
-                <span>{{ item.label }}</span><strong>{{ formatCount(item.count) }}</strong><i aria-hidden="true">→</i>
-              </button>
-            </section>
-            <section class="overview-section" aria-labelledby="overview-models-title">
-              <div class="overview-section-heading">
-                <div><span>MODEL ACTIVITY</span><h2 id="overview-models-title">模型使用</h2></div>
-                <button type="button" @click="activeTab = 'usage'">查看详情 →</button>
-              </div>
-              <p v-if="usageLoadFailed" class="overview-hint">模型明细暂不可用，请稍后刷新。</p>
-              <p v-else-if="modelUsage.length === 0" class="overview-hint">最近 24 小时还没有模型调用。</p>
-              <div v-for="item in modelUsage" v-else :key="`${item.provider}-${item.model}`" class="overview-provider">
-                <div><span>{{ providerName(item.provider) }} · {{ item.model || '模型未知' }}</span><strong>{{ formatCount(item.requestCount) }} 次</strong></div>
-                <div class="overview-provider-track"><span :style="{ width: `${Number(item.requestCount || 0) / maxProviderCalls * 100}%` }"></span></div>
-              </div>
-            </section>
-          </div>
+          <OperationsCockpit :overview="overview" :actions="overviewActions" :usage="modelUsage"
+            :usage-unavailable="usageLoadFailed" :failed-details-available="!sectionErrors.jobs && failedBackgroundJobs.length > 0" @navigate="activeTab = $event" />
           <section v-if="failedBackgroundJobs.length" class="overview-section failed-jobs" aria-labelledby="failed-jobs-title">
             <div class="overview-section-heading">
-              <div><span>RETRY QUEUE</span><h2 id="failed-jobs-title">失败任务</h2></div>
+              <div><h2 id="failed-jobs-title">失败任务</h2></div>
               <small>错误仅显示类型，不包含密钥或请求正文</small>
             </div>
             <div v-for="item in failedBackgroundJobs" :key="item.id" class="overview-queue-row failed-job-row">
@@ -1057,6 +1084,7 @@ async function exitAdmin() {
             </div>
           </dl>
           <div class="card-actions">
+            <button v-if="item.subject==='商家资料申请'" type="button" :disabled="Boolean(processingKey) || actionBusy || contactMerchantState.busy" @click="organizeMerchantApplication(item)">把商家申请整理成草稿</button>
             <span v-if="item.status === 'HANDLED'">这条消息已完成跟进</span>
             <button
               v-else
@@ -1116,6 +1144,7 @@ async function exitAdmin() {
                 />
               </label>
             </div>
+            <p v-for="warning in previewResult?.warnings || []" :key="warning" class="import-preview-status" role="status">{{ warning }}</p>
             <p v-if="previewResult" class="import-preview-status" role="status">
               已解析 {{ previewResult.sourceType === 'URL' ? '网页' : '文件' }}，正文约
               {{ previewResult.content.length.toLocaleString('zh-CN') }} 字。
@@ -1209,8 +1238,6 @@ async function exitAdmin() {
         </article>
       </section>
 
-      <AdminCareerPanel v-else-if="activeTab === 'career'" />
-      <AdminCanteenPanel v-else-if="activeTab === 'canteens'" />
       <AdminWallPanel v-else-if="activeTab === 'wall'" />
 
       <section v-else-if="activeTab === 'documents'" class="review-list">
@@ -1220,17 +1247,25 @@ async function exitAdmin() {
           <button type="button" @click="activeTab = 'import'">{{ importCheckpoint.isDirty() || revisionOf ? '继续编辑资料' : '新增资料' }}</button>
         </div>
         <p v-if="!sectionErrors.documents" class="document-results" role="status">当前列表 {{ documents.length }} 份 · 符合筛选 {{ filteredDocuments.length }} 份</p>
+        <p v-if="sourceReviewIsEmpty" class="document-results source-review-empty" role="status">本次加载暂无待核对的来源变化。仅代表已检查的来源，不代表全站资料已收齐。</p>
         <details v-if="updateCandidates.length" class="source-update-section">
           <summary class="source-update-heading">
-            <div><span>SOURCE CHANGES</span><h2 id="source-update-title">官网资料有变化</h2></div>
-            <small>{{ updateCandidates.length }} 项待核对 · 点击展开 · 不会自动覆盖</small>
+            <div><h2 id="source-update-title">官网来源核对</h2></div>
+            <small>{{ updateCandidates.length }} 项候选 · 尚未确认正文变化</small>
           </summary>
           <div class="source-update-list">
+          <p class="document-results">完整网页与知识摘要不同，不等于官网修订。先对照已发布资料，核对正文、年份和附件。</p>
           <article v-for="item in updateCandidates" :key="item.id" class="review-card source-update-card">
-            <div class="card-meta"><span>待确认更新</span><time>{{ formatDate(item.detectedAt) }}</time></div>
+            <div class="card-meta"><span>待核对来源</span><time>{{ formatDate(item.detectedAt) }}</time></div>
             <h2>{{ item.detectedTitle || item.currentTitle }}</h2>
             <a v-if="safeExternalUrl(item.sourceUrl)" :href="safeExternalUrl(item.sourceUrl)" target="_blank" rel="noopener noreferrer">查看官网来源 ↗</a>
             <details><summary>预览检测到的新正文</summary><p>{{ item.detectedContent }}</p></details>
+            <button type="button" class="source-compare-button" :disabled="sourceComparisons[item.id]?.loading" @click="comparePublishedSource(item)">{{ sourceComparisons[item.id]?.loading ? '正在读取已发布资料…' : '对照已发布资料' }}</button>
+            <p v-if="sourceComparisons[item.id]?.error" role="alert">{{ sourceComparisons[item.id].error }}</p>
+            <details v-if="sourceComparisons[item.id]?.content" open class="source-published-comparison">
+              <summary>已发布 · v{{ sourceComparisons[item.id].version }} · {{ sourceComparisons[item.id].title }}</summary>
+              <p>{{ sourceComparisons[item.id].content }}</p>
+            </details>
             <div class="card-actions">
               <button type="button" :disabled="Boolean(processingKey) || actionBusy" @click="dismissDetectedUpdate(item)">忽略本次变化</button>
               <button type="button" :disabled="Boolean(processingKey) || actionBusy" @click="applyDetectedUpdate(item)">{{ actionRunning ? '正在处理…' : '核对后发布新版本' }}</button>
@@ -1244,11 +1279,11 @@ async function exitAdmin() {
         </div>
         <div v-else-if="filteredDocuments.length === 0" class="empty-state"><strong>没有符合筛选的资料</strong><span>尝试更短的关键词或切换发布状态</span><button type="button" @click="documentQuery = ''; documentStatus = 'ALL'">清除筛选</button></div>
         <article v-for="item in filteredDocuments" v-else :key="item.id" class="review-card">
-          <div class="card-meta"><span>{{ item.status === 'PUBLISHED' ? '已发布' : '已下架' }}</span>
+          <div class="card-meta"><span class="document-state" :class="item.status === 'PUBLISHED' ? 'is-published' : 'is-archived'">{{ item.status === 'PUBLISHED' ? '已发布' : '已下架' }}</span>
             <time>v{{ item.versionNumber || 1 }} · #{{ item.id }}</time></div>
           <h2>{{ item.title }}</h2>
           <p>{{ item.category }} · {{ item.sourceDepartment || '来源未填写' }}</p>
-          <p v-if="item.expiresAt">有效至 {{ formatDate(item.expiresAt) }}</p>
+          <p v-if="item.expiresAt">有效至 {{ formatDate(item.expiresAt, true) }}</p>
           <div class="card-actions">
             <button type="button" @click="showVersions(item)">版本记录</button>
             <button v-if="item.status === 'PUBLISHED' && safeExternalUrl(item.sourceUrl)"
@@ -1303,7 +1338,7 @@ async function exitAdmin() {
         </article>
       </section>
 
-      <section v-else class="review-list feedback-list">
+      <section v-else-if="activeTab === 'feedback'" class="review-list feedback-list">
         <div v-if="sectionErrors.feedback" class="empty-state"><strong>回答反馈尚未读取成功</strong><span>请重试读取，其他后台模块仍可使用</span></div>
         <div v-else-if="feedback.length === 0" class="empty-state">
           <el-icon><Check /></el-icon>
@@ -1348,11 +1383,15 @@ async function exitAdmin() {
       <!-- Keep this in-memory editor mounted across admin module switches. -->
       <AdminBatchImportPanel v-if="adminAuth.user" v-show="!loading && activeTab === 'import'"
         ref="batchImport" :school-id="adminAuth.user.schoolId" @published="refreshDocumentsAfterImport" />
+      <AdminCareerPanel v-if="adminAuth.user && catalogMounted.career" v-show="!loading && activeTab === 'career'" ref="careerPanel" />
+      <AdminCanteenPanel v-if="adminAuth.user && catalogMounted.canteens" v-show="!loading && activeTab === 'canteens'" ref="canteenPanel" />
+      <div v-if="contactMerchantDraft && adminAuth.user" v-show="!loading && activeTab==='contact'" ref="contactMerchantTarget" class="contact-merchant-intake"><p>整理商家申请 #{{ contactMerchantDraft.id }}。只带入店铺说明，不把申请人的称呼、回复方式自动作为公开资料。</p><MaterialIntakePanel :key="contactMerchantDraft.id" ref="contactMerchantPanel" :scope="`${editorOwner}:merchant-application:${contactMerchantDraft.id}`" :user="adminAuth.user" :seed="contactMerchantDraft.seed" embedded @state="Object.assign(contactMerchantState,$event)" @done="finishMerchantApplication" /></div>
     </main>
   </div>
 </template>
 
 <style scoped>
+.identity-review-disclosure{margin:18px 0 28px;border-bottom:1px solid var(--assistant-line,#e2e7ec)}.identity-review-disclosure>summary{min-height:44px;align-content:center;cursor:pointer;font-size:15px;color:var(--assistant-ink,#29323c)}.identity-review-disclosure>summary:focus-visible{outline:2px solid var(--assistant-accent,#2b63cf);outline-offset:3px}
 .resolution-note {
   padding: 12px 14px;
   color: #27623c;
@@ -1598,7 +1637,6 @@ header > span {
   gap: 12px;
   margin-bottom: 24px;
 }
-.overview-section-heading > div > span { color: #0071e3; font-size: 9px; font-weight: 750; letter-spacing: .14em; }
 .overview-section-heading h2 { margin: 7px 0 0; font-size: 21px; font-weight: 660; letter-spacing: -.035em; }
 .overview-section-heading small { color: #8d8f96; font-size: 11px; }
 .overview-queue-row {
@@ -1616,6 +1654,10 @@ header > span {
 .overview-queue-row strong { font-size: 14px; font-variant-numeric: tabular-nums; }
 .overview-queue-row i { color: #a0a2a8; font-size: 14px; font-style: normal; }
 .failed-jobs { margin-top: 14px; }.failed-job-row { grid-template-columns: minmax(0,1fr) auto auto; }.failed-job-row button { min-height: 38px; padding: 0 12px; color: #8a3f13; font-size: 12px; font-weight: 650; background: #fff1e8; border-radius: 9px; }.failed-job-row button:disabled { opacity: .55; cursor: wait; }
+@media (max-width: 760px) {
+  .failed-jobs .overview-section-heading { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .failed-jobs .overview-section-heading > div { flex-shrink: 0; }
+}
 .overview-hint { margin: 0; color: #888b92; font-size: 13px; line-height: 1.7; }
 .overview-provider + .overview-provider { margin-top: 19px; }
 .overview-provider > div:first-child { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 9px; font-size: 12px; }
@@ -1969,6 +2011,7 @@ header > span {
 }
 .card-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   align-items: center;
   justify-content: flex-end;
@@ -1984,6 +2027,12 @@ header > span {
   font-weight: 600;
   background: #ededf0;
   border-radius: 999px;
+}
+.card-actions button {
+  flex: 0 0 auto;
+  min-height: 44px;
+  font-size: 14px;
+  white-space: nowrap;
 }
 .card-actions button:last-child,
 .reject-panel button:last-child {
@@ -2075,12 +2124,12 @@ header > span {
 .feedback-card blockquote {
   margin: 20px 0 0;
   padding: 14px 16px;
-  color: #1d1d1f;
-  font-size: 13px;
-  line-height: 1.65;
-  background: #f5f5f7;
-  border-left: 3px solid #ff453a;
-  border-radius: 0 12px 12px 0;
+  color: var(--assistant-ink, #29323c);
+  font-size: 14px;
+  line-height: 1.7;
+  background: var(--assistant-panel, #f2f5fa);
+  border: 1px solid var(--assistant-line, #e2e7ec);
+  border-radius: 12px;
 }
 .feedback-user {
   margin-top: 20px;
@@ -2140,12 +2189,6 @@ header > span {
   gap: 14px;
   margin-top: 18px;
 }
-.source-update-heading span {
-  color: #0069d4;
-  font-size: 10px;
-  font-weight: 750;
-  letter-spacing: .15em;
-}
 .source-update-heading h2 {
   margin: 6px 0 0;
   color: #1d1d1f;
@@ -2159,6 +2202,21 @@ header > span {
 .source-update-card {
   margin: 0;
   box-shadow: none;
+}
+.source-compare-button {
+  min-height: 44px;
+  margin-top: 10px;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--assistant-soft, #eef2f5);
+  color: var(--assistant-accent, #526b86);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.source-published-comparison p {
+  max-width: 72ch;
 }
 .source-update-card details {
   margin-top: 15px;

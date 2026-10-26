@@ -104,23 +104,20 @@ test(
     )
     assert.match(
       source,
-      /editing\.value && \(!!raw\.value\.trim\(\) \|\| hasDraftFieldChanges\(form, draftBaseline\.value\)\)/,
+      /editing\.value && \(!!raw\.value\.trim\(\) \|\| imagePending\.value \|\| hasDraftFieldChanges\(form, draftBaseline\.value\)\)/,
     )
     assert.equal((source.match(/draftBaseline\.value = captureDraftFields/g) || []).length, 2)
     assert.match(source, /未保存的表格、学期、日期和提醒设置会被放弃/)
   },
 )
-test('image cancel is guarded and hidden image fields cannot dirty course mode', options, () => {
+test('one structured course surface replaces image modes without deleting legacy originals', options, () => {
   const source = readFileSync(new URL('../src/views/TimetableView.vue', import.meta.url), 'utf8')
-  assert.match(
-    source,
-    /viewMode\.value === 'image'[\s\S]*hasDraftFieldChanges\(form, draftBaseline\.value\)/,
-  )
-  assert.match(source, /async function discardImport\(\)[\s\S]*dirty\.value &&[\s\S]*await confirm/)
-  assert.match(source, /@click="discardImport"/)
-  assert.doesNotMatch(source, /@click="cancelImport"/)
-  assert.equal((source.match(/draftBaseline\.value = captureDraftFields/g) || []).length, 3)
-  assert.match(source, /!dirty\.value &&\s*!preparing\.value &&\s*!store\.timetable/)
+  assert.match(source, /<UnifiedWeekCalendar /)
+  assert.match(source, /<CourseSchedulePanel[^>]*:manage-only="unifiedAvailable" \/>/)
+  assert.equal((source.match(/<CourseSchedulePanel\b/g) || []).length, 1)
+  assert.doesNotMatch(source, /viewMode|switchMode|<img|deleteTimetable|saveTimetable/)
+  assert.match(source, /download="我的旧课表原件.jpg"/)
+  assert.match(source, /@toggle="loadLegacy"/)
 })
 test('shared confirmations load overlay styles and keep mobile actions reachable', options, () => {
   const main = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8')

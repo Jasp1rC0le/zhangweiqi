@@ -12,6 +12,7 @@ export function validatedTimetableSnapshot(snapshot) {
     typeof snapshot.semester !== 'string' ||
     !snapshot.semester.trim() ||
     snapshot.semester.length > 100 ||
+    // oxlint-disable-next-line no-control-regex -- Reject control characters in private schedule metadata.
     /[\u0000-\u001f\u007f]/.test(snapshot.semester) ||
     typeof snapshot.firstMonday !== 'string' ||
     snapshot.firstMonday < '2000-01-01' ||

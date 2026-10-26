@@ -52,6 +52,19 @@ public class AiSpendGuard {
             throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE,
                     "这段对话已超过免费版单次上下文容量，请新建对话或精简附件后重试");
         }
+        return reserveBound(provider, model, inputBound, outputLimit);
+    }
+
+    /** Trusted provider tokenizer estimate, never the Base64 byte count or a client-supplied value. */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public Ticket reserveVision(String provider, String model, int inputTokens, int outputLimit) {
+        if (inputTokens < 1 || inputTokens > inputByteLimit || outputLimit < 1)
+            throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "图片上下文过大，请裁剪后重试");
+        if (!enabled) return null;
+        return reserveBound(provider, model, inputTokens, outputLimit);
+    }
+
+    private Ticket reserveBound(String provider, String model, long inputBound, int outputLimit) {
         BigDecimal held = pricing.estimate(provider, model, inputBound, (long) outputLimit);
         if (held == null || held.signum() <= 0) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,

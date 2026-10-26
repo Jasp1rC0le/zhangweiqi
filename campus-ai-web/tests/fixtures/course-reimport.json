@@ -1,0 +1,8 @@
+{
+  "semester": "2026—2027学年 第1学期（合成课表示例）",
+  "firstMonday": "2026-09-07",
+  "courses": [
+    {"name":"课程示例A","weekday":1,"startTime":"08:00","endTime":"09:40","weeks":[1,3,5,7,9,11,13,15],"room":"新教室B203"},
+    {"name":"课程示例B","weekday":3,"startTime":"10:00","endTime":"11:40","weeks":[2,4,6,8,10,12,14,16],"room":"教室示例"}
+  ]
+}

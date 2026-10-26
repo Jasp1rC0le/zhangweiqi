@@ -43,6 +43,18 @@ class KnowledgeSourceRefreshServiceTest {
             previews, documents, documentService, jdbc);
 
     @Test
+    void unknownPageLayoutCannotCreateSourceChangeFromNavigation() throws Exception {
+        KnowledgeDocument document = document("old");
+        when(documents.findByIdAndSchoolId(11L, 7L)).thenReturn(document);
+        when(previews.url(7L, document.getSourceUrl())).thenReturn(new KnowledgeImportPreview(
+                "页面预览", "导航和推荐新闻", document.getSourceUrl(), "URL", null, List.of(),
+                List.of(OfficialHtmlContent.FALLBACK_WARNING)));
+        assertThatThrownBy(() -> service.check(7L, 11L)).isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("未定位独立正文");
+        verify(jdbc, never()).update(anyString(), any(Object[].class));
+    }
+
+    @Test
     void unchangedSourceDoesNotCreateCandidate() throws Exception {
         KnowledgeDocument document = document("unchanged");
         when(documents.findByIdAndSchoolId(11L, 7L)).thenReturn(document);

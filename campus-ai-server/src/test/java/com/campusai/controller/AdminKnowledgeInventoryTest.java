@@ -30,4 +30,14 @@ class AdminKnowledgeInventoryTest {
         controller.scanDocuments(1L,"ADMIN",50L);
         verify(documents).scan(7L,50L);
     }
+    @Test void chatDocumentPickerRejectsUnprivilegedOrRevokedAdminBeforeReadingAnyBody(){
+        assertThatThrownBy(()->controller.documentPage(1L,"STUDENT",0,25,"")).isInstanceOf(ResponseStatusException.class);
+        var user=new User();user.setRole("STUDENT");user.setStatus(1);when(users.getById(1L)).thenReturn(user);
+        assertThatThrownBy(()->controller.documentPage(1L,"ADMIN",0,25,"秘密")).isInstanceOf(ResponseStatusException.class);verifyNoInteractions(documents);
+    }
+    @Test void chatDocumentPickerPinsEveryReadToCurrentDatabaseSchool(){
+        var user=new User();user.setRole("ADMIN");user.setStatus(1);user.setSchoolId(7L);when(users.getById(1L)).thenReturn(user);
+        controller.documentPage(1L,"ADMIN",2,25,"%_!");verify(documents).editablePage(7L,2,25,"%_!");
+        user.setStatus(0);assertThatThrownBy(()->controller.documentPage(1L,"ADMIN",2,25,"%_!")).isInstanceOf(ResponseStatusException.class);
+    }
 }

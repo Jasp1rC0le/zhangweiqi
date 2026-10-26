@@ -2,12 +2,12 @@
 import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import CampMark from '@/components/CampMark.vue'
+import { workspaceRetryTarget } from '@/utils/connectionRetry'
 const route = useRoute(), router = useRouter(), busy = ref(false)
 async function retry() {
   if (busy.value) return
   busy.value = true
-  const path = route.query.retry
-  const destination = typeof path === 'string' && /^\/(chat|account|admin|projects|reviews|canteens|wall|study|instruments|feedback|pro)(\/|\?|#|$)/.test(path) ? path : '/chat'
+  const destination = workspaceRetryTarget(route.query.retry, path => router.resolve(path))
   try { await router.replace(destination) }
   finally { busy.value = false }
 }
@@ -16,7 +16,6 @@ async function retry() {
   <main class="connection-page">
     <section aria-labelledby="connection-title">
       <CampMark />
-      <p class="eyebrow">CAMPTHINK / 连接状态</p>
       <h1 id="connection-title">暂时连不上服务</h1>
       <p>我们还无法确认你的登录状态，不必重新输入密码。检查网络后，再试一次</p>
       <button type="button" :disabled="busy" @click="retry">{{ busy ? '正在重新连接…' : '重新连接' }}</button>

@@ -17,6 +17,10 @@ public interface KnowledgeDocumentService {
 
     List<KnowledgeDocument> scan(Long schoolId, Long beforeId);
 
+    record DocumentOption(Long id,String title,String category) {}
+    record DocumentPage(List<DocumentOption> items,int page,int size,int total,int totalPages,String search) {}
+    DocumentPage editablePage(Long schoolId,int page,int size,String search);
+
     KnowledgeDocument setPublished(Long schoolId, Long documentId, Long actorId,
                                    boolean published, String note);
 

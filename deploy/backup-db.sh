@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Linux server. No password on argv, no unencrypted dump on disk.
+# Legacy DB-only format. Use app-backup.mjs for DB + private originals.
 set -euo pipefail
 source "$(dirname "$0")/backup-common.sh"
 umask 077

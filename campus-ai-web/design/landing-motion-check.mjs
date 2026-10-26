@@ -1,0 +1,241 @@
+import { createRequire } from 'node:module'
+import { mkdtemp, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
+import assert from 'node:assert/strict'
+
+const require = createRequire(import.meta.url)
+const { chromium } = require(require.resolve('playwright', { paths: ['/Users/zhangweiqi/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules'] }))
+const output = await mkdtemp(path.join(tmpdir(), 'campthink-landing-motion-'))
+const browser = await chromium.launch({ headless: true, channel: 'chrome' })
+const page = await browser.newPage({ viewport: { width: 1440, height: 960 } })
+page.setDefaultTimeout(12000)
+const errors = [], passed = []
+const state = { authenticated: false, loginFails: true, schoolsFail: true, loginCount: 0, registrationCount: 0 }
+const student = { id: -901, username: 'fixture-only', nickname: '动效验收', schoolId: 1, role: 'STUDENT' }
+page.on('pageerror', error => errors.push(error.message))
+// Isolated mock sessions only. Never write to a real account or backend.
+await page.route(url => url.pathname.startsWith('/api/'), async route => {
+  const url = new URL(route.request().url())
+  const respond = (data, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(data) })
+  if (url.pathname === '/api/auth/refresh') return state.authenticated ? respond({ token: 'fixture-token' }) : respond({}, 401)
+  if (url.pathname === '/api/auth/me') return respond(student)
+  if (url.pathname === '/api/auth/login') {
+    state.loginCount++
+    await new Promise(resolve => setTimeout(resolve, 550))
+    if (state.loginFails) return respond({ message: '模拟登录失败，请重试' }, 400)
+    state.authenticated = true
+    return respond({ token: 'fixture-token', user: student })
+  }
+  if (url.pathname === '/api/users') {
+    state.registrationCount++
+    await new Promise(resolve => setTimeout(resolve, 550))
+    return respond({ message: '模拟注册失败，内容已保留' }, 503)
+  }
+  if (url.pathname === '/api/schools') return state.schoolsFail ? respond({ message: '学校列表暂时不可用' }, 503) : respond([{ id: 1, name: '天津中德应用技术大学' }])
+  if (url.pathname === '/api/ai/quota') return respond({ limit: 20000, remaining: 18000 })
+  if (url.pathname === '/api/models') return respond([{ key: 'standard', name: '问答', available: true }])
+  return respond([])
+})
+const check = name => passed.push(name)
+async function capture(name) {
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `${name}: horizontal overflow`)
+  await page.screenshot({ path: path.join(output, `${name}.png`) })
+}
+async function openLogin() {
+  await page.locator('.nav-action').click()
+  await page.waitForFunction(() => document.activeElement?.id === 'login-username')
+}
+async function closeLogin() {
+  await page.getByRole('button', { name: '关闭登录窗口' }).click()
+  await page.locator('.auth-dialog').waitFor({ state: 'detached' })
+}
+try {
+  await page.goto('http://127.0.0.1:5173/login')
+  await page.locator('.landing').waitFor()
+  await page.locator('.intro-curtain').waitFor({ state: 'detached' })
+  await page.waitForTimeout(850)
+  await capture('home-desktop')
+  await page.locator('.hero-entry-tools button').nth(1).click()
+  await page.locator('.hero-entry-tools button').nth(2).click()
+  await page.waitForTimeout(450)
+  assert.equal(await page.locator('.hero-demo-content').count(), 1)
+  assert.ok((await page.locator('.hero-demo-content').innerText()).includes('Java'))
+  check('rapid example switching leaves a single matching preview')
+
+  await page.locator('.hero-cta').click()
+  await page.waitForTimeout(120)
+  const opening = await page.locator('.auth-dialog').evaluate(element => ({
+    transform: getComputedStyle(element).transform,
+    duration: getComputedStyle(element).transitionDuration,
+    staged: getComputedStyle(element.querySelector('.auth-stage')).animationName,
+    parentPaused: getComputedStyle(document.querySelector('.intelligence-orb'), '::before').animationPlayState,
+  }))
+  assert.notEqual(opening.transform, 'none')
+  assert.equal(opening.staged, 'auth-content-arrive')
+  assert.equal(opening.parentPaused, 'paused')
+  await capture('login-opening')
+  await page.waitForFunction(() => document.activeElement?.id === 'login-username')
+  assert.equal(await page.locator('.auth-dialog').evaluate(el => getComputedStyle(el).transform), 'none')
+  await capture('login-desktop')
+  check('click opens a moving panel with staged contents, then focuses input without scroll')
+
+  await page.locator('#login-username').fill('fixture-only')
+  await page.locator('#login-password').fill('fixture-password')
+  await page.locator('#auth-panel-login form').evaluate(form => { form.requestSubmit(); form.requestSubmit() })
+  await page.waitForFunction(() => document.querySelector('#login-username')?.disabled)
+  assert.equal(await page.getByRole('button', { name: '关闭登录窗口' }).isDisabled(), true)
+  await page.getByText('模拟登录失败，请重试', { exact: true }).waitFor()
+  assert.equal(state.loginCount, 1)
+  assert.equal(await page.locator('#login-password').inputValue(), 'fixture-password')
+  check('duplicate login submission blocked; failure keeps inputs')
+
+  await page.getByRole('tab', { name: '创建账户' }).click()
+  await page.getByRole('button', { name: '重新加载学校' }).waitFor()
+  await page.locator('#register-username').fill('new-fixture')
+  state.schoolsFail = false
+  await page.getByRole('button', { name: '重新加载学校' }).click()
+  await page.locator('.school-error').waitFor({ state: 'detached' })
+  assert.equal(await page.locator('#register-username').inputValue(), 'new-fixture')
+  await page.locator('#register-nickname').fill('验收用户')
+  await page.locator('#register-password').fill('fixture-password')
+  await page.locator('#register-confirm').fill('fixture-password')
+  await page.locator('.consent input').check()
+  await page.locator('#auth-panel-register form').evaluate(form => { form.requestSubmit(); form.requestSubmit() })
+  await page.waitForFunction(() => document.querySelector('#register-username')?.disabled)
+  await page.getByText('模拟注册失败，内容已保留', { exact: true }).waitFor()
+  assert.equal(state.registrationCount, 1)
+  assert.equal(await page.locator('#register-nickname').inputValue(), '验收用户')
+  check('school retry and registration failure preserve data; duplicate registration blocked')
+
+  await page.locator('#auth-tab-register').focus()
+  await page.keyboard.press('ArrowLeft')
+  await page.waitForTimeout(70)
+  assert.equal(await page.locator('.auth-step-leave-active').evaluate(el => el.inert), true)
+  await page.keyboard.press('ArrowRight')
+  await page.waitForTimeout(750)
+  assert.equal(await page.locator('.auth-form').count(), 1)
+  assert.equal(await page.locator('#auth-panel-register').evaluate(el => el.inert), false)
+  await page.keyboard.press('Tab')
+  assert.equal(await page.locator('.auth-dialog').evaluate(el => el.contains(document.activeElement)), true)
+  await capture('register-desktop')
+  check('tabs support arrow keys; interrupted mode switch has no focusable outgoing form')
+
+  await closeLogin()
+  assert.equal(await page.evaluate(() => document.body.style.overflow), '')
+  assert.equal(await page.locator('.hero-cta').evaluate(el => el === document.activeElement), true)
+  await openLogin()
+  await closeLogin()
+  check('repeated open and close restores focus, scroll lock, and page interaction')
+  // Cancel during the opening animation, then reopen normally.
+  await page.locator('.nav-action').click()
+  await page.waitForTimeout(80)
+  await page.keyboard.press('Escape')
+  await page.locator('.auth-dialog').waitFor({ state: 'detached' })
+  assert.equal(await page.locator('.landing').evaluate(el => el.inert), false)
+  check('opening animation is safely interruptible')
+
+  await page.locator('.explore-cue').click()
+  await page.waitForTimeout(1100)
+  await capture('capabilities-desktop')
+  await page.locator('.campus-tool-links button').first().click()
+  await page.getByText('登录后进入实验与作业，随时可以切换功能').waitFor()
+  await closeLogin()
+  check('homepage exposes existing tools with an explicit login destination')
+
+  await page.setViewportSize({ width: 1280, height: 720 })
+  await page.waitForFunction(() => document.querySelector('#experience')?.classList.contains('is-tall'))
+  await page.locator('.campus-tool-links button').last().scrollIntoViewIfNeeded()
+  await page.locator('.campus-tool-links button').last().click()
+  await page.getByText('登录后进入校园墙，随时可以切换功能').waitFor()
+  await closeLogin()
+  await capture('capabilities-short-desktop')
+  check('short desktop viewport releases oversized sticky chapters; lower tools stay clickable')
+
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.evaluate(() => scrollTo({ top: 0, behavior: 'instant' }))
+  await page.waitForTimeout(350)
+  await capture('home-mobile')
+  await openLogin()
+  await capture('login-mobile')
+  await page.getByRole('tab', { name: '创建账户' }).click()
+  await page.waitForTimeout(750)
+  await page.locator('#register-confirm').scrollIntoViewIfNeeded()
+  await capture('register-mobile')
+  assert.equal(await page.locator('#register-confirm').isVisible(), true)
+  await closeLogin()
+  check('mobile login and registration remain scrollable without horizontal overflow')
+
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await openLogin()
+  assert.equal(await page.locator('.auth-dialog').evaluate(el => getComputedStyle(el).transform), 'none')
+  assert.equal(await page.locator('.auth-stage').evaluate(el => getComputedStyle(el).animationName), 'none')
+  await closeLogin()
+  check('reduced motion skips spatial and staged animations')
+  await page.setViewportSize({ width: 1440, height: 960 })
+  await page.locator('.page-index button').nth(2).click()
+  await page.locator('.life-content button').click()
+  await page.getByText('登录后进入食堂评分，随时可以切换功能').waitFor()
+  await page.locator('#login-username').fill('fixture-only')
+  await page.locator('#login-password').fill('fixture-password')
+  state.loginFails = false
+  await page.locator('#auth-panel-login .form-submit').click()
+  await page.waitForURL('**/canteens')
+  await page.locator('.workspace').waitFor()
+  assert.equal(await page.evaluate(() => document.body.style.overflow), '')
+  check('canteen entry logs in directly to canteens and releases scroll lock')
+
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
+  const previousUrl = page.url()
+  await page.locator('.sidebar').evaluate(el => el.dataset.continuity = 'preserved')
+  await page.locator('.membership-entry').click()
+  await page.locator('.pro-suite').waitFor()
+  assert.equal(page.url(), previousUrl)
+  assert.equal(await page.locator('.pro-curtain.pro-inline').count(), 0)
+  assert.ok((await page.locator('.pro-plaque').evaluate(el => getComputedStyle(el).animationName)).startsWith('plaque-arrive'))
+  await page.waitForTimeout(1950)
+  await capture('pro-original-modal')
+  await page.getByRole('button', { name: '关闭 Pro 介绍' }).click()
+  await page.locator('.pro-suite').waitFor({ state: 'detached' })
+  assert.equal(await page.locator('.workspace').evaluate(el => el.inert), false)
+  assert.equal(await page.locator('.sidebar').getAttribute('data-continuity'), 'preserved')
+  assert.equal(await page.locator('.membership-entry').evaluate(el => el === document.activeElement), true)
+  check('Pro retains original gold animation as modal; closing preserves route and sidebar')
+  await page.goto('http://127.0.0.1:5173/pro')
+  await page.locator('.pro-suite').waitFor()
+  await page.waitForURL('**/chat')
+  await page.waitForTimeout(2000)
+  await page.getByRole('button', { name: '关闭 Pro 介绍' }).click()
+  await page.locator('.pro-suite').waitFor({ state: 'detached' })
+  check('legacy Pro deep link opens the same modal rather than an inline page')
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.getByRole('button', { name: '打开菜单', exact: true }).click()
+  await page.locator('.membership-entry').click()
+  await page.locator('.pro-suite').waitFor()
+  await page.waitForTimeout(1950)
+  await capture('pro-mobile')
+  await page.getByRole('button', { name: '关闭 Pro 介绍' }).click()
+  await page.locator('.pro-suite').waitFor({ state: 'detached' })
+  assert.equal(await page.getByRole('button', { name: '打开菜单', exact: true }).evaluate(el => el === document.activeElement), true)
+  check('mobile Pro closes back to the menu trigger without leaving focus in hidden sidebar')
+
+  state.authenticated = false
+  await page.setViewportSize({ width: 1440, height: 960 })
+  await page.goto('http://127.0.0.1:5173/login')
+  await page.locator('.landing').waitFor()
+  await page.locator('.intro-curtain').waitFor({ state: 'detached' })
+  await openLogin()
+  await page.locator('#login-username').fill('fixture-only')
+  await page.locator('#login-password').fill('fixture-password')
+  await page.locator('#auth-panel-login .form-submit').click()
+  await page.waitForURL('**/chat')
+  await page.waitForFunction(() => performance.getEntriesByName('campus:arrival-finished').length > 0)
+  assert.equal(await page.evaluate(() => document.documentElement.classList.contains('workspace-arriving')), false)
+  assert.equal(await page.evaluate(() => document.body.style.overflow), '')
+  check('animated successful login completes the workspace transition and cleans up its state')
+  assert.deepEqual(errors, [])
+} finally {
+  await writeFile(path.join(output, 'results.json'), JSON.stringify({ passed, errors, state }, null, 2))
+  console.log(JSON.stringify({ output, passed, errors }))
+  await browser.close()
+}

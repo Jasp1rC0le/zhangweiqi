@@ -6,7 +6,8 @@ spring:
       request-timeout: 180s
   servlet:
     multipart:
-      max-file-size: 8MB
+      resolve-lazily: true # Existing JWT and request admission run before multipart body parsing.
+      max-file-size: 10MB
       max-request-size: 40MB
   datasource:
     url: jdbc:mysql://${DB_HOST:127.0.0.1}:${DB_PORT:3306}/${DB_NAME:campus_ai}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
@@ -38,6 +39,18 @@ mybatis:
   configuration:
     map-underscore-to-camel-case: true
 app:
+  teaching:
+    enabled: ${APP_TEACHING_ENABLED:false}
+    identity-enabled: ${APP_TEACHING_IDENTITY_ENABLED:${APP_TEACHING_ENABLED:false}}
+    roster-enabled: ${APP_TEACHING_ROSTER_ENABLED:false}
+    lifecycle-enabled: ${APP_TEACHING_LIFECYCLE_ENABLED:false}
+    responsibility-enabled: ${APP_TEACHING_RESPONSIBILITY_ENABLED:false}
+    lesson-change-enabled: ${APP_TEACHING_LESSON_CHANGE_ENABLED:false}
+    reminder-delay-ms: ${TEACHING_REMINDER_DELAY_MS:30000}
+    reminder-lesson-batch: ${TEACHING_REMINDER_LESSON_BATCH:100}
+    reminder-notice-batch: ${TEACHING_REMINDER_NOTICE_BATCH:1000}
+    # Prepare rows early, but inbox reads keep due_at <= now; this is not early delivery.
+    reminder-prepare-seconds: ${TEACHING_REMINDER_PREPARE_SECONDS:900}
   jobs:
     initial-delay-millis: ${JOB_INITIAL_DELAY_MILLIS:5000}
     poll-millis: ${JOB_POLL_MILLIS:2000}

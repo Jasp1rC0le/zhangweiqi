@@ -1,12 +1,27 @@
 {
   "school": "天津中德应用技术大学",
   "checkedAt": "2026-10-09",
+  "supplementCheckedAt": "2026-10-11",
   "image": "/campus-map/tsguas-handdrawn-2026-10-09.jpg",
   "imageSha256": "efaf3005e08d520b64f94d608f3bfcb175b666c3dd40ebcd140549e77545a260",
   "imageSource": "用户提供；图纸制作时间及版权归属未核实",
   "coordinateSystem": "schematic-normalized-image-only",
   "satelliteVerified": false,
   "walkableGraphVerified": false,
+  "officialAerialReference": {
+    "image": "/campus-map/tsguas-official-aerial-undated-2026-10-11.jpg",
+    "imageSha256": "4f7ba297210b8bf9f62147bd079ff076e0d04eb061ad7c9c4351c476dc6989f7",
+    "title": "天津中德应用技术大学实景图",
+    "sourcePage": "https://hqjj.tsguas.edu.cn/lxwm.htm",
+    "sourceImage": "https://hqjj.tsguas.edu.cn/__local/1/22/45/4ABCA21C78AD729A64443503D66_6B4321A1_22EA5.jpg",
+    "sourceDate": null,
+    "reviewedAt": "2026-10-11",
+    "width": 1024,
+    "height": 696,
+    "georeferenced": false,
+    "currentAccessVerified": false,
+    "note": "官网公开实景方位参考，拍摄和图纸制作日期未知。H1至H6、G、L1/L2等旧楼号不能与用户手绘图编号自动对应；未重定位任何手绘图归一化坐标，不保证现行楼宇用途或通行。"
+  },
   "panorama": {
     "url": "https://www.720yun.com/t/30vkie79r2w?scene_id=33330282",
     "status": "title_only_scene_timeout",
@@ -17,11 +32,13 @@
     "https://jxcl.tsguas.edu.cn/xygk/lxwm.htm",
     "https://zs.tsguas.edu.cn/info/1006/1847.htm",
     "https://xxtx.tsguas.edu.cn/",
-    "https://xny.tsguas.edu.cn/lxwm.htm"
+    "https://xny.tsguas.edu.cn/lxwm.htm",
+    "https://hqjj.tsguas.edu.cn/lxwm.htm"
   ],
   "conflicts": [
     "官网英文说明与手绘图对炎培大道、行知大道的左右位置描述相反，问路暂不用这两个路名",
-    "部分楼号只在手绘图出现；未核实具体楼门、台阶、无障碍入口、实时施工或校门通行"
+    "部分楼号只在手绘图出现；未核实具体楼门、台阶、无障碍入口、实时施工或校门通行",
+    "官方实景图与手绘图的公寓及部分楼号不同，日期未知，不自动合并楼号或套用手绘归一化坐标"
   ],
   "answerPolicy": [
     "先确定起点",

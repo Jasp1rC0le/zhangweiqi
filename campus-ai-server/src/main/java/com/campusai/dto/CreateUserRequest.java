@@ -25,6 +25,9 @@ public class CreateUserRequest {
     @Positive(message = "学校编号无效")
     private Long schoolId;
 
+    @jakarta.validation.constraints.Pattern(regexp = "STUDENT|TEACHER|COUNSELOR|SECRETARY", message = "注册身份无效")
+    private String teachingIdentity = "STUDENT";
+
     @NotNull(message = "请先阅读并同意隐私说明")
     @AssertTrue(message = "请先阅读并同意隐私说明")
     private Boolean privacyAccepted;

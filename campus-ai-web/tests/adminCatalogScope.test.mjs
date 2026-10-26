@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import vm from 'node:vm'
+import { createCatalogDraftTransition } from '../src/utils/catalogDraftTransition.js'
 import {
   createAdminCatalogScope,
   createAdminCatalogState,
@@ -429,7 +430,10 @@ timed(
       const source = await readFile(new URL(`../src/views/${name}.vue`, import.meta.url), 'utf8')
       assert.match(source, /watch\(owner,[^\n]*flush: 'sync'/)
       assert.match(source, /userSessionGeneration\.value/)
-      assert.match(source, /onBeforeUnmount\(\(\) => catalog\.dispose\(\)\)/)
+      assert.match(
+        source,
+        /onBeforeUnmount\(\(\) => \{ transitions\.dispose\(\); catalog\.dispose\(\) \}\)/,
+      )
       assert.match(source, /useScopedConfirmation/)
       assert.doesNotMatch(source, /ElMessageBox/)
       for (const field of source.matchAll(
@@ -547,9 +551,9 @@ async function panelFixture(name, overrides = {}) {
     .replace('<script setup>', '')
     .replace(/^import[^\n]*\n/gm, '')
   const canteenNames =
-    'catalog, state, canteenId, merchantId, canteenForm, merchantForm, photoPreviews, submitCanteen, submitMerchant, uploadPhoto, moderate'
+    'catalog, state, canteenId, merchantId, canteenForm, merchantForm, photoPreviews, submitCanteen, submitMerchant, uploadPhoto, moderate, editCanteen, editMerchant, cancelCanteen, cancelMerchant, dirty, canteenDirty, merchantDirty, draftKey'
   const careerNames =
-    'catalog, state, employerId, candidateId, jobId, employer, job, candidateKeyword, prepareCandidate, editEmployer, submitEmployer, submitJob, discoverCandidates'
+    'catalog, state, employerId, candidateId, jobId, employer, job, candidateKeyword, prepareCandidate, editEmployer, submitEmployer, submitJob, discoverCandidates, editJob, cancelEmployer, cancelJob, rejectCandidate, dirty, employerDirty, jobDirty, draftKey'
   const scope = {
     api,
     reactive,
@@ -568,6 +572,8 @@ async function panelFixture(name, overrides = {}) {
     userSessionGeneration: ref(1),
     createAdminCatalogScope,
     createAdminCatalogState,
+    createCatalogDraftTransition,
+    defineExpose: () => {},
     catalogId: (id) => Number.isSafeInteger(id) && id > 0,
     sameCatalogEntry,
     validCatalogList,
@@ -595,9 +601,10 @@ async function panelFixture(name, overrides = {}) {
     ...result,
     calls,
     urls,
+    epoch: scope.userSessionGeneration,
     unmount: () => unmounts.forEach((fn) => fn()),
     candidate,
-    employer,
+    employerRow: employer,
   }
 }
 timed('actual canteen save freezes ID and payload and never clears later form edits', async () => {
@@ -670,7 +677,7 @@ timed(
     const p = await panelFixture('AdminCareerPanel')
     p.prepareCandidate(p.candidate)
     assert.equal(p.candidateId.value, 3)
-    p.editEmployer(p.employer)
+    p.editEmployer(p.employerRow)
     assert.equal(p.candidateId.value, null)
     assert.equal(await p.submitEmployer(), true)
     assert.equal(p.calls.filter((c) => c.method === 'importEmployerCandidate').length, 0)
@@ -708,5 +715,118 @@ timed(
     d.resolve(true)
     assert.equal(await searching, false)
     assert.equal(p.calls.filter((c) => c.method === 'discoverEmployerCandidates').length, 0)
+  },
+)
+
+timed('actual canteen editor baselines distinguish prefill change and restoration', async () => {
+  const p = await panelFixture('AdminCanteenPanel')
+  assert.equal(p.dirty.value, false)
+  assert.equal(await p.editCanteen(p.state.canteens[0]), true)
+  assert.equal(p.canteenDirty.value, false)
+  p.canteenForm.name = '尚未保存的修改'
+  assert.equal(p.canteenDirty.value, true)
+  p.canteenForm.name = p.state.canteens[0].name
+  assert.equal(p.canteenDirty.value, false)
+  p.merchantForm.description = '只填写商家介绍也算未保存'
+  assert.equal(p.dirty.value, true)
+})
+timed('actual cancelled canteen replacement retains both independent forms', async () => {
+  const p = await panelFixture('AdminCanteenPanel', { confirm: async () => false })
+  p.canteenForm.name = '当前新食堂'
+  p.merchantForm.description = '当前商家'
+  assert.equal(await p.editCanteen(p.state.canteens[0]), false)
+  assert.equal(p.canteenId.value, null)
+  assert.equal(p.canteenForm.name, '当前新食堂')
+  assert.equal(p.merchantForm.description, '当前商家')
+  assert.equal(p.calls.filter((c) => c.method.startsWith('save')).length, 0)
+})
+timed('actual confirmed merchant clear affects no canteen draft or saved row', async () => {
+  const p = await panelFixture('AdminCanteenPanel')
+  p.canteenForm.name = '保留食堂填写'
+  p.merchantForm.name = '放弃商家填写'
+  assert.equal(await p.cancelMerchant(), true)
+  assert.equal(p.merchantDirty.value, false)
+  assert.equal(p.merchantForm.name, '')
+  assert.equal(p.canteenForm.name, '保留食堂填写')
+  assert.equal(p.calls.filter((c) => c.method.startsWith('save')).length, 0)
+})
+timed('actual accepted canteen discard cannot clear a later login draft', async () => {
+  const d = deferred(),
+    p = await panelFixture('AdminCanteenPanel', { confirm: () => d.promise })
+  p.canteenForm.name = '旧登录草稿'
+  const cancelling = p.cancelCanteen()
+  p.epoch.value = 2
+  p.canteenForm.name = '新登录草稿'
+  d.resolve(true)
+  assert.equal(await cancelling, false)
+  assert.equal(p.canteenForm.name, '新登录草稿')
+  assert.equal(p.dirty.value, true)
+})
+timed('actual successful canteen save resets baseline only after acknowledgement', async () => {
+  const d = deferred(),
+    p = await panelFixture('AdminCanteenPanel', { saveAdminCanteen: () => d.promise })
+  p.canteenForm.name = '待保存草稿'
+  const saving = p.submitCanteen()
+  assert.equal(p.dirty.value, true)
+  d.resolve({})
+  assert.equal(await saving, true)
+  assert.equal(p.dirty.value, false)
+})
+timed(
+  'actual candidate edit cancellation retains personal input and independent job draft',
+  async () => {
+    const p = await panelFixture('AdminCareerPanel', { confirm: async () => false })
+    p.employer.name = '当前企业填写'
+    p.job.description = '保留岗位描述'
+    assert.equal(await p.prepareCandidate(p.candidate), false)
+    assert.equal(p.candidateId.value, null)
+    assert.equal(p.employer.name, '当前企业填写')
+    assert.equal(p.job.description, '保留岗位描述')
+  },
+)
+timed('actual job clear and restored metadata use complete independent baseline', async () => {
+  const p = await panelFixture('AdminCareerPanel')
+  assert.equal(await p.editJob(p.state.jobs[0]), true)
+  assert.equal(p.jobDirty.value, false)
+  p.job.expiresAt = '2026-12-01T10:00'
+  assert.equal(p.jobDirty.value, true)
+  p.job.expiresAt = ''
+  assert.equal(p.jobDirty.value, false)
+  p.employer.industry = '保留行业填写'
+  p.job.title = '放弃岗位修改'
+  assert.equal(await p.cancelJob(), true)
+  assert.equal(p.jobDirty.value, false)
+  assert.equal(p.employer.industry, '保留行业填写')
+  p.candidateKeyword.value = ' '
+  assert.equal(p.dirty.value, true)
+})
+timed(
+  'actual employer discard rejects changed-and-restored text while confirmation waits',
+  async () => {
+    const d = deferred(),
+      p = await panelFixture('AdminCareerPanel', { confirm: () => d.promise })
+    p.employer.name = '原填写'
+    const cancelling = p.cancelEmployer()
+    p.employer.name = '后填写'
+    p.employer.name = '原填写'
+    d.resolve(true)
+    assert.equal(await cancelling, false)
+    assert.equal(p.employer.name, '原填写')
+  },
+)
+timed(
+  'actual ignored candidate acknowledgement never clears later edits of the same candidate',
+  async () => {
+    const d = deferred(),
+      p = await panelFixture('AdminCareerPanel', { rejectEmployerCandidate: () => d.promise })
+    await p.prepareCandidate(p.candidate)
+    const ignoring = p.rejectCandidate(p.candidate)
+    await Promise.resolve()
+    await Promise.resolve()
+    p.employer.description = '等待结果时的新说明'
+    d.resolve({})
+    assert.equal(await ignoring, true)
+    assert.equal(p.employer.description, '等待结果时的新说明')
+    assert.equal(p.employerDirty.value, true)
   },
 )

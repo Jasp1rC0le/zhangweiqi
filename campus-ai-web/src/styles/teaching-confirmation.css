@@ -1,0 +1,63 @@
+.ct-teaching-change-confirm.el-message-box {
+  box-sizing: border-box;
+  display: inline-flex;
+  flex-direction: column;
+  width: min(520px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
+  max-height: 90vh;
+  max-height: calc(100dvh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  padding: 20px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--assistant-surface, #fff);
+  color: var(--assistant-ink, #29323c);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC', sans-serif;
+  --el-color-primary: var(--assistant-accent, #0b62db);
+}
+.ct-teaching-change-confirm .el-message-box__header {
+  flex: none;
+  padding-inline-end: 44px;
+}
+.ct-teaching-change-confirm .el-message-box__headerbtn {
+  top: 8px;
+  right: 8px;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+}
+.ct-teaching-change-confirm .el-message-box__content {
+  min-height: 0;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--assistant-line, #e2e7ec) transparent;
+}
+.ct-teaching-change-confirm .el-message-box__message,
+.ct-teaching-change-confirm .el-message-box__message p {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.75;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.ct-teaching-change-confirm .el-message-box__btns {
+  flex: none;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 16px;
+}
+.ct-teaching-change-confirm .el-message-box__btns .el-button {
+  min-width: 88px;
+  min-height: 44px;
+  height: auto;
+  margin-inline-start: 0;
+  padding: 10px 16px;
+  border-radius: 12px;
+  font-size: 16px;
+}
+.ct-teaching-change-confirm button:focus-visible {
+  outline: 2px solid var(--assistant-accent, #0b62db);
+  outline-offset: 3px;
+}
+@media (max-width: 480px) {
+  .ct-teaching-change-confirm .el-message-box__btns .el-button { flex: 1; }
+}

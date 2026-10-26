@@ -185,6 +185,12 @@ public class AdminKnowledgeController {
         return documentService.findOne(requireAdmin(userId, role).getSchoolId(), id);
     }
 
+    @GetMapping("/documents/page")
+    public KnowledgeDocumentService.DocumentPage documentPage(@RequestAttribute("currentUserId") Long userId,@RequestAttribute("currentUserRole") String role,
+            @RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="25") int size,@RequestParam(defaultValue="") String search) {
+        return documentService.editablePage(requireAdmin(userId,role).getSchoolId(),page,size,search);
+    }
+
     @GetMapping("/documents/scan")
     public List<KnowledgeDocument> scanDocuments(
             @RequestAttribute("currentUserId") Long userId,

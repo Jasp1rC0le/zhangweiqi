@@ -1,0 +1,142 @@
+/* Shared navigation only: do not alter home, login, or the Pro dialog. */
+html:root body .workspace .primary-navigation {
+  display: grid;
+  gap: 4px;
+}
+html:root body .workspace .primary-navigation .nav-item {
+  width: 100%;
+  min-height: 44px;
+  transition:
+    background-color 180ms ease,
+    color 180ms ease;
+}
+html:root body .workspace .workspace-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex: none;
+}
+html:root body .workspace .workspace-header-actions .chat-new-button {
+  margin-left: 0;
+}
+html:root body .workspace .sidebar-account .profile {
+  grid-template-columns: 36px minmax(0, 1fr) 16px;
+}
+html:root body .workspace .profile-chevron {
+  color: var(--assistant-muted);
+  font-size: 14px;
+  transition: transform 180ms ease;
+}
+html:root body .workspace .profile[aria-expanded='true'] .profile-chevron {
+  transform: rotate(180deg);
+}
+html:root body .workspace .sidebar .profile-menu {
+  width: 100%;
+  max-height: calc(100dvh - 120px - env(safe-area-inset-bottom, 0px));
+  box-sizing: border-box;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 8px;
+  border: 1px solid var(--assistant-line);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  color: var(--assistant-ink);
+}
+html:root body .workspace .profile-menu-user {
+  margin-bottom: 6px;
+  padding: 8px 6px 14px;
+  border-bottom: 1px solid var(--assistant-line);
+}
+html:root body .workspace .profile-menu-user strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+html:root body .workspace .profile-menu-user :is(small, .profile-username) {
+  font-size: 12px;
+  color: var(--assistant-muted);
+}
+html:root body .workspace .profile-entry,
+html:root body .workspace .logout-entry {
+  min-height: 44px;
+  padding: 9px 10px;
+  gap: 10px;
+  border-radius: 9px;
+  font-size: 13px;
+  text-align: left;
+  color: var(--assistant-ink);
+  transition: background-color 160ms ease;
+}
+html:root body .workspace .profile-entry :is(svg, .el-icon),
+html:root body .workspace .logout-entry .el-icon {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  color: var(--assistant-muted);
+}
+html:root body .workspace .profile-entry small {
+  margin-left: auto;
+  white-space: nowrap;
+  color: var(--assistant-muted);
+  font-size: 10px;
+}
+html:root body .workspace .profile-entry:is(:hover, [aria-current='page']),
+html:root body .workspace .logout-entry:hover {
+  background: var(--assistant-soft);
+}
+html:root body .workspace .profile-entry[aria-current='page'] {
+  color: var(--assistant-accent-hover);
+}
+html:root body .workspace .logout-entry {
+  margin-top: 8px;
+}
+html:root body .workspace :is(.profile-menu-enter-active, .profile-menu-leave-active) {
+  transition:
+    opacity 180ms ease,
+    transform 180ms var(--assistant-ease);
+}
+html:root body .workspace :is(.profile-menu-enter-from, .profile-menu-leave-to) {
+  opacity: 0;
+  transform: translateY(4px);
+}
+@media (max-width: 760px) {
+  html:root body .workspace .mobile-sidebar-mask {
+    left: min(290px, 84vw);
+    background: rgb(34 43 47 / 20%);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  html:root body .workspace .workspace-header-actions {
+    gap: 0;
+  }
+  html:root body .workspace .profile-entry,
+  html:root body .workspace .logout-entry {
+    font-size: 14px;
+  }
+  html:root body .workspace .sidebar-account {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
+@media (max-width: 360px) {
+  html:root body .workspace.chat-focused .assistant-identity .assistant-avatar {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html:root
+    body
+    .workspace
+    :is(
+      .primary-navigation .nav-item,
+      .profile-chevron,
+      .profile-entry,
+      .logout-entry,
+      .profile-menu-enter-active,
+      .profile-menu-leave-active
+    ) {
+    transition: none;
+  }
+}

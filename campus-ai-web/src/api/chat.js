@@ -21,11 +21,11 @@ export async function getMessages(conversationId, options = {}) {
   return response.data
 }
 
-export async function sendMessage(conversationId, content, model = 'standard') {
+export async function sendMessage(conversationId, content, model = 'standard', options = {}) {
   const response = await http.post(
     `/api/conversations/${conversationId}/messages`,
     { content, model },
-    { timeout: 120000 },
+    { timeout: 120000, ...options },
   )
   return response.data
 }
@@ -44,7 +44,7 @@ export async function sendMessageStream(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Accept: 'text/event-stream',
+        Accept: 'text/event-stream, application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: JSON.stringify({ content, model }),

@@ -1,14 +1,30 @@
 import { parseCsv } from './projectDataCheck.js'
 import { addDays, chinaDate, dayNumber, mondayOf } from './timetable.js'
 
-export const COURSE_COLUMNS = ['课程名称', '星期', '开始时间', '结束时间', '周次', '教室']
-const aliases = ['name', 'weekday', 'startTime', 'endTime', 'weeks', 'room']
+export const COURSE_COLUMNS = ['课程名称', '星期', '开始时间', '结束时间', '周次', '教室', '任课教师']
+export const PERIOD_COLUMNS = ['课程名称', '星期', '开始节次', '结束节次', '周次', '教室', '任课教师']
+const aliases = ['name', 'weekday', 'startTime', 'endTime', 'weeks', 'room', 'teacher']
 export const COURSE_TEMPLATE =
-  '\uFEFF' + COURSE_COLUMNS.join(',') + '\r\n课程示例（请替换）,1,08:00,09:40,1-16单,教室示例\r\n'
+  '\uFEFF' + COURSE_COLUMNS.join(',') + '\r\n课程示例（请替换）,1,08:00,09:40,1-16单,教室示例,教师示例（请替换）\r\n'
+export const PERIOD_TEMPLATE =
+  '\uFEFF' + PERIOD_COLUMNS.join(',') + '\r\n课程示例（请替换）,1,1,2,6,教室示例,教师示例（请替换）\r\n'
+export const isPeriodCourse = (course) => Number.isInteger(course?.startPeriod)
+export const courseTimeLabel = (course) =>
+  isPeriodCourse(course)
+    ? `第${course.startPeriod}${course.endPeriod === course.startPeriod ? '' : `—${course.endPeriod}`}节`
+    : `${course.startTime}—${course.endTime}`
+export function compareCourseTime(a, b) {
+  if (isPeriodCourse(a) && isPeriodCourse(b))
+    return a.startPeriod - b.startPeriod || a.endPeriod - b.endPeriod
+  if (!isPeriodCourse(a) && !isPeriodCourse(b)) return a.startTime.localeCompare(b.startTime)
+  // Without a verified bell schedule the two coordinate systems cannot be ordered in time.
+  return isPeriodCourse(a) ? -1 : 1
+}
 const textField = (value, label, required = true) => {
   if (
     typeof value !== 'string' ||
     value.length > 100 ||
+    // oxlint-disable-next-line no-control-regex -- Imported single-line fields must reject control characters.
     /[\u0000-\u001f\u007f]/.test(value) ||
     (required && !value.trim())
   )
@@ -39,26 +55,40 @@ export function courseKey(course) {
   return JSON.stringify([
     course.name,
     course.weekday,
-    course.startTime,
-    course.endTime,
+    isPeriodCourse(course) ? `period:${course.startPeriod}` : course.startTime,
+    isPeriodCourse(course) ? `period:${course.endPeriod}` : course.endTime,
     course.weeks,
     course.room,
+    course.teacher || '',
   ])
 }
 export function normalizeCourse(course) {
   const name = textField(course?.name, '课程名称'),
-    room = textField(course?.room, '教室', false)
+    room = textField(course?.room, '教室', false), teacher = textField(course?.teacher ?? '', '任课教师', false)
   if (!Number.isInteger(course.weekday) || course.weekday < 1 || course.weekday > 7)
     throw new Error('星期须填1至7，周一为1，周日为7')
   const time = /^(?:[01]\d|2[0-3]):[0-5]\d$/
+  const byPeriod = course.startPeriod != null || course.endPeriod != null
   if (
-    typeof course.startTime !== 'string' ||
-    typeof course.endTime !== 'string' ||
-    !time.test(course.startTime) ||
-    !time.test(course.endTime) ||
-    course.startTime >= course.endTime
+    byPeriod &&
+    (!Number.isInteger(course.startPeriod) ||
+      !Number.isInteger(course.endPeriod) ||
+      course.startPeriod < 1 ||
+      course.endPeriod > 16 ||
+      course.startPeriod > course.endPeriod ||
+      (course.startTime != null && course.startTime !== '') ||
+      (course.endTime != null && course.endTime !== ''))
   )
-    throw new Error('时间请填HH:mm，结束时间须晚于开始时间；不自动换算第几节课')
+    throw new Error('节次须为1至16的整数，结束节次不小于开始节次；不能同时填写钟点')
+  if (
+    !byPeriod &&
+    (typeof course.startTime !== 'string' ||
+      typeof course.endTime !== 'string' ||
+      !time.test(course.startTime) ||
+      !time.test(course.endTime) ||
+      course.startTime >= course.endTime)
+  )
+    throw new Error('时间请填HH:mm，结束时间须晚于开始时间；只有第几节时请使用节次表头')
   if (
     !Array.isArray(course.weeks) ||
     !course.weeks.length ||
@@ -69,10 +99,12 @@ export function normalizeCourse(course) {
   return {
     name,
     weekday: course.weekday,
-    startTime: course.startTime,
-    endTime: course.endTime,
+    ...(byPeriod
+      ? { startPeriod: course.startPeriod, endPeriod: course.endPeriod }
+      : { startTime: course.startTime, endTime: course.endTime }),
     weeks: [...new Set(course.weeks)].sort((a, b) => a - b),
     room,
+    ...(teacher ? { teacher } : {}),
   }
 }
 export function normalizeCourses(courses) {
@@ -85,9 +117,7 @@ export function normalizeCourses(courses) {
   }
   return [...distinct.values()].sort(
     (a, b) =>
-      a.weekday - b.weekday ||
-      a.startTime.localeCompare(b.startTime) ||
-      courseKey(a).localeCompare(courseKey(b)),
+      a.weekday - b.weekday || compareCourseTime(a, b) || courseKey(a).localeCompare(courseKey(b)),
   )
 }
 export function parseCourseTable(input) {
@@ -109,27 +139,34 @@ export function parseCourseTable(input) {
     : parseCsv(input)
   if (parsed.error) throw new Error(parsed.error)
   const headers = parsed.headers.map((value) => value.trim())
-  const index = COURSE_COLUMNS.map((label, i) =>
-    headers.findIndex((value) => value === label || value === aliases[i]),
+  const byPeriod = headers.includes('开始节次') || headers.includes('startPeriod')
+  const columns = byPeriod ? PERIOD_COLUMNS : COURSE_COLUMNS
+  const keys = byPeriod ? ['name', 'weekday', 'startPeriod', 'endPeriod', 'weeks', 'room', 'teacher'] : aliases
+  const index = columns.map((label, i) =>
+    headers.findIndex((value) => value === label || value === keys[i]),
   )
-  if (headers.length !== 6 || new Set(headers).size !== 6 || index.includes(-1))
+  if (![6,7].includes(headers.length) || new Set(headers).size !== headers.length || index.slice(0,6).includes(-1) || headers.length === 7 && index[6] < 0)
     throw new Error(
-      '表头须为：课程名称、星期、开始时间、结束时间、周次、教室。请删除学号、姓名等多余列',
+      '表头须为：课程名称、星期、开始时间、结束时间、周次、教室，可加任课教师；也可将时间两列改为开始节次、结束节次。请删除学生姓名、学号等多余列',
     )
   if (!parsed.rows.length || parsed.rows.length > 120)
     throw new Error('每份表格须有1至120条课程安排')
   let courses = parsed.rows.map((row) => {
     try {
-      if (row.cells.length !== 6) throw new Error('本行应有6列，请检查逗号或制表符')
-      const cell = index.map((i) => row.cells[i].trim())
+      if (row.cells.length !== headers.length) throw new Error(`本行应有${headers.length}列，请检查逗号或制表符`)
+      const cell = index.map((i) => i < 0 ? '' : row.cells[i].trim())
       if (!/^[1-7]$/.test(cell[1])) throw new Error('星期须填1至7，周一为1')
+      if (byPeriod && !cell.slice(2, 4).every((value) => /^\d{1,2}$/.test(value)))
+        throw new Error('节次填1至16的整数，不填钟点或文字')
       return normalizeCourse({
         name: cell[0],
         weekday: Number(cell[1]),
-        startTime: cell[2],
-        endTime: cell[3],
+        ...(byPeriod
+          ? { startPeriod: Number(cell[2]), endPeriod: Number(cell[3]) }
+          : { startTime: cell[2], endTime: cell[3] }),
         weeks: parseCourseWeeks(cell[4]),
         room: cell[5],
+        teacher: cell[6],
       })
     } catch (failure) {
       throw new Error(`第${row.line}行：${failure.message}`, { cause: failure })
@@ -149,7 +186,11 @@ export function courseConflicts(courses) {
     for (let j = i + 1; j < courses.length; j++) {
       const a = courses[i],
         b = courses[j]
-      if (a.weekday === b.weekday && a.startTime < b.endTime && b.startTime < a.endTime) {
+      const sameUnit = isPeriodCourse(a) === isPeriodCourse(b)
+      const overlaps = isPeriodCourse(a)
+        ? a.startPeriod <= b.endPeriod && b.startPeriod <= a.endPeriod
+        : a.startTime < b.endTime && b.startTime < a.endTime
+      if (sameUnit && a.weekday === b.weekday && overlaps) {
         const weeks = a.weeks.filter((week) => b.weeks.includes(week))
         if (weeks.length) conflicts.push({ a: i, b: j, weeks })
       }
@@ -194,14 +235,15 @@ export function nextImportedCourse(schedule, now = new Date()) {
   for (const course of schedule.courses)
     for (const week of course.weeks) {
       const date = addDays(schedule.firstMonday, (week - 1) * 7 + course.weekday - 1)
-      if (date > today || (date === today && course.endTime > hm))
+      if (date > today || (date === today && (isPeriodCourse(course) || course.endTime > hm)))
         candidates.push({
           ...course,
           date,
           week,
-          current: date === today && course.startTime <= hm,
+          current: !isPeriodCourse(course) && date === today && course.startTime <= hm,
+          ...(isPeriodCourse(course) ? { timeUnknown: true } : {}),
         })
     }
-  candidates.sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime))
+  candidates.sort((a, b) => a.date.localeCompare(b.date) || compareCourseTime(a, b))
   return candidates[0] || null
 }

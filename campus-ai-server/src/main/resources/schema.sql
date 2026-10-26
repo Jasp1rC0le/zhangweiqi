@@ -544,6 +544,44 @@ CREATE TABLE IF NOT EXISTS student_course_schedules (
     CONSTRAINT fk_course_schedule_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS personal_schedule_terms (
+    owner_id BIGINT NOT NULL, first_monday DATE NOT NULL, revision INT NOT NULL,
+    semester VARCHAR(100) NOT NULL, snapshot_json MEDIUMTEXT NOT NULL,
+    PRIMARY KEY(owner_id,first_monday),
+    CONSTRAINT fk_personal_term_user FOREIGN KEY(owner_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS personal_schedule_history (
+    owner_id BIGINT NOT NULL, revision INT NOT NULL, first_monday DATE NOT NULL,
+    semester VARCHAR(100) NOT NULL, action VARCHAR(30) NOT NULL, reason VARCHAR(500) NOT NULL,
+    snapshot_json MEDIUMTEXT NOT NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY(owner_id,revision),
+    CONSTRAINT fk_personal_history_user FOREIGN KEY(owner_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS material_command_receipts (
+    owner_id BIGINT NOT NULL,
+    school_id BIGINT NOT NULL,
+    request_id CHAR(36) NOT NULL,
+    kind VARCHAR(40) NOT NULL,
+    payload_sha256 CHAR(64) NOT NULL,
+    result_json MEDIUMTEXT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY(owner_id, request_id),
+    CONSTRAINT fk_material_receipt_user FOREIGN KEY(owner_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS private_material_quota(id INT PRIMARY KEY);
+INSERT INTO private_material_quota(id) SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM private_material_quota WHERE id=1);
+CREATE TABLE IF NOT EXISTS private_material_files (
+    id CHAR(36) PRIMARY KEY, owner_id BIGINT NOT NULL, school_id BIGINT NOT NULL,
+    request_id CHAR(36) NOT NULL, name VARCHAR(180) NOT NULL, byte_size BIGINT NOT NULL,
+    sha256 CHAR(64) NOT NULL, text_sha256 CHAR(64) NOT NULL, extracted_text MEDIUMTEXT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_private_file_request(owner_id,request_id),
+    INDEX idx_private_file_owner(owner_id,school_id,created_at),
+    CONSTRAINT fk_private_file_user FOREIGN KEY(owner_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS student_projects (
     id CHAR(36) PRIMARY KEY,
     user_id BIGINT NOT NULL,

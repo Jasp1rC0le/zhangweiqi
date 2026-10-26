@@ -37,10 +37,16 @@ test('partial, interrupted and user messages never receive verified-looking card
   }
 })
 
-test('answer card labels the cited document count rather than the retrieved chunk count', () => {
+test('full answer comes before secondary references and never becomes a service summary card', () => {
   const view = readFileSync(new URL('../src/views/ChatView.vue', import.meta.url), 'utf8')
-  assert.match(view, /回答引用\s*\{\{ campusServiceResult\(message\)\.sourceCount \}\}\s*份本校资料/)
-  assert.doesNotMatch(view, /依据\s*\{\{ campusServiceResult\(message\)\.sourceCount \}\}\s*项本校资料/)
+  const answer = view.indexOf('<div v-else class="answer-markdown" v-html="renderMarkdown(message.content)">')
+  const references = view.indexOf(':id="`sources-${message.id}`"')
+  assert.ok(answer >= 0 && references > answer)
+  assert.doesNotMatch(view, /v-else-if="campusServiceResult\(message\)"/)
+  assert.doesNotMatch(view, /<small>校内事务<\/small>/)
+  assert.match(view, /safeExternalUrl\(source\.sourceUrl\)/)
+  assert.match(view, /source\.sourceDepartment/)
+  assert.match(view, /formatSourceDate\(source\.publishedAt\)/)
 })
 
 test('reference disclosure labels every retrieved item as a fragment without changing citation numbers', () => {

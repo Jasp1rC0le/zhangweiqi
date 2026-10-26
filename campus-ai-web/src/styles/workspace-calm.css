@@ -1,0 +1,969 @@
+/* Functional workspaces share the approved chat palette. The selector boundary
+   deliberately excludes landing/login, chat composition, and the Pro dialog. */
+html:root body .workspace.calm-workspace {
+  --ct-paper: var(--assistant-bg);
+  --ct-white: #fff;
+  --ct-ink: var(--assistant-ink);
+  --ct-muted: var(--assistant-muted);
+  --ct-blue: var(--assistant-accent);
+  --ct-blue-soft: var(--assistant-soft);
+  --ct-line: var(--assistant-line);
+  --el-color-primary: var(--assistant-accent);
+  --work-radius: 14px;
+  --work-blue: var(--assistant-accent);
+  --work-panel-radius: 16px;
+  --work-space: 24px;
+  --work-enter-duration: 160ms;
+  --work-leave-duration: 60ms;
+  display: grid;
+  grid-template-columns: 244px minmax(0, 1fr);
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0;
+  gap: 0;
+  background: var(--assistant-bg);
+  color: var(--assistant-ink);
+  font:
+    16px/1.65 -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    'PingFang SC',
+    'Microsoft YaHei',
+    sans-serif;
+  transition: grid-template-columns var(--assistant-motion) var(--assistant-ease);
+}
+html:root body .calm-workspace ::selection {
+  background: #dce6ee;
+  color: var(--assistant-ink);
+}
+html:root body .calm-workspace :is(button, a, summary, input, select, textarea):focus-visible {
+  outline: 2px solid var(--assistant-accent);
+  outline-offset: 3px;
+}
+html:root body .calm-workspace :is(input, textarea) {
+  caret-color: var(--assistant-accent);
+}
+html:root body .calm-workspace :is(input, textarea)::placeholder {
+  color: var(--assistant-muted);
+  opacity: 1;
+}
+html:root body .calm-workspace :is(input, select, textarea) {
+  font-weight: 400;
+}
+html:root body .calm-workspace :is(input[type='checkbox'], input[type='radio']) {
+  accent-color: var(--assistant-accent);
+}
+html:root
+  body
+  .calm-workspace
+  :is(.sidebar-nav, .workspace-content, .instrument-directory, .admin-sidebar nav) {
+  scrollbar-width: thin;
+  scrollbar-color: #bec8c8 transparent;
+}
+html:root body .calm-workspace button {
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+}
+html:root body .calm-workspace button:hover {
+  transform: none;
+}
+html:root body .calm-workspace button:disabled {
+  cursor: not-allowed;
+}
+html:root body .calm-workspace a {
+  text-underline-offset: 3px;
+}
+html:root body .calm-workspace .form-recovery-settings summary {
+  color: var(--assistant-accent-hover);
+}
+
+/* The same slim navigation remains present while only the right pane changes. */
+html:root body .calm-workspace > .sidebar {
+  width: 244px;
+  min-width: 0;
+  padding: 28px 16px 16px;
+  background: var(--assistant-panel);
+  border: 0;
+  border-right: 1px solid var(--assistant-line);
+  border-radius: 0;
+  overflow: hidden;
+  transition:
+    opacity 180ms ease,
+    visibility 180ms;
+}
+html:root body .calm-workspace .brand {
+  padding: 0 10px;
+  gap: 10px;
+}
+html:root body .calm-workspace .brand strong {
+  font-size: 21px;
+  letter-spacing: -0.035em;
+}
+html:root body .calm-workspace .brand small {
+  font-size: 11px;
+  color: var(--assistant-muted);
+}
+html:root body .calm-workspace .compose-button {
+  min-height: 44px;
+  height: 44px;
+  margin: 28px 0 20px;
+  padding: 0 14px;
+  border: 1px solid var(--assistant-line);
+  border-radius: var(--work-radius);
+  background: var(--assistant-bg);
+  color: var(--assistant-ink);
+  box-shadow: none;
+  font-size: 14px;
+}
+html:root body .calm-workspace .sidebar-nav {
+  margin-top: 0;
+  padding: 0 2px;
+}
+html:root body .calm-workspace .nav-label {
+  margin: 12px 10px 8px;
+  font-size: 12px;
+  letter-spacing: 0;
+  color: var(--assistant-muted);
+}
+html:root body .calm-workspace :is(.nav-item, .conversation-item) {
+  min-height: 40px;
+  padding: 8px 12px;
+  font-size: 14px;
+  border-radius: 10px;
+  color: var(--assistant-muted);
+  box-shadow: none;
+}
+html:root body .calm-workspace :is(.nav-item, .conversation-item):hover {
+  background: #e5e9e6;
+}
+html:root body .calm-workspace :is(.nav-item.active, .conversation-row.active .conversation-item) {
+  background: var(--assistant-soft);
+  color: var(--assistant-accent-hover);
+  box-shadow: none;
+}
+html:root body .calm-workspace .nav-item :is(svg, .el-icon) {
+  width: 18px;
+  height: 18px;
+}
+html:root body .calm-workspace .membership-entry {
+  gap: 8px;
+  white-space: nowrap;
+}
+html:root body .calm-workspace .membership-entry small {
+  color: var(--assistant-muted);
+  background: transparent;
+  font-size: 10px;
+  padding: 0;
+  font-weight: 400;
+  flex: none;
+}
+html:root body .calm-workspace .recent-label {
+  margin-top: 28px;
+}
+html:root body .calm-workspace .history-search {
+  border: 0;
+  background: transparent;
+  min-height: 36px;
+  height: 36px;
+}
+html:root body .calm-workspace .history-search input {
+  font-size: 13px;
+}
+html:root body .calm-workspace .fresh-conversation {
+  border: 0;
+  background: transparent;
+  font-size: 13px;
+}
+html:root body .calm-workspace .sidebar-account {
+  padding-top: 12px;
+}
+html:root body .calm-workspace .profile {
+  padding: 10px 8px;
+}
+html:root body .calm-workspace .avatar {
+  border-radius: 10px;
+  background: #dce4e4;
+  color: var(--assistant-accent-hover);
+  border: 0;
+}
+html:root body .calm-workspace .profile-copy strong {
+  font-size: 13px;
+}
+html:root body .calm-workspace .profile-copy small {
+  font-size: 11px;
+}
+html:root body .calm-workspace .workspace-pane {
+  height: 100dvh;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: var(--assistant-bg);
+}
+html:root body .calm-workspace .workspace-toolbar {
+  min-height: 80px;
+  padding: 16px 32px;
+  gap: 16px;
+  border: 0;
+  color: var(--assistant-muted);
+  font-size: 14px;
+}
+html:root body .calm-workspace .workspace-menu-button {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--assistant-muted);
+  cursor: pointer;
+}
+html:root body .calm-workspace .workspace-menu-button:hover {
+  background: var(--assistant-panel);
+}
+html:root body .calm-workspace .workspace-location {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+html:root body .calm-workspace .workspace-content {
+  scroll-padding: 24px;
+}
+html:root body .calm-workspace .workspace-reveal {
+  animation: none;
+}
+html:root body .calm-workspace .workspace-content-enter-active {
+  transition:
+    opacity var(--work-enter-duration) ease,
+    transform var(--work-enter-duration) var(--assistant-ease);
+}
+html:root body .calm-workspace .workspace-content-leave-active {
+  transition: none;
+}
+html:root body .calm-workspace .workspace-content-enter-from {
+  transform: translateX(6px);
+}
+html:root body .calm-workspace .workspace-content-leave-to {
+  transform: none;
+}
+
+/* Give discussion previews a readable measure without boxing each topic. */
+html:root body .calm-workspace .wall-row p {
+  max-width: 72ch;
+}
+html:root body .calm-workspace .wall-guidance {
+  margin: 0 0 12px;
+  color: var(--assistant-muted);
+  font-size: 14px;
+}
+html:root body .calm-workspace .wall-guidance summary {
+  min-height: 44px;
+  line-height: 44px;
+  cursor: pointer;
+  width: fit-content;
+}
+html:root body .calm-workspace .wall-guidance .wall-notice {
+  margin: 0 0 12px;
+  padding: 0;
+  border: 0;
+}
+
+/* Readable tasks: one heading, grouped controls, breathing room between sections. */
+html:root body .calm-workspace :is(.work-page, .table-main, .account-content, .review-content) {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 20px 40px 64px;
+  color: var(--assistant-ink);
+}
+html:root body .calm-workspace :is(.table-page, .account-page, .project-studio, .admin-page) {
+  background: transparent;
+  color: var(--assistant-ink);
+}
+html:root
+  body
+  .calm-workspace
+  :is(.work-heading, .timetable-heading, .table-intro, .instrument-heading, .account-intro) {
+  margin: 0 0 28px;
+  padding-top: 0;
+}
+html:root
+  body
+  .calm-workspace
+  :is(
+    .work-heading h1,
+    .review-content h1,
+    .timetable-heading h1,
+    .table-intro h1,
+    .instrument-heading h2,
+    .account-intro h1,
+    .studio-start h2,
+    .admin-page > main > header h1
+  ) {
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: -0.025em;
+  color: var(--assistant-ink);
+  margin: 0 0 10px;
+}
+html:root
+  body
+  .calm-workspace
+  :is(
+    .work-heading p,
+    .timetable-heading p,
+    .table-lead,
+    .instrument-heading p,
+    .account-intro .lede,
+    .studio-start > p,
+    .admin-page > main > header > span
+  ) {
+  color: var(--assistant-muted);
+  font-size: 15px;
+  line-height: 1.75;
+  margin: 0;
+  max-width: 68ch;
+}
+html:root
+  body
+  .calm-workspace
+  :is(.work-form h2, .account-card h2, .section-heading h2, .overview-section-heading h2) {
+  font-size: 20px;
+  line-height: 1.45;
+  letter-spacing: -0.02em;
+  margin: 0 0 12px;
+}
+html:root
+  body
+  .calm-workspace
+  :is(
+    .work-form,
+    .account-card,
+    .course-import,
+    .review-empty,
+    .overview-section,
+    .import-form,
+    .review-card
+  ) {
+  border: 1px solid var(--assistant-line);
+  background: #fff;
+  border-radius: var(--work-panel-radius);
+  box-shadow: none;
+  padding: var(--work-space);
+}
+html:root
+  body
+  .calm-workspace
+  :is(
+    .work-button,
+    .project-studio button,
+    .account-card button,
+    .table-save-score,
+    .table-comment-footer button,
+    .table-empty button
+  ) {
+  min-height: 42px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: none;
+}
+html:root body .calm-workspace .work-button {
+  background: #fff;
+  border-color: var(--assistant-line);
+  color: var(--assistant-ink);
+}
+html:root
+  body
+  .calm-workspace
+  :is(
+    .work-button.primary,
+    .project-studio button.primary,
+    .account-card button:not(.secondary):not(.danger),
+    .table-save-score,
+    .table-comment-footer button,
+    .table-empty button,
+    .quality-form button,
+    .import-form-actions > button,
+    .import-source-actions > button
+  ) {
+  background: var(--assistant-accent);
+  border-color: var(--assistant-accent);
+  color: #fff;
+}
+html:root
+  body
+  .calm-workspace
+  :is(
+    .work-button.primary,
+    .project-studio button.primary,
+    .account-card button:not(.secondary):not(.danger),
+    .table-save-score,
+    .table-comment-footer button
+  ):hover:not(:disabled) {
+  background: var(--assistant-accent-hover);
+  border-color: var(--assistant-accent-hover);
+  filter: none;
+}
+html:root
+  body
+  .calm-workspace
+  :is(
+    .work-button:not(.primary),
+    .project-studio button:not(.primary),
+    .account-card button.secondary
+  ):hover:not(:disabled) {
+  background: var(--assistant-panel);
+  border-color: #b9c4c5;
+  filter: none;
+}
+html:root body .calm-workspace .account-card button.secondary {
+  background: var(--assistant-soft);
+  color: var(--assistant-accent-hover);
+}
+html:root
+  body
+  .calm-workspace
+  .workspace-pane
+  :is(
+    input:not([type='checkbox']):not([type='radio']):not([type='file']):not([type='hidden']),
+    select,
+    textarea
+  ):not(:where(.table-search input)) {
+  color: var(--assistant-ink);
+  background: #fff;
+  border-color: var(--assistant-line);
+  border-radius: 12px;
+  font-size: 16px;
+  box-shadow: none;
+}
+html:root body .calm-workspace .workspace-pane :is(input, select, textarea):focus-visible {
+  border-color: var(--assistant-accent);
+  box-shadow: none;
+}
+html:root body .calm-workspace :is(.work-tabs, .table-filters) {
+  border-radius: var(--assistant-control-radius);
+  background: var(--assistant-panel);
+  padding: 4px;
+  gap: 4px;
+}
+html:root body .calm-workspace :is(.work-tabs button, .table-filters button, .studio-tabs button) {
+  border-radius: 10px;
+  color: var(--assistant-muted);
+  border-color: transparent;
+  box-shadow: none;
+}
+html:root
+  body
+  .calm-workspace
+  :is(
+    .work-tabs button[aria-pressed='true'],
+    .table-filters button.active,
+    .studio-tabs button.active
+  ) {
+  background: var(--assistant-soft);
+  color: var(--assistant-accent-hover);
+  border-color: transparent;
+  box-shadow: none;
+}
+html:root
+  body
+  .calm-workspace
+  :is(
+    .work-help,
+    .work-form small,
+    .wall-notice,
+    .wall-meta,
+    .wall-row footer,
+    .studio-field-help,
+    .studio-boundary,
+    .directory-intro,
+    .directory-empty
+  ) {
+  color: var(--assistant-muted);
+  line-height: 1.75;
+}
+html:root body .calm-workspace :is(.wall-meta > span, .studio-toolbar strong) {
+  background: var(--assistant-panel);
+  color: var(--assistant-muted);
+}
+html:root body .calm-workspace .wall-row {
+  border-color: var(--assistant-line);
+  padding: 24px 0;
+}
+html:root body .calm-workspace .wall-row h2 {
+  font-size: 19px;
+  font-weight: 600;
+}
+html:root body .calm-workspace .wall-row a {
+  color: var(--assistant-ink);
+}
+html:root body .calm-workspace .wall-row a:hover h2 {
+  color: var(--assistant-accent-hover);
+}
+html:root body .calm-workspace :is(.wall-row p, .wall-body) {
+  color: var(--assistant-muted);
+  font-size: 16px;
+  line-height: 1.8;
+}
+html:root body .calm-workspace .work-empty {
+  background: var(--assistant-panel);
+  border: 0;
+  border-radius: var(--work-panel-radius);
+}
+
+/* Ratings remain expressive, with a quieter frame around actual food and reviews. */
+html:root body .calm-workspace .table-intro {
+  padding-bottom: 0;
+}
+html:root body .calm-workspace .table-intro-note {
+  border-color: var(--assistant-line);
+}
+html:root body .calm-workspace .table-intro-note p {
+  font-size: 15px;
+  color: var(--assistant-ink);
+}
+html:root
+  body
+  .calm-workspace
+  :is(.table-intro-note, .table-location, .table-description, .table-first-review) {
+  color: var(--assistant-muted);
+}
+html:root body .calm-workspace .table-search {
+  background: #fff;
+  border: 1px solid var(--assistant-line);
+  border-radius: 12px;
+}
+html:root body .calm-workspace .table-search input {
+  border: 0;
+  background: transparent;
+}
+html:root body .calm-workspace .table-card {
+  padding: 24px;
+  border-radius: var(--work-panel-radius);
+  border: 1px solid var(--assistant-line);
+  box-shadow: none;
+  background: #fff;
+}
+html:root body .calm-workspace .table-shop-info h3 {
+  font-size: 21px;
+  letter-spacing: -0.02em;
+}
+html:root body .calm-workspace .table-score strong {
+  font-size: 30px;
+  color: var(--assistant-accent-hover);
+  letter-spacing: -0.025em;
+}
+html:root body .calm-workspace .table-featured {
+  background: #f6f3eb;
+  border: 0;
+  border-radius: 10px;
+}
+html:root body .calm-workspace .table-featured p {
+  color: #6e5b34;
+}
+html:root body .calm-workspace .table-review-toggle {
+  color: var(--assistant-accent-hover);
+}
+
+/* Editors keep their functional hierarchy and private-data boundaries. */
+html:root body .calm-workspace .studio-layout {
+  min-height: calc(100dvh - 80px);
+}
+html:root body .calm-workspace .studio-directory {
+  background: var(--assistant-panel);
+  border-color: var(--assistant-line);
+  padding: 24px 18px;
+}
+html:root body .calm-workspace .directory-heading h1 {
+  font-size: 18px;
+}
+html:root body .calm-workspace .studio-main {
+  padding: 20px 32px 64px;
+}
+html:root body .calm-workspace .project-studio .project-template {
+  border-radius: 0;
+  background: transparent;
+  border-bottom-color: var(--assistant-line);
+  box-shadow: none;
+}
+html:root body .calm-workspace .studio-next-action {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  align-items: center;
+  gap: 16px;
+}
+html:root body .calm-workspace .studio-next-action > div {
+  min-width: 0;
+}
+html:root body .calm-workspace .studio-next-action > button {
+  justify-self: start;
+  max-width: 100%;
+  white-space: normal;
+}
+html:root
+  body
+  .calm-workspace
+  :is(.project-list a.selected, .instrument-directory button[aria-pressed='true']) {
+  background: var(--assistant-soft);
+  color: var(--assistant-accent-hover);
+  border-color: transparent;
+  box-shadow: none;
+}
+html:root
+  body
+  .calm-workspace
+  :is(.studio-next-action, .selection-assistant, .instrument-source, .data-row-detail) {
+  background: var(--assistant-panel);
+  border: 0;
+  border-radius: var(--work-panel-radius);
+}
+html:root body .calm-workspace :is(.instrument-library, .instrument-purpose) {
+  color: var(--assistant-ink);
+}
+html:root body .calm-workspace :is(.instrument-source a, .project-list svg) {
+  color: var(--assistant-accent-hover);
+}
+html:root body .calm-workspace .instrument-directory button {
+  color: var(--assistant-muted);
+  border-radius: 10px;
+}
+html:root body .calm-workspace .instrument-directory button:hover {
+  background: var(--assistant-panel);
+}
+html:root body .calm-workspace .account-content {
+  max-width: 1040px;
+}
+html:root body .calm-workspace .account-intro {
+  padding-bottom: 24px;
+}
+html:root body .calm-workspace .account-card {
+  margin-bottom: 24px;
+  scroll-margin-top: 24px;
+}
+html:root body .calm-workspace :is(.account-card h2, .identity-copy h2, .identity-copy p) {
+  color: var(--assistant-ink);
+}
+html:root body .calm-workspace .account-card p {
+  color: var(--assistant-muted);
+}
+html:root body .calm-workspace .account-card p.form-error {
+  color: var(--assistant-danger, #bf303d);
+}
+html:root body .calm-workspace .studio-directory .directory-error {
+  grid-column: 1 / -1;
+  color: var(--assistant-danger, #bf303d);
+  font-size: 14px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+html:root body .calm-workspace .identity-panel {
+  background: #fff;
+  border-color: var(--assistant-line);
+  border-radius: var(--work-panel-radius);
+}
+html:root body .calm-workspace .identity-copy small {
+  color: var(--assistant-muted);
+}
+html:root body .calm-workspace .identity-actions button {
+  border-color: var(--assistant-line);
+  background: var(--assistant-panel);
+  color: var(--assistant-ink);
+  border-radius: 12px;
+}
+html:root body .calm-workspace .identity-admin-link {
+  border-color: var(--assistant-accent);
+  background: var(--assistant-accent);
+  color: #fff;
+  border-radius: 12px;
+}
+html:root body .calm-workspace .identity-admin-link:hover {
+  background: var(--assistant-accent-hover);
+}
+html:root body .calm-workspace .danger-card {
+  border-color: #e6cbc7;
+}
+html:root body .calm-workspace .account-nav a {
+  color: var(--assistant-accent-hover);
+}
+
+/* Administrator navigation stays dense and available; authority is unchanged. */
+html:root body .calm-workspace .workspace-page .admin-sidebar {
+  background: transparent;
+  backdrop-filter: none;
+  padding: 0 32px 12px;
+  border-color: var(--assistant-line);
+}
+html:root body .calm-workspace .workspace-page .admin-sidebar nav {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding: 4px 2px 8px;
+  gap: 6px;
+}
+html:root body .calm-workspace .workspace-page .admin-sidebar nav button {
+  flex: none;
+  min-height: 40px;
+  border-radius: 10px;
+  color: var(--assistant-muted);
+  font-size: 14px;
+}
+html:root body .calm-workspace .workspace-page .admin-sidebar nav button.active {
+  background: var(--assistant-soft);
+  color: var(--assistant-accent-hover);
+  box-shadow: none;
+}
+html:root body .calm-workspace .workspace-page .admin-page > main {
+  width: 100%;
+  max-width: 1120px;
+  padding: 24px 40px 64px;
+}
+html:root body .calm-workspace .overview-panel {
+  margin-top: 24px;
+}
+html:root body .calm-workspace .overview-metric {
+  min-height: 134px;
+  padding: 20px;
+  background: #fff;
+  border: 1px solid var(--assistant-line);
+  border-radius: var(--work-panel-radius);
+  box-shadow: none;
+}
+html:root body .calm-workspace .overview-metric strong {
+  font-family: inherit;
+  color: var(--assistant-ink);
+  font-size: 28px;
+  letter-spacing: -0.025em;
+  margin: 12px 0;
+}
+html:root body .calm-workspace .overview-metric :is(span, small) {
+  color: var(--assistant-muted);
+}
+html:root body .calm-workspace .overview-metric-action:hover {
+  background: var(--assistant-panel);
+  border-color: #b9c4c5;
+  box-shadow: none;
+}
+html:root body .calm-workspace :is(.overview-toolbar button, .overview-section-heading button) {
+  color: var(--assistant-accent-hover);
+  font-size: 13px;
+}
+html:root body .calm-workspace .overview-provider-track span {
+  background: var(--assistant-accent);
+}
+html:root
+  body
+  .calm-workspace
+  :is(.overview-metric small, .overview-section-heading small, .import-notice) {
+  font-size: 13px;
+}
+html:root body .calm-workspace .admin-page table {
+  font-variant-numeric: tabular-nums;
+}
+html:root body .calm-workspace :is(.canteen-admin, .career-admin) .editor {
+  border-color: var(--assistant-line);
+  border-radius: var(--work-panel-radius);
+  background: var(--assistant-surface);
+  box-shadow: none;
+}
+html:root
+  body
+  .calm-workspace
+  :is(.canteen-admin, .career-admin)
+  :is(.form-actions, .row-actions)
+  button:not(.quiet) {
+  background: var(--assistant-accent);
+  font-weight: 500;
+}
+html:root body .calm-workspace :is(.canteen-admin, .career-admin) .catalog-refresh {
+  background: var(--assistant-soft);
+  color: var(--assistant-accent-hover);
+  font-weight: 500;
+}
+
+@media (min-width: 761px) {
+  html:root body .workspace.calm-workspace.workspace-expanded {
+    grid-template-columns: 0 minmax(0, 1fr) !important;
+  }
+  html:root body .workspace.calm-workspace.workspace-expanded > .sidebar {
+    display: flex !important;
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+@media (max-width: 1100px) {
+  html:root
+    body
+    .calm-workspace
+    :is(.work-page, .table-main, .account-content, .review-content, .workspace-page .admin-page > main) {
+    padding: 20px 28px 48px;
+  }
+  html:root body .calm-workspace .studio-main {
+    padding: 20px 24px 48px;
+  }
+  html:root body .calm-workspace .instrument-layout {
+    display: block;
+  }
+  html:root body .calm-workspace .instrument-directory {
+    display: flex;
+    max-height: none;
+    overflow-x: auto;
+    margin-bottom: 24px;
+  }
+  html:root body .calm-workspace .instrument-directory button {
+    flex: 0 0 175px;
+  }
+}
+@media (max-width: 760px) {
+  html:root body .workspace.calm-workspace {
+    display: block;
+  }
+  html:root body .calm-workspace > .sidebar {
+    position: fixed;
+    z-index: 45;
+    inset: 0 auto 0 0;
+    width: min(290px, 84vw);
+    height: 100dvh;
+    transform: translateX(-100%);
+    visibility: hidden;
+    transition:
+      transform 200ms var(--assistant-ease),
+      visibility 200ms;
+  }
+  html:root body .calm-workspace > .sidebar.mobile-open {
+    transform: none;
+    visibility: visible;
+  }
+  html:root body .calm-workspace .mobile-sidebar-mask {
+    left: min(290px, 84vw);
+    backdrop-filter: none;
+    background: rgb(36 51 57 / 20%);
+  }
+  html:root body .calm-workspace :is(.sidebar-mask-enter-active, .sidebar-mask-leave-active) {
+    transition: opacity 180ms ease;
+  }
+  html:root body .calm-workspace .workspace-toolbar {
+    min-height: 68px;
+    padding: 12px 16px;
+    gap: 10px;
+  }
+  html:root body .calm-workspace .workspace-menu-button {
+    width: 44px;
+    height: 44px;
+  }
+  html:root
+    body
+    .calm-workspace
+    :is(
+      .work-page,
+      .review-content,
+      .table-main,
+      .account-content,
+      .workspace-page .admin-page > main,
+      .studio-main
+    ) {
+    padding: 16px 20px calc(40px + env(safe-area-inset-bottom));
+  }
+  html:root
+    body
+    .calm-workspace
+    :is(
+      .work-heading h1,
+      .review-content h1,
+      .timetable-heading h1,
+      .table-intro h1,
+      .instrument-heading h2,
+      .account-intro h1,
+      .studio-start h2,
+      .admin-page > main > header h1
+    ) {
+    font-size: 25px;
+  }
+  html:root
+    body
+    .calm-workspace
+    :is(.work-form, .account-card, .course-import, .table-card, .overview-section) {
+    padding: 18px;
+  }
+  html:root
+    body
+    .calm-workspace
+    :is(
+      .work-button,
+      .work-tabs button,
+      .table-filters button,
+      .studio-tabs button,
+      .account-card button
+    ) {
+    min-height: 44px;
+  }
+  html:root body .calm-workspace .workspace-page .admin-sidebar {
+    padding: 4px 20px 16px;
+  }
+  html:root body .calm-workspace .workspace-page .admin-sidebar nav {
+    display: none;
+  }
+  html:root body .calm-workspace .overview-metric {
+    min-height: 122px;
+    padding: 16px;
+  }
+  html:root body .calm-workspace .overview-bottom {
+    grid-template-columns: 1fr;
+  }
+  html:root body .calm-workspace .table-intro {
+    align-items: flex-start;
+  }
+  html:root body .calm-workspace .account-intro {
+    padding-bottom: 8px;
+  }
+  html:root body .calm-workspace .account-nav {
+    gap: 4px 12px;
+    flex-wrap: wrap;
+  }
+  html:root body .calm-workspace .account-nav a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    font-size: 13px;
+  }
+  html:root body .calm-workspace .studio-directory {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px 12px;
+    padding: 16px 20px;
+  }
+  html:root body .calm-workspace .studio-directory
+    :is(.directory-heading, .mobile-project-picker, .directory-empty, .studio-skeleton) {
+    grid-column: 1 / -1;
+  }
+  html:root body .calm-workspace .studio-directory .archive-filter {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    margin: 0;
+  }
+  html:root body .calm-workspace .studio-directory .directory-refresh {
+    justify-self: end;
+    margin: 0;
+  }
+  html:root body .calm-workspace .studio-directory .mobile-project-picker {
+    margin: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html:root body .workspace.calm-workspace,
+  html:root body .calm-workspace *,
+  html:root body .calm-workspace *::before,
+  html:root body .calm-workspace *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

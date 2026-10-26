@@ -5,11 +5,12 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawn } from 'node:child_process'
-import { randomBytes } from 'node:crypto'
+import { randomBytes, createHash } from 'node:crypto'
 import { createServer } from 'node:http'
 import { createServer as createSmtpServer } from 'node:net'
 import assert from 'node:assert/strict'
 import {checkFeedbackAndReviews,checkRefreshAndLogout} from './reliability-smoke.mjs'
+import {coreTableNames, assertTableInventory, resolveSmokeArtifacts, redactGeneratedSecrets} from './smoke-contract.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const bin = process.env.SMOKE_MYSQL_BIN || '/usr/local/mysql-8.4.11-macos15-arm64/bin'
@@ -27,6 +28,8 @@ process.once('SIGINT',interrupt);process.once('SIGTERM',interrupt)
 abort.signal.addEventListener('abort',()=>{for(const command of commands)command.kill('SIGKILL')})
 const password = randomBytes(24).toString('hex')
 const accountPassword = randomBytes(20).toString('hex')
+const generatedSecrets = new Set([password, accountPassword])
+const rememberSecret = value => { if (typeof value === 'string' && value) generatedSecrets.add(value) }
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 let mysql, java
 let modelCalls = 0
@@ -58,7 +61,7 @@ function lastMailToken() {
   if (/Content-Transfer-Encoding: base64/i.test(raw)) body = Buffer.from(body.replace(/\s/g, ''), 'base64').toString('utf8')
   else body = body.replace(/=\r\n/g, '').replace(/=([A-Fa-f0-9]{2})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
   const token = body.match(/#token=([A-Za-z0-9_-]{43})/)?.[1]
-  assert.ok(token, 'SMTP message should carry an opaque fragment token'); return token
+  assert.ok(token, 'SMTP message should carry an opaque fragment token'); rememberSecret(token); return token
 }
 const modelServer = createServer(async (req, res) => {
   let body = ''; for await (const chunk of req) body += chunk
@@ -87,6 +90,10 @@ const run = (command, args, input = '') => new Promise((resolve, reject) => {
   child.stdin.end(input)
 })
 const sql = text => run(path.join(bin, 'mysql'), ['--no-defaults', '--protocol=SOCKET', `--socket=${folder}/mysql.sock`, '-u', 'root', '-N', 'campthink_smoke'], text)
+const inventory = async database => {
+  assert.ok(['campthink_smoke', 'campthink_upgrade_smoke', 'campthink_restore_smoke'].includes(database))
+  return sql(`SELECT table_name FROM information_schema.tables WHERE table_schema='${database}' ORDER BY table_name`)
+}
 const check = name => { checks.push(name); console.log(`PASS ${name}`) }
 async function waitFor(fn, child, label) {
   const until=Date.now()+60000
@@ -100,6 +107,7 @@ async function waitFor(fn, child, label) {
   throw new Error(`${label} startup timed out`)
 }
 async function request(method, url, body, token, cookie) {
+  rememberSecret(body?.password); rememberSecret(body?.token); rememberSecret(token); rememberSecret(cookie)
   const response = await fetch(`http://127.0.0.1:${appPort}${url}`, { method,
     signal:AbortSignal.any([abort.signal,AbortSignal.timeout(8000)]),
     headers: { 'Content-Type': 'application/json', Origin: `http://localhost:${appPort}`,
@@ -107,6 +115,8 @@ async function request(method, url, body, token, cookie) {
     body: body === undefined ? undefined : JSON.stringify(body) })
   const text = await response.text()
   let data; try { data = text ? JSON.parse(text) : null } catch { data = text }
+  rememberSecret(data?.token)
+  rememberSecret(response.headers.get('set-cookie')?.match(/campus_refresh=([^;]+)/)?.[1])
   return { status: response.status, data, headers: response.headers }
 }
 async function stop(child) {
@@ -118,6 +128,12 @@ async function stop(child) {
 }
 
 try {
+  // Validate a complete source or release layout before starting a database or Java.
+  const artifacts = await resolveSmokeArtifacts(root, process.env.SMOKE_RELEASE_DIR)
+  const schema = await readFile(artifacts.schema, 'utf8')
+  const tables = coreTableNames(schema)
+  const jarSha256 = createHash('sha256').update(await readFile(artifacts.jar)).digest('hex')
+  const schemaSha256 = createHash('sha256').update(schema).digest('hex')
   // Port collision must fail before initializing any service, never connect to an existing instance.
   for (const port of [dbPort, appPort]) {
     const probe = createServer()
@@ -131,13 +147,12 @@ try {
   await waitFor(async () => { await run(path.join(bin, 'mysqladmin'), ['--no-defaults', `--socket=${folder}/mysql.sock`, '-u', 'root', 'ping']); return true }, mysql, 'MySQL')
   await run(path.join(bin, 'mysql'), ['--no-defaults', `--socket=${folder}/mysql.sock`, '-u', 'root'],
     `CREATE DATABASE campthink_smoke CHARACTER SET utf8mb4; CREATE USER 'campthink_test'@'127.0.0.1' IDENTIFIED BY '${password}'; GRANT ALL ON campthink_smoke.* TO 'campthink_test'@'127.0.0.1';`)
-  const schema=await readFile(path.join(root, 'campus-ai-server/src/main/resources/schema.sql'), 'utf8')
   await sql(schema)
-  const migration = await readFile(path.join(root, 'deploy/migrations/V20261004__ai_spend.sql'), 'utf8')
+  const migration = await readFile(path.join(artifacts.migrations, 'V20261004__ai_spend.sql'), 'utf8')
   await sql(migration); await sql(migration)
-  const receiptMigration=await readFile(path.join(root,'deploy/migrations/V20261009__contact_submission_keys.sql'),'utf8')
+  const receiptMigration=await readFile(path.join(artifacts.migrations,'V20261009__contact_submission_keys.sql'),'utf8')
   await sql(receiptMigration);await sql(receiptMigration)
-  assert.equal(await sql('SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()'), '45')
+  assertTableInventory(await inventory('campthink_smoke'), tables, 'fresh schema')
   assert.equal(await sql('SELECT @@transaction_isolation'),'REPEATABLE-READ')
   check('real MySQL fresh schema and repeatable additive migration')
   const receiptDefinition=schema.match(/CREATE TABLE IF NOT EXISTS contact_submission_keys \([\s\S]*?\);/)?.[0]
@@ -145,17 +160,20 @@ try {
   // Representative prior schema, not a copy of the user's database.
   const legacy=schema.replace(receiptDefinition,'')
   await sql(`CREATE DATABASE campthink_upgrade_smoke CHARACTER SET utf8mb4; USE campthink_upgrade_smoke;\n${legacy}\nINSERT INTO contact_messages(name,contact,subject,message) VALUES('fixture','test@example.invalid','历史反馈','迁移后必须保持');`)
-  assert.equal(await sql("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='campthink_upgrade_smoke'"),'44')
+  assertTableInventory(await inventory('campthink_upgrade_smoke'), tables.filter(name => name !== 'contact_submission_keys'), 'before receipt migration')
   await sql(`USE campthink_upgrade_smoke;\n${receiptMigration}\n${receiptMigration}`)
-  assert.equal(await sql("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='campthink_upgrade_smoke'"),'45')
+  assertTableInventory(await inventory('campthink_upgrade_smoke'), tables, 'after receipt migration')
   assert.equal(await sql('SELECT message FROM campthink_upgrade_smoke.contact_messages'),'迁移后必须保持')
   assert.equal(await sql('SELECT COUNT(*) FROM campthink_upgrade_smoke.contact_submission_keys'),'0')
-  check('additive receipt migration upgrades representative 44-table schema twice without modifying historical feedback')
+  check(`additive receipt migration upgrades representative ${tables.length - 1}-table schema twice without modifying historical feedback`)
   await new Promise(resolve => modelServer.listen(0, '127.0.0.1', resolve))
   await new Promise(resolve => smtpServer.listen(0, '127.0.0.1', resolve))
   const modelPort = modelServer.address().port
   const env = { ...process.env, SPRING_PROFILES_ACTIVE: 'free', DB_HOST: '127.0.0.1', DB_PORT: String(dbPort), DB_NAME: 'campthink_smoke', DB_USERNAME: 'campthink_test', DB_PASSWORD: password,
     JWT_SECRET: randomBytes(48).toString('base64'), SERVER_PORT: String(appPort), SERVER_ADDRESS: '127.0.0.1',
+    SPRING_SQL_INIT_MODE: 'never', APP_JOBS_ENABLED: 'false', WEB_SEARCH_ENABLED: 'false',
+    APP_TEACHING_ENABLED: 'false', APP_TEACHING_IDENTITY_ENABLED: 'false', APP_TEACHING_ROSTER_ENABLED: 'false',
+    APP_TEACHING_LIFECYCLE_ENABLED: 'false', APP_TEACHING_RESPONSIBILITY_ENABLED: 'false', APP_TEACHING_LESSON_CHANGE_ENABLED: 'false',
     CORS_ALLOWED_ORIGINS: `http://localhost:${appPort}`, PUBLIC_WEB_URL: `http://localhost:${appPort}`, AUTH_SECURE_COOKIES: 'false',
     DEEPSEEK_API_KEY: 'isolated-fake-key', DEEPSEEK_BASE_URL: `http://127.0.0.1:${modelPort}`, KIMI_API_KEY: '', GLM_API_KEY: '',
     DEEPSEEK_FLASH_INPUT_CNY_PER_MILLION: '2', DEEPSEEK_FLASH_OUTPUT_CNY_PER_MILLION: '8',
@@ -165,13 +183,14 @@ try {
     SPRING_MAIL_PROPERTIES_MAIL_SMTP_SSL_ENABLE: 'false', SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH: 'false',
     BOCHA_API_KEY: '', KNOWLEDGE_SEMANTIC_API_KEY: '',
     JOB_INITIAL_DELAY_MILLIS: '3600000' }
+  rememberSecret(env.JWT_SECRET)
   let appLog = ''
-  java = spawn('java', ['-jar', path.join(root, 'campus-ai-server/target/campus-ai-server-0.0.1-SNAPSHOT.jar')], { env, stdio: ['ignore', 'pipe', 'pipe'] })
+  java = spawn('java', ['-jar', artifacts.jar], { env, cwd: folder, stdio: ['ignore', 'pipe', 'pipe'] })
   java.on('error',error=>{java.launchError=error})
   java.stdout.on('data', chunk => { appLog += chunk }); java.stderr.on('data', chunk => { appLog += chunk })
   try {
     await waitFor(async () => (await request('GET', '/api/health/ready')).status === 200, java, 'Backend')
-    check('packaged Java boot and 45-table readiness')
+    check(`packaged Java boot and ${tables.length}-table readiness`)
     // Rename only our empty fixture table to simulate an old deployment missing the migration.
     await sql('RENAME TABLE contact_submission_keys TO fixture_held_contact_keys')
     assert.equal((await request('GET','/api/health/ready')).status,503)
@@ -261,7 +280,7 @@ try {
     check('logout immediately invalidates existing access token')
   } finally {
     // Redact generated test credentials even from isolated diagnostic logs.
-    await writeFile(path.join(folder, 'backend.log'), appLog.replaceAll(password, '[redacted]').replaceAll(accountPassword, '[redacted]'), { mode: 0o600 })
+    await writeFile(path.join(folder, 'backend.log'), redactGeneratedSecrets(appLog, generatedSecrets), { mode: 0o600 })
   }
   await stop(java)
   const dump = await run(path.join(bin, 'mysqldump'), ['--no-defaults', `--socket=${folder}/mysql.sock`, '-u', 'root',
@@ -269,9 +288,10 @@ try {
   await sql('CREATE DATABASE campthink_restore_smoke CHARACTER SET utf8mb4')
   await run(path.join(bin, 'mysql'), ['--no-defaults', `--socket=${folder}/mysql.sock`, '-u', 'root', 'campthink_restore_smoke'], dump)
   const restoredCounts = await sql("SELECT COUNT(*) FROM campthink_restore_smoke.users; SELECT COUNT(*) FROM campthink_restore_smoke.ai_provider_attempts; SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='campthink_restore_smoke'")
-  assert.deepEqual(restoredCounts.split('\n'), ['1', '1', '45'])
+  assert.deepEqual(restoredCounts.split('\n'), ['1', '1', String(tables.length)])
+  assertTableInventory(await inventory('campthink_restore_smoke'), tables, 'DB-only import')
   assert.equal(await sql('SELECT COUNT(*) FROM campthink_restore_smoke.contact_submission_keys'),'1')
-  check('real mysqldump restores into a new isolated database, retaining accounts and cost ledger')
+  check('DB-only mysqldump import into a fresh isolated database retains accounts and cost ledger (not private-file/session restore)')
   let encryptedBackupVerified = false
   if (process.env.SMOKE_ENCRYPTED_BACKUP === 'true') {
     const identity = path.join(folder, 'drill.agekey')
@@ -280,22 +300,22 @@ try {
     const cnf = path.join(folder, 'drill.cnf')
     await writeFile(cnf, `[client]\nuser=root\nprotocol=SOCKET\nsocket=${folder}/mysql.sock\n`, { mode: 0o600 })
     const backupRoot = path.join(folder, 'backups')
-    await run('bash', [path.join(root, 'deploy/backup-db.sh'), cnf, 'campthink_smoke', backupRoot, recipient])
+    await run('bash', [path.join(artifacts.root, 'deploy/backup-db.sh'), cnf, 'campthink_smoke', backupRoot, recipient])
     const job = path.join(backupRoot, (await readdir(backupRoot))[0])
-    await run('bash', [path.join(root, 'deploy/restore-drill.sh'), cnf, identity, job, 'campthink_restore_encrypted'])
+    await run('bash', [path.join(artifacts.root, 'deploy/restore-drill.sh'), cnf, identity, job, 'campthink_restore_encrypted'])
     assert.equal(await sql('SELECT COUNT(*) FROM campthink_restore_encrypted.users'), '1')
-    await assert.rejects(run('bash', [path.join(root, 'deploy/restore-drill.sh'), cnf, identity, job, 'campthink_restore_encrypted']))
+    await assert.rejects(run('bash', [path.join(artifacts.root, 'deploy/restore-drill.sh'), cnf, identity, job, 'campthink_restore_encrypted']))
     const corrupt = path.join(folder, 'backup-corrupt'); await cp(job, corrupt, { recursive: true })
     await writeFile(path.join(corrupt, 'database.sql.gz.age'), 'tampered ciphertext')
-    await assert.rejects(run('bash', [path.join(root, 'deploy/restore-drill.sh'), cnf, identity, corrupt, 'campthink_restore_corrupt']))
+    await assert.rejects(run('bash', [path.join(artifacts.root, 'deploy/restore-drill.sh'), cnf, identity, corrupt, 'campthink_restore_corrupt']))
     assert.equal(await sql("SELECT COUNT(*) FROM information_schema.schemata WHERE schema_name='campthink_restore_corrupt'"), '0')
     encryptedBackupVerified = true
     check('real age encrypted backup and isolated restore; refuses overwrite and rejects tampering before DB creation (not offsite)')
   }
-  await writeFile(path.join(folder, 'result.json'), JSON.stringify({ checks, realMySql: true, isolation:'REPEATABLE-READ', realHttpSessions:true, browserTabsVerified:false, realModel: false, smtpLoopbackVerified: true, realMailboxVerified: false, production: false, encryptedBackupVerified, offsiteRestoreVerified: false }, null, 2), { mode: 0o600 })
+  await writeFile(path.join(folder, 'result.json'), JSON.stringify({ checks, artifactLayout: artifacts.layout, jarSha256, schemaSha256, coreTables: tables, realMySql: true, isolation:'REPEATABLE-READ', realHttpSessions:true, browserTabsVerified:false, realModel: false, smtpLoopbackVerified: true, realMailboxVerified: false, production: false, encryptedBackupVerified, applicationRestoreVerified: false, offsiteRestoreVerified: false }, null, 2), { mode: 0o600 })
   console.log(`Evidence: ${folder}`)
 } catch (failure) {
-  console.error(`FAIL: ${failure.message}; isolated evidence: ${folder}`)
+  console.error(`FAIL: ${redactGeneratedSecrets(failure.message, generatedSecrets)}; isolated evidence: ${folder}`)
   process.exitCode = 1
 } finally {
   await stop(java); await stop(mysql)

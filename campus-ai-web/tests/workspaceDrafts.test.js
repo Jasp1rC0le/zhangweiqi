@@ -41,3 +41,22 @@ test('deleting a conversation forgets its drafts across models without clearing 
     assert.equal(drafts.read(model), 'keep new draft')
   }
 })
+test('account cutover clears every in-memory model and conversation slot without mutating prior snapshots', () => {
+  const drafts = createWorkspaceDrafts()
+  for (const model of ['standard', 'kimi', 'glm']) {
+    drafts.save(model, null, 'old owner new draft')
+    drafts.save(model, 7, 'old owner saved conversation draft')
+  }
+  const priorSnapshot = drafts.entries()
+  drafts.reset()
+  assert.deepEqual(drafts.entries(), [])
+  for (const model of ['standard', 'kimi', 'glm']) {
+    assert.equal(drafts.read(model), '')
+    assert.equal(drafts.read(model, 7), '')
+  }
+  assert.equal(priorSnapshot.length, 6)
+  assert.equal(priorSnapshot[0].text, 'old owner new draft')
+  drafts.save('standard', null, 'next owner draft')
+  assert.equal(drafts.read('standard'), 'next owner draft')
+  assert.equal(drafts.read('kimi', 7), '')
+})

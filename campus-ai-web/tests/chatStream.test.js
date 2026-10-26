@@ -131,6 +131,36 @@ test('idle stream times out, releases the reader, and never claims completion', 
   assert.equal(fixture.response.body.locked, false)
 })
 
+test('transport heartbeats cannot extend first-answer or meaningful-content deadlines forever', {timeout:1000}, async () => {
+  for(const partial of [false,true]) {
+    let timer, cancelled=false
+    const response=new Response(new ReadableStream({
+      start(controller){if(partial)controller.enqueue(encoder.encode(event('delta',{content:'部分'})));timer=setInterval(()=>controller.enqueue(encoder.encode(': heartbeat\n\n')),3)},
+      cancel(){cancelled=true;clearInterval(timer)},
+    }))
+    await assert.rejects(readChatStream(response,{}, {idleTimeoutMs:20,firstAnswerTimeoutMs:20}),error=>error.response.status===408)
+    assert.equal(cancelled,true)
+  }
+})
+test('JSON error responses can trigger one session renewal; an in-stream 401 is never automatically replayed', {timeout:1000}, async () => {
+  let requests=0,renewals=0
+  const session=createSessionClient({adapter:async config=>{renewals++;return {config,data:{token:'renewed',user:{id:1,schoolId:1}},status:200,headers:{},statusText:'OK'}}})
+  session.setToken('expired')
+  await session.requestWithSession(async token=>{requests++;return token==='renewed'?responseFor(event('done',completion())).response:new Response('{"status":401}',{status:401,headers:{'Content-Type':'application/json'}})},(response,lease)=>readChatStream(response,{},lease))
+  assert.equal(requests,2);assert.equal(renewals,1)
+  requests=0
+  await assert.rejects(session.requestWithSession(async()=>{requests++;return responseFor(event('error',{status:401})).response},(response,lease)=>readChatStream(response,{},lease)),error=>error.response.status===401)
+  assert.equal(requests,1);assert.equal(renewals,1)
+})
+test('a proxy JSON or HTML success body is rejected before waiting for nonexistent SSE events', {timeout:1000}, async () => {
+  for(const type of ['application/json','text/html']) {
+    const fixture=responseFor('',false)
+    fixture.response.headers.set('Content-Type',type)
+    await assert.rejects(readChatStream(fixture.response),error=>error.response.status===502)
+    assert.equal(fixture.wasCancelled(),true)
+  }
+})
+
 test('view cancellation aborts a held reader without changing the login session', {timeout:1000}, async () => {
   const session = createSessionClient(), controller = new AbortController()
   session.setToken('current-account')

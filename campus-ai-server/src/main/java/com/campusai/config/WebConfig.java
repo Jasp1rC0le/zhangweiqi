@@ -14,14 +14,17 @@ public class WebConfig implements WebMvcConfigurer {
     private final JwtInterceptor jwtInterceptor;
     private final String[] allowedOrigins;
     private final com.campusai.security.PublicWriteThrottle publicWriteThrottle;
+    private final com.campusai.security.TeachingRequestGate teachingGate;
 
     public WebConfig(JwtInterceptor jwtInterceptor,
             @Value("${app.auth.allowed-origins:http://localhost:5173}") String allowedOrigins,
             Environment environment,
             @Value("${app.auth.secure-cookies:false}") boolean secureCookies,
-            com.campusai.security.PublicWriteThrottle publicWriteThrottle) {
+            com.campusai.security.PublicWriteThrottle publicWriteThrottle,
+            com.campusai.security.TeachingRequestGate teachingGate) {
         this.jwtInterceptor = jwtInterceptor;
         this.publicWriteThrottle = publicWriteThrottle;
+        this.teachingGate=teachingGate;
         this.allowedOrigins = com.campusai.security.TrustedOrigins.list(allowedOrigins).toArray(String[]::new);
         if (this.allowedOrigins.length == 0
                 || java.util.Arrays.asList(this.allowedOrigins).contains("*")) {
@@ -56,6 +59,10 @@ public class WebConfig implements WebMvcConfigurer {
                         "/api/schools",
                         "/api/schools/**"
                 );
+        // JWT rejection precedes admission; anonymous callers cannot occupy teaching slots.
+        registry.addInterceptor(teachingGate).addPathPatterns("/api/teaching/**","/api/timetable/**",
+                "/api/admin/teaching/**","/api/account/teaching-identities","/api/admin/teaching-identities","/api/admin/teaching-identities/**",
+                "/api/material-actions/**","/api/private-materials","/api/private-materials/**");
     }
 
     @Override
@@ -64,6 +71,7 @@ public class WebConfig implements WebMvcConfigurer {
                 .allowedOrigins(allowedOrigins)
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                 .allowedHeaders("*")
+                .exposedHeaders("X-Content-SHA256")
                 .allowCredentials(true)
                 .maxAge(3600);
     }

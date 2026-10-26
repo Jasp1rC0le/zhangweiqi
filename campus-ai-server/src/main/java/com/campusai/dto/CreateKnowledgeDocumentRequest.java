@@ -14,6 +14,9 @@ import java.time.LocalDateTime;
 @Setter
 public class CreateKnowledgeDocumentRequest {
 
+    @Pattern(regexp="[a-f0-9]{64}",message="资料核对版本无效")
+    private String expectedRevisionTag;
+
     @NotNull(message = "请选择资料所属学校")
     @Positive(message = "学校编号无效")
     private Long schoolId;

@@ -2,26 +2,24 @@
 import { computed, onMounted } from 'vue'
 import { useTimetableStore } from '@/stores/timetable'
 import { useTimetableClock } from '@/utils/useTimetableClock'
-import { timetableStatus } from '@/utils/timetable'
 import NavigationIcon from './NavigationIcon.vue'
 import { useCourseScheduleStore } from '@/stores/courseSchedule'
-import { nextImportedCourse } from '@/utils/courseSchedule'
+import { nextImportedCourse, courseTimeLabel } from '@/utils/courseSchedule'
 const timetable = useTimetableStore()
 const courses = useCourseScheduleStore()
 const clock = useTimetableClock()
-const status = computed(() => timetableStatus(timetable.timetable, clock.value))
 const nextCourse = computed(() => nextImportedCourse(courses.schedule, clock.value))
 const label = computed(() => {
   if (courses.schedule) {
     const next = nextCourse.value
     return next
-      ? `导入表格${next.current ? '正在上' : '下一节'}：${next.date} ${next.startTime} ${next.name} · ${next.room || '教室未填'}，临时调课需核对`
+      ? `导入表格${next.timeUnknown ? '最近上课日' : next.current ? '正在上' : '下一节'}：${next.date} ${courseTimeLabel(next)} ${next.name} · ${next.room || '教室未填'}${next.timeUnknown ? '，按节次查看全部安排' : '，临时调课需核对'}`
       : '已导入课程没有后续安排，请核对或更新表格'
   }
-  if (timetable.timetable) return status.value.label
+  if (timetable.timetable) return '旧原件可取回，请导入数据文件生成课程安排'
   if (timetable.loading || courses.loading) return '正在读取…'
   if (timetable.error || courses.error) return '课表暂未读取，点此重试'
-  return '保存截图或课程表格，下次不用再登录教务'
+  return '上传课表文件自动解析，下次登录直接看'
 })
 onMounted(() => {
   timetable.load()
@@ -35,8 +33,7 @@ onMounted(() => {
       ><strong>我的课表</strong><small>{{ label }}</small></span
     >
     <span class="teaser-action"
-      >{{ timetable.timetable || courses.schedule ? '查看课表' : '导入课表' }}
-      <span aria-hidden="true">→</span></span
+      >{{ courses.schedule ? '查看课表' : '导入课表' }} <span aria-hidden="true">→</span></span
     >
   </RouterLink>
 </template>

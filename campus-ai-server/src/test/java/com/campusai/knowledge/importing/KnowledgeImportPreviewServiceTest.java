@@ -120,6 +120,22 @@ class KnowledgeImportPreviewServiceTest {
                 1L, html, "1720.htm", "https://aqbw.tsguas.edu.cn/info/1008/1720.htm", "URL");
         assertThat(preview.title()).isEqualTo("新生户口常见问题及解答");
         assertThat(preview.content()).contains("迁户自愿");
+        assertThat(preview.warnings()).contains(OfficialHtmlContent.FALLBACK_WARNING);
+    }
+
+    @Test
+    void shouldPreviewCmsBodyAndWarnAboutUnreadImagesWithoutPublishing() {
+        byte[] html = """
+                <!doctype html><html><head><meta charset="utf-8"><title>分数统计</title></head>
+                <body><nav>招生首页</nav><div id="vsb_newscontent"><div id="vsb_content">
+                <table><tr><th>专业</th><th>最低分</th></tr><tr><td>数控</td><td>477</td></tr></table>
+                <img src="supplement.jpg"></div></div><aside>变化的推荐新闻</aside></body></html>
+                """.getBytes(StandardCharsets.UTF_8);
+        KnowledgeImportPreview preview = ReflectionTestUtils.invokeMethod(service, "parse",
+                1L, html, "1832.htm", "https://zs.tsguas.edu.cn/info/1015/1832.htm", "URL");
+        assertThat(preview.content()).contains("专业 最低分", "数控 477")
+                .doesNotContain("招生首页", "推荐新闻");
+        assertThat(preview.warnings()).hasSize(1).doesNotContain(OfficialHtmlContent.FALLBACK_WARNING);
     }
 
     @Test

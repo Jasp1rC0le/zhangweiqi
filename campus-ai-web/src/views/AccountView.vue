@@ -1,41 +1,62 @@
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import http from '@/api/http'
+import { computed,nextTick,onBeforeUnmount,onMounted, reactive, ref,watch } from 'vue'
+import { useRoute,useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import http,{userSessionGeneration} from '@/api/http'
 import { useAuthStore } from '@/stores/auth'
 import CampMark from '@/components/CampMark.vue'
 import TokenActivityPanel from '@/components/TokenActivityPanel.vue'
 import AccountIdentityPanel from '@/components/AccountIdentityPanel.vue'
+import TeachingIdentityPanel from '@/components/TeachingIdentityPanel.vue'
+import ProductUpdates from '@/components/ProductUpdates.vue'
+import { wasRouteFailureHandled } from '@/utils/routeRecovery'
 import { createDraftCheckpoint } from '@/utils/draftCheckpoint'
 import { useUnsavedChanges } from '@/utils/useUnsavedChanges'
+import {focusWorkflowElement} from '@/utils/teachingWorkflows'
+import { useScopedConfirmation } from '@/utils/useScopedConfirmation'
+import { createAccountLifecycle } from '@/utils/accountLifecycle'
+import { createLatestRequest } from '@/utils/latestRequest'
 
 const router = useRouter()
+const route=useRoute(),identityPanel=ref(),updatesPanel=ref()
+let focusDisposed=false
 const auth = useAuthStore()
+const owner = computed(() => auth.user ? `${auth.user.id}:${auth.user.schoolId}:${userSessionGeneration.value}` : '')
+const lifecycle = createAccountLifecycle(() => owner.value)
+const { confirm, confirming } = useScopedConfirmation(lifecycle.key, () => !focusDisposed)
 const verifiedEmail = ref('')
 const busy = ref(false)
 const deleteBusy = ref(false)
 const profileBusy = ref(false)
 const profileLoading = ref(true), profileLoaded = ref(false), profileError = ref(''), profileStatus = ref('')
 const exportBusy = ref(false), emailLoading = ref(true), emailError = ref('')
+const emailStatus = ref(''), emailSubmitError = ref(''), deletionError = ref('')
 const accountDeleted = ref(false)
-const sessions = ref([]), sessionsBusy = ref(false), sessionsError = ref('')
+const sessions = ref([]), sessionsLoading = ref(false), revokeBusy = ref(false), sessionsError = ref(''), sessionsStatus = ref('')
+const accountBusy = computed(() => profileBusy.value || busy.value || deleteBusy.value || revokeBusy.value || confirming.value)
+const sessionsBusy = computed(() => sessionsLoading.value || accountBusy.value)
 const sessionDate = value => new Date(value).toLocaleString('zh-CN', { hour12: false })
-async function loadSessions() {
-  sessionsBusy.value = true; sessionsError.value = ''
-  try { sessions.value = (await http.get('/api/account/sessions')).data }
-  catch { sessionsError.value = '登录记录暂时无法读取。请检查后端是否已更新，再重试'; sessions.value = [] }
-  finally { sessionsBusy.value = false }
-}
+const sessionsReader = createLatestRequest({
+  load: options => http.get('/api/account/sessions', options),
+  onStart: () => { sessionsLoading.value = true; sessionsError.value = '' },
+  onSuccess: ({ data }) => { sessions.value = data },
+  onError: () => { sessionsError.value = '最新登录记录未能读取，下方仅保留上次结果。请重试刷新记录' },
+  onFinish: () => { sessionsLoading.value = false },
+})
+function loadSessions() { if (owner.value && !focusDisposed && !accountBusy.value) return sessionsReader.run() }
 async function revokeOthers() {
-  try { await ElMessageBox.confirm('其他登录会话会立即失效，当前页面保持登录。继续？', '退出其他会话', { confirmButtonText: '退出其他会话', cancelButtonText: '取消' }) }
-  catch { return }
-  sessionsBusy.value = true
+  if (sessionsBusy.value || sessionsError.value || !sessions.value.some(session => !session.current)) return
+  const ticket = lifecycle.capture()
+  if (!ticket.current() || !(await confirm('其他登录会话会立即失效，当前页面保持登录。继续？', { title: '退出其他会话', confirmText: '退出其他会话', cancelText: '取消' })) || !ticket.current()) return
+  revokeBusy.value = true; sessionsError.value = ''; sessionsStatus.value = ''
   try {
-    const { data } = await http.post('/api/account/sessions/revoke-others')
-    ElMessage.success(`已退出 ${data.revoked} 个其他会话`)
-    await loadSessions()
-  } catch { sessionsError.value = '操作未确认成功，请重试'; sessionsBusy.value = false }
+    const { data } = await http.post('/api/account/sessions/revoke-others', undefined, { signal: ticket.signal })
+    if (!ticket.current()) return
+    sessions.value = sessions.value.filter(session => session.current)
+    sessionsStatus.value = `已退出 ${data.revoked} 个其他会话，当前会话保持登录`
+    await sessionsReader.run()
+  } catch { if (ticket.current()) sessionsError.value = '未能确认退出成功，请先刷新记录核对，再决定是否重试' }
+  finally { if (ticket.current()) revokeBusy.value = false }
 }
 const emailForm = reactive({ email: '', password: '' })
 const deletion = reactive({ password: '' })
@@ -43,26 +64,29 @@ const profile = reactive({ major: '', grade: '', skillsText: '', careerDirection
 const checkpoint = createDraftCheckpoint(() => profile)
 useUnsavedChanges(
   () => !accountDeleted.value && (checkpoint.isDirty() || Boolean(emailForm.email || emailForm.password || deletion.password)),
-  () => !accountDeleted.value && (profileBusy.value || busy.value || deleteBusy.value),
+  () => !accountDeleted.value && accountBusy.value,
 )
 
-async function loadProfile() {
-  profileLoading.value = true
-  profileError.value = ''
-  try {
-    const { data } = await http.get('/api/account/profile')
+const profileReader = createLatestRequest({
+  load: options => http.get('/api/account/profile', options),
+  onStart: () => { profileLoading.value = true; profileError.value = '' },
+  onSuccess: ({ data }) => {
     Object.assign(profile, {
       major: data.major || '', grade: data.grade || '', skillsText: (data.skills || []).join('、'),
       careerDirection: data.careerDirection || '', bio: data.bio || '',
     })
     checkpoint.accept()
     profileLoaded.value = true
-  } catch { profileError.value = '暂时无法读取个人信息，重试成功后才能编辑，避免覆盖已有资料' }
-  finally { profileLoading.value = false }
-}
+  },
+  onError: () => { profileError.value = '暂时无法读取个人信息，重试成功后才能编辑，避免覆盖已有资料' },
+  onFinish: () => { profileLoading.value = false },
+})
+function loadProfile() { if (owner.value && !focusDisposed && !accountBusy.value) return profileReader.run() }
 
 async function saveProfile() {
-  if (profileBusy.value || profileLoading.value || !profileLoaded.value) return
+  if (accountBusy.value || profileLoading.value || !profileLoaded.value) return
+  const ticket = lifecycle.capture()
+  if (!ticket.current()) return
   profileError.value = ''; profileStatus.value = ''
   profileBusy.value = true
   const skills = profile.skillsText.split(/[、,，]/).map((item) => item.trim()).filter(Boolean)
@@ -74,70 +98,93 @@ async function saveProfile() {
     await http.put('/api/account/profile', {
       major: profile.major, grade: profile.grade, skills,
       careerDirection: profile.careerDirection, bio: profile.bio,
-    })
+    }, { signal: ticket.signal })
+    if (!ticket.current()) return
     checkpoint.accept()
     profileStatus.value = '已保存，后续建议会参考这些信息'
-  } catch (error) { profileError.value = error.response?.data?.message || '未能确认保存成功，填写内容已保留，请稍后重试' }
-  finally { profileBusy.value = false }
+  } catch (error) { if (ticket.current()) profileError.value = error.response?.data?.message || '未能确认保存成功，填写内容已保留，请稍后重试' }
+  finally { if (ticket.current()) profileBusy.value = false }
 }
 
-async function loadEmail() {
-  emailLoading.value = true; emailError.value = ''
-  try { verifiedEmail.value = (await http.get('/api/account/email')).data.email || '' }
-  catch { emailError.value = '暂时无法读取邮箱状态，请重试' }
-  finally { emailLoading.value = false }
-}
+const emailReader = createLatestRequest({
+  load: options => http.get('/api/account/email', options),
+  onStart: () => { emailLoading.value = true; emailError.value = '' },
+  onSuccess: ({ data }) => { verifiedEmail.value = data.email || '' },
+  onError: () => { emailError.value = '暂时无法读取邮箱状态，请重试' },
+  onFinish: () => { emailLoading.value = false },
+})
+function loadEmail() { if (owner.value && !focusDisposed && !accountBusy.value) return emailReader.run() }
 
 async function requestVerification() {
-  if (busy.value) return
+  if (accountBusy.value) return
+  const ticket = lifecycle.capture()
+  if (!ticket.current()) return
   if (!emailForm.email.trim() || !emailForm.password) return ElMessage.warning('请填写邮箱和当前密码')
-  busy.value = true
+  busy.value = true; emailStatus.value = ''; emailSubmitError.value = ''
   try {
-    await http.post('/api/account/email/verification', emailForm)
+    await http.post('/api/account/email/verification', { ...emailForm }, { signal: ticket.signal })
+    if (!ticket.current()) return
     emailForm.password = ''
     emailForm.email = ''
-    ElMessage.success('验证邮件已发送，请在30分钟内打开邮件中的链接')
+    emailStatus.value = '验证邮件已发送，请在30分钟内打开邮件中的链接'
   } catch (error) {
-    ElMessage.error(error.response?.data?.message || '发送失败，请稍后再试')
-  } finally { busy.value = false }
+    if (ticket.current()) emailSubmitError.value = error.response?.data?.message || '未能确认发送成功，请先检查邮箱后再决定是否重试'
+  } finally { if (ticket.current()) busy.value = false }
 }
 
 async function exportData() {
-  if (exportBusy.value) return
+  if (exportBusy.value || accountBusy.value) return
+  const ticket = lifecycle.capture()
+  if (!ticket.current()) return
   exportBusy.value = true
   try {
-    const response = await http.get('/api/account/export', { responseType: 'blob' })
+    const response = await http.get('/api/account/export', { responseType: 'blob', signal: ticket.signal })
+    if (!ticket.current()) return
     const url = URL.createObjectURL(response.data)
     const link = document.createElement('a')
     link.href = url
     link.download = 'campus-ai-account-data.json'
     link.click()
     setTimeout(() => URL.revokeObjectURL(url), 60000)
-  } catch { ElMessage.error('导出失败，请稍后重试') }
-  finally { exportBusy.value = false }
+  } catch { if (ticket.current()) ElMessage.error('导出失败，请稍后重试') }
+  finally { if (ticket.current()) exportBusy.value = false }
 }
 
 async function deleteAccount() {
-  if (deleteBusy.value) return
+  if (accountBusy.value) return
   if (!deletion.password) return ElMessage.warning('请输入当前密码')
+  const ticket = lifecycle.capture(), password = deletion.password
+  if (!ticket.current() || !(await confirm('删除后聊天记录、反馈和提交资料无法恢复。确认永久删除？',
+    { title: '再次确认', confirmText: '永久删除', cancelText: '取消', type: 'warning' })) || !ticket.current()) return
+  if (password !== deletion.password) { deletionError.value = '确认期间密码输入发生变化，请重新确认；未提交删除'; return }
+  deleteBusy.value = true; deletionError.value = ''
   try {
-    await ElMessageBox.confirm('删除后聊天记录、反馈和提交资料无法恢复。确认永久删除？',
-      '再次确认', { confirmButtonText: '永久删除', cancelButtonText: '取消', type: 'warning' })
-  } catch { return }
-  deleteBusy.value = true
-  try {
-    await http.delete('/api/account', { data: { password: deletion.password } })
+    await http.delete('/api/account', { data: { password }, signal: ticket.signal })
+    if (!ticket.current()) return
     deletion.password = ''
     accountDeleted.value = true
     auth.clearLocalSession()
     ElMessage.success('账户已删除')
     await router.replace('/login')
   } catch (error) {
-    ElMessage.error(error.response?.data?.message || '删除失败，请检查密码')
-  } finally { deleteBusy.value = false }
+    if (ticket.current()) deletionError.value = error.response?.data?.message || '未能确认删除结果，请检查连接后重新登录核对'
+  } finally { if (ticket.current()) deleteBusy.value = false }
 }
 
-onMounted(() => Promise.all([loadEmail(), loadProfile(), loadSessions()]))
+async function focusAccountWorkflow(){const principal=()=>auth.user?`${auth.user.id}:${auth.user.schoolId}:${userSessionGeneration.value}`:'',owner=principal(),hash=route.hash;if(!owner||!['#teaching-identity','#product-updates'].includes(hash))return;await nextTick();const target=hash==='#product-updates'?updatesPanel:identityPanel;if(!focusDisposed&&owner===principal()&&route.hash===hash)focusWorkflowElement(target.value?.$el,()=>!focusDisposed&&owner===principal()&&route.hash===hash)}
+async function openProductFeature(item) { if(accountBusy.value||focusDisposed)return;try{await router.push(item.route)}catch(error){if(!wasRouteFailureHandled(error))ElMessage.error('页面暂时没能打开，请再试一次')} }
+watch(()=>route.hash,focusAccountWorkflow,{flush:'post'})
+watch(owner, () => {
+  lifecycle.reset()
+  for (const reader of [profileReader, emailReader, sessionsReader]) reader.cancel()
+  for (const form of [emailForm, deletion, profile]) for (const key of Object.keys(form)) form[key] = ''
+  checkpoint.accept(); profileLoaded.value = false; verifiedEmail.value = ''; sessions.value = []
+  for (const value of [profileError, profileStatus, emailError, emailSubmitError, emailStatus, sessionsError, sessionsStatus, deletionError]) value.value = ''
+  for (const value of [profileBusy, busy, deleteBusy, revokeBusy, exportBusy, accountDeleted]) value.value = false
+  if (owner.value) { emailReader.run(); profileReader.run(); sessionsReader.run() }
+}, { immediate: true, flush: 'sync' })
+onBeforeUnmount(() => { focusDisposed = true; lifecycle.dispose(); for (const reader of [profileReader, emailReader, sessionsReader]) reader.dispose() })
+onMounted(focusAccountWorkflow)
 </script>
 
 <template>
@@ -147,20 +194,19 @@ onMounted(() => Promise.all([loadEmail(), loadProfile(), loadSessions()]))
       <span class="brand"><CampMark /> Campthink.</span>
     </header>
     <div class="account-content">
-      <div class="account-intro"><p class="eyebrow">YOUR OWN SPACE / 个人空间</p>
-      <h1>关于你，<br /><em>由你决定</em></h1>
+      <div class="account-intro">
+      <h1>关于你，由你决定</h1>
       <p class="lede">你的偏好、账户与数据。<br />只保留你愿意分享的部分。</p>
-      <nav class="account-nav" aria-label="账户设置目录"><a href="#personal">个人信息</a><a href="#security">找回邮箱</a><a href="#token-activity">额度记录</a><a href="#my-data">我的数据</a><a href="#sessions">登录会话</a><a href="#close-account">注销账户</a></nav></div>
+      <nav class="account-nav" aria-label="账户设置目录"><a href="#product-updates">产品更新</a><a href="#teaching-identity">教学身份</a><a href="#personal">个人信息</a><a href="#security">找回邮箱</a><a href="#token-activity">额度记录</a><a href="#my-data">我的数据</a><a href="#sessions">登录会话</a><a href="#close-account">注销账户</a></nav></div>
 
-      <div class="account-sections"><AccountIdentityPanel /><section id="personal" class="account-card">
-        <div class="card-index">01 / 个性化</div>
+      <div class="account-sections"><ProductUpdates id="product-updates" ref="updatesPanel" :disabled="accountBusy" @activate="openProductFeature" /><AccountIdentityPanel /><TeachingIdentityPanel ref="identityPanel" tabindex="-1" /><section id="personal" class="account-card">
         <h2>让建议更适合你</h2>
         <p>这些信息完全自愿填写，只用于调整解释深度、例子和求职建议，不会被当作校园事实来源。</p>
         <p v-if="profileLoading" role="status">正在读取个人信息…</p>
         <p v-if="profileError" class="form-error" role="alert">{{ profileError }}</p>
         <button v-if="!profileLoaded && !profileLoading" class="secondary" type="button" @click="loadProfile">重新读取</button>
         <form :aria-busy="profileLoading || profileBusy" @submit.prevent="saveProfile" @input="profileStatus = ''">
-          <fieldset class="account-form profile-form" :disabled="profileLoading || profileBusy || !profileLoaded">
+          <fieldset class="account-form profile-form" :disabled="profileLoading || accountBusy || !profileLoaded">
           <legend class="sr-only">个人信息</legend>
           <div class="form-pair">
             <label for="profile-major">专业<input id="profile-major" v-model.trim="profile.major" maxlength="100" placeholder="例如：软件工程" /></label>
@@ -171,52 +217,53 @@ onMounted(() => Promise.all([loadEmail(), loadProfile(), loadSessions()]))
           <label for="profile-bio">补充说明<textarea id="profile-bio" v-model.trim="profile.bio" maxlength="500" rows="3" placeholder="可选，不要填写身份证号、密码等敏感信息"></textarea></label>
           <p v-if="profileStatus && !checkpoint.isDirty()" role="status">{{ profileStatus }}</p>
           <small v-else-if="profileLoaded && checkpoint.isDirty()">有未保存的修改</small>
-          <button type="submit" :disabled="profileBusy || !profileLoaded || !checkpoint.isDirty()">{{ profileBusy ? '正在保存…' : '保存个性化资料' }}</button>
+          <button type="submit" :disabled="accountBusy || !profileLoaded || !checkpoint.isDirty()">{{ profileBusy ? '正在保存…' : '保存个性化资料' }}</button>
           </fieldset>
         </form>
       </section>
 
       <section id="security" class="account-card">
-        <div class="card-index">02 / 安全</div>
         <h2>找回邮箱</h2>
         <p v-if="emailLoading" role="status">正在读取邮箱状态…</p>
         <p v-else-if="emailError" role="alert">{{ emailError }} <button class="secondary" type="button" @click="loadEmail">重试</button></p>
         <p v-else-if="verifiedEmail">已验证：{{ verifiedEmail }}</p>
         <p v-else>尚未绑定邮箱。绑定后，忘记密码时才能通过邮件找回。</p>
-        <form class="account-form" @submit.prevent="requestVerification">
+        <form class="account-form" :aria-busy="busy" @submit.prevent="requestVerification" @input="emailStatus = ''; emailSubmitError = ''">
           <label for="account-email">邮箱地址</label>
-          <input id="account-email" v-model.trim="emailForm.email" :disabled="busy" type="email" autocomplete="email" required maxlength="254" placeholder="name@example.com" />
+          <input id="account-email" v-model.trim="emailForm.email" :disabled="accountBusy" type="email" autocomplete="email" required maxlength="254" placeholder="name@example.com" />
           <label for="account-current-password">当前密码</label>
-          <input id="account-current-password" v-model="emailForm.password" :disabled="busy" type="password" autocomplete="current-password" required />
-          <button type="submit" :disabled="busy">{{ busy ? '正在发送…' : verifiedEmail ? '更换验证邮箱' : '发送验证邮件' }}</button>
+          <input id="account-current-password" v-model="emailForm.password" :disabled="accountBusy" type="password" autocomplete="current-password" required />
+          <p v-if="emailSubmitError" class="form-error" role="alert">{{ emailSubmitError }}</p>
+          <p v-if="emailStatus" role="status">{{ emailStatus }}</p>
+          <button type="submit" :disabled="accountBusy">{{ busy ? '正在发送…' : verifiedEmail ? '更换验证邮箱' : '发送验证邮件' }}</button>
         </form>
       </section>
 
       <section id="my-data" class="account-card">
-        <div class="card-index">03 / 数据</div>
         <h2>下载我的数据</h2>
         <p>导出个人资料、对话、反馈、评分、私有项目及保留版本。下载文件包含你的原文，请勿转发给不可信对象。</p>
-        <button class="secondary" type="button" :disabled="exportBusy" @click="exportData">{{ exportBusy ? '正在准备下载…' : '下载 JSON 文件' }}</button>
+        <button class="secondary" type="button" :disabled="exportBusy || accountBusy" @click="exportData">{{ exportBusy ? '正在准备下载…' : '下载 JSON 文件' }}</button>
       </section>
 
       <section id="sessions" class="account-card" aria-labelledby="sessions-title">
         <h2 id="sessions-title">管理登录会话</h2>
         <p>查看最近100个有效会话。不采集设备指纹，因此不推测设备名称或位置。</p>
-        <p v-if="sessionsError" role="alert">{{ sessionsError }}</p>
+        <p v-if="sessionsStatus" role="status">{{ sessionsStatus }}</p>
+        <p v-if="sessionsError" class="form-error" role="alert">{{ sessionsError }}</p>
         <p v-else-if="sessionsBusy" role="status">正在更新会话…</p>
         <ul class="session-list"><li v-for="(session, index) in sessions" :key="index"><strong>{{ session.current ? '当前会话' : '其他会话' }}</strong><span>登录于 {{ sessionDate(session.createdAt) }}</span><small>到期 {{ sessionDate(session.expiresAt) }}</small></li></ul>
-        <div class="session-actions"><button class="secondary" :disabled="sessionsBusy" @click="loadSessions">刷新记录</button><button :disabled="sessionsBusy || Boolean(sessionsError) || !sessions.some(s => !s.current)" @click="revokeOthers">退出其他会话</button></div>
+        <div class="session-actions"><button class="secondary" :disabled="sessionsBusy" @click="loadSessions">刷新记录</button><button :disabled="sessionsBusy || Boolean(sessionsError) || !sessions.some(s => !s.current)" @click="revokeOthers">{{ revokeBusy ? '正在退出…' : '退出其他会话' }}</button></div>
       </section>
 
       <TokenActivityPanel />
       <section id="close-account" class="account-card danger-card">
-        <div class="card-index">04 / 注销</div>
         <h2>永久删除账户</h2>
         <p>此操作不可撤销。已发布的公共校园资料可能仍保留，详见隐私说明。</p>
-        <form class="account-form" @submit.prevent="deleteAccount">
+        <form class="account-form" :aria-busy="deleteBusy" @submit.prevent="deleteAccount" @input="deletionError = ''">
           <label for="account-delete-password">输入当前密码确认身份</label>
-          <input id="account-delete-password" v-model="deletion.password" type="password" autocomplete="current-password" required />
-          <button class="danger" type="submit" :disabled="deleteBusy">{{ deleteBusy ? '正在处理…' : '删除我的账户' }}</button>
+          <input id="account-delete-password" v-model="deletion.password" :disabled="accountBusy" type="password" autocomplete="current-password" required />
+          <p v-if="deletionError" class="form-error" role="alert">{{ deletionError }}</p>
+          <button class="danger" type="submit" :disabled="accountBusy">{{ deleteBusy ? '正在处理…' : '删除我的账户' }}</button>
         </form>
       </section>
       <RouterLink to="/privacy" class="privacy-link">查看隐私说明 →</RouterLink>

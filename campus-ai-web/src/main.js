@@ -17,6 +17,7 @@ import router from './router'
 import './styles/campthink.css'
 import './styles/readability.css'
 import './styles/confirmation.css'
+import './styles/public-refinement.css'
 
 const app = createApp(App)
 
@@ -28,3 +29,4 @@ for (const component of [ElButton, ElForm, ElFormItem, ElIcon, ElInput, ElOption
 }
 
 app.mount('#app')
+window.dispatchEvent(new Event('campthink:mounted'))

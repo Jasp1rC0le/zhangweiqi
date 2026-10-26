@@ -75,8 +75,21 @@ public class AiMessageServiceImpl
     );
 
     private static final List<String> WEB_SEARCH_TERMS = List.of(
-            "最新", "实时", "今天", "当前", "新闻", "天气", "官网",
-            "公告", "政策", "价格", "比赛", "招聘", "通知"
+            "最新", "实时", "新闻", "天气", "价格"
+    );
+
+    private static final List<String> EXPLICIT_WEB_REQUESTS = List.of(
+            "联网", "搜索网页", "搜索官网", "检索网页", "检索官网", "上网查", "查资料"
+    );
+
+    private static final List<String> NO_WEB_REQUESTS = List.of(
+            "不要联网", "不联网", "无需联网", "不要搜索", "只用知识库", "仅用知识库"
+    );
+
+    private static final Pattern WEB_CAPABILITY_QUESTION = Pattern.compile(
+            "(?:你好|请问){0,2}(?:你们?|助手|系统)?(?:现在|目前|当前)?(?:是否|是不是)?"
+                    + "(?:能不能|可不可以|能否|可以|支持|能够|不能|能|会不会|会|有)?"
+                    + "(?:联网|上网|网络搜索|网页搜索)(?:搜索|检索)?(?:功能|能力)?(?:吗|么|呢|不)?"
     );
 
     private static final List<String> PRIVATE_QUERY_TERMS = List.of(
@@ -95,9 +108,12 @@ public class AiMessageServiceImpl
     );
 
     private static final String UNKNOWN_CAMPUS_FACT_RESPONSE = """
-            目前校园知识库里没有足够可靠的资料，我不能确认这件事。
+            本次检索没有足够可靠的资料，我不能确认这件事。这不等于知识库完全没有收录，也不代表学校没有相关服务。
 
-            你可以先查看学校官网、相关部门公众号或直接咨询工作人员。如果你找到了可靠通知，也可以在当前对话中补充，管理员审核后会加入知识库。
+            你可以先查看学校官网、相关部门公众号或直接咨询工作人员。找到可靠的公开资料后，可以通过“补充校园信息”入口主动提交，提交后由管理员审核，审核通过才会进入公共知识库。
+            普通聊天不会自动提交审核或加入公共知识库。私人课表和个人信息不要提交到这个公开资料入口；讨论个人问题不需要管理员审核。
+            聊天界面可以通过已认证业务工具新增课程、记录考勤和维护知识资料；这些写入必须核对目标并由用户明确确认，以真实业务回执为准。纯文本回复不能执行写入，绝不能声称已经修改。
+            课程、考勤与人员查询由业务接口先按本人、任课课程、负责班级或学院授权筛选，不能先读取全库再靠输出过滤。不要把“属于个人信息”当作已授权数据一律不可查询的理由；本次没有收到业务结果时不能编造，可引导使用聊天工具中的对应操作。
             """;
 
     private static final String SYSTEM_PROMPT = """
@@ -116,8 +132,12 @@ public class AiMessageServiceImpl
             但不得编造学校规定、通知、时间、地点、
             联系方式或招聘信息。
             如果用户询问的是学校专属事实且资料不足，
-            请明确说明目前不知道，并邀请知道可靠信息的用户
-            在当前对话中补充，补充内容必须经过管理员审核。
+            请明确说明目前不知道。用户如愿意贡献可靠的公开资料，
+            应通过“补充校园信息”入口主动提交，由管理员审核通过后进入公共知识库。
+            普通聊天不会自动提交审核或加入公共知识库；不要将所有聊天内容说成待审核资料。
+            私人课表、个人信息和私人附件不能作为公共资料提交。
+            讨论个人问题不需要管理员审核，不得要求用户先经管理员审核才能继续对话。
+            不要为了补齐学校资料而索取私人课表或个人身份资料。
 
             如果提供了学校资料：
             1. 优先按照资料回答。
@@ -135,15 +155,26 @@ public class AiMessageServiceImpl
                资料不完整时只回答已核实部分，不将未取得的附件说成已审阅。
             7. 数字门槛、费用、材料、次数必须与原文适用对象和条件一起表达。
                不把“其他对象”“某一类别”的要求扩大成所有人的统一要求。
+               保留豁免对象和例外；例如“除本市高校应届生外的其他考生”不能改成两类考生均需提交。
+               “不少于”是下限，不是精确比例或录取率；有生源不足例外时不能断言必然有人淘汰。
             8. 未找到授权或规则不等于明确禁止。资料仅说明局部文献传递时，
                应说不能据此承诺整书任意下载，不能武断说所有合法整书访问都不允许。
                说明未知和明确禁止的区别，不将资料未提及的功能一概断言为不存在。
                区分“本站建议/提示”和学校原文，不把本站的建议说成通知明文要求。
+               学校来源链接下的整理摘要可能混有本站对照解读，不代表整段都是学校原文。
+               Campthink不代收证件、不代报名等是本站隐私约定，不得称为学校公告明示。
+               混有本站解释时，不用“以上均为学校规定”概括全部回答；逐项标明原文要点与本站提醒。
+            9. 检索结果只是本次选出的片段，不是知识库完整目录。
+               未检索到某项资料只能说“本次没有检索到可确认的相关片段”，
+               不得断言“知识库没有收录”或“学校没有这项服务”。
+               混合问题逐项核对来源，某个场馆的资料不能证明另一个场馆的时间和规则。
+               引用必须支持对应的具体断言，不把图书馆来源说成体育馆原文来源。
 
-            当前系统可能会提供“联网搜索结果”。如果提供了联网搜索结果，
-            必须承认本次回答使用了系统联网搜索，不能再说“我不能联网”、
-            “我没有联网工具”或要求用户自己打开浏览器；必须引用[网络1]、
-            [网络2]并保留对应链接。只有没有提供联网结果时，才能说明本次没有可用的网络资料。
+            当前系统可能会提供“联网搜索结果”。收到搜索结果不等于它们支持本题，
+            必须逐项核对学校、地区、年度、适用对象和具体断言；无关网页不引用、不补入学校规定。
+            使用相关结果时引用[网络1]、[网络2]并保留对应链接。
+            不得把“结果与本题无关”说成“我不能联网”或“我没有联网工具”；
+            全部无关时明确本次搜索结果不能支持本题，并继续依据已核实的校内资料回答。
             """;
 
     private final AiConversationMapper conversationMapper;
@@ -920,17 +951,12 @@ public class AiMessageServiceImpl
     }
 
     private boolean asksWebCapability(String question) {
-        boolean mentionsWeb = question.contains("联网")
-                || question.contains("上网")
-                || question.contains("网络搜索")
-                || question.contains("网页搜索");
-        boolean asksWhether = question.contains("能")
-                || question.contains("可以")
-                || question.contains("支持")
-                || question.contains("不能")
-                || question.contains("吗")
-                || question.contains("么");
-        return mentionsWeb && asksWhether;
+        if (question.length() > 120) return false;
+        if (NO_WEB_REQUESTS.stream().anyMatch(question::contains)) return false;
+        // Only a standalone capability question may bypass knowledge retrieval.
+        // A web preference in a substantive campus question still needs an answer.
+        String normalized = question.replaceAll("[\\s\\p{P}]", "");
+        return WEB_CAPABILITY_QUESTION.matcher(normalized).matches();
     }
 
     private AiModelResult webCapabilityResult() {
@@ -966,12 +992,11 @@ public class AiMessageServiceImpl
 
         boolean explicitlyNeedsWeb = WEB_SEARCH_TERMS.stream()
                 .anyMatch(question::contains)
-                || question.contains("联网")
-                || question.contains("搜索网页")
-                || question.contains("查资料");
+                || EXPLICIT_WEB_REQUESTS.stream().anyMatch(question::contains);
 
         if (asksSystemTime(question)
                 || question.length() > 500
+                || NO_WEB_REQUESTS.stream().anyMatch(question::contains)
                 || ((modelProfile == AiModelProfile.KIMI
                 || modelProfile == AiModelProfile.GLM)
                 && !explicitlyNeedsWeb)

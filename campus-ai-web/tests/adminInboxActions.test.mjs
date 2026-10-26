@@ -23,6 +23,19 @@ function load(name, context) {
   return vm.runInNewContext(`${view.slice(start, end)}\n${name}`, context, { timeout: 100 })
 }
 const ref = (value) => ({ value })
+test('overview retry invokes its scoped reader without forwarding the click event', options, async () => {
+  const unavailable = view.slice(view.indexOf('class="empty-state overview-unavailable"'), view.indexOf('<OperationsCockpit'))
+  assert.match(unavailable, /@click="refreshOverview\(\)"/)
+  const context = {
+    editorScope: { capture: () => ({ current: () => true }) },
+    getAdminOverview: async () => ({ pendingSubmissions: 12 }),
+    overview: ref(null), overviewLoadFailed: ref(true), overviewUpdatedAt: ref(null),
+  }
+  await load('refreshOverview', context)()
+  assert.equal(context.overview.value.pendingSubmissions, 12)
+  assert.equal(context.overviewLoadFailed.value, false)
+  assert.ok(context.overviewUpdatedAt.value)
+})
 function reviewContext(extra = {}) {
   const state = { owner: '2:1:1', events: [] }
   const editorScope = createAdminEditorScope(

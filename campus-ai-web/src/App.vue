@@ -1,11 +1,19 @@
 <script setup>
-import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { isNavigationFailure, useRouter } from 'vue-router'
-import { userSessionEnded } from '@/api/http'
+import { userSessionEnded, userSessionGeneration } from '@/api/http'
 import SessionEnded from '@/components/SessionEnded.vue'
+import PageRecovery from '@/components/PageRecovery.vue'
+import { routeLoadFailure, clearRouteFailure, reloadFailedRoute } from '@/utils/routeRecovery'
+import { settleVisualMotion, retireRoutePage, activateRoutePage } from '@/utils/routeMotion'
 
 const router = useRouter()
 const arriving = ref(false)
+watch(userSessionGeneration, clearRouteFailure, { flush: 'sync' })
+function reloadRoute() {
+  reloadFailedRoute(routeLoadFailure.value, { resolve: path => router.resolve(path),
+    confirm: message => window.confirm(message), assign: path => window.location.assign(path) })
+}
 
 async function enterWorkspace(event) {
   const destination = event.detail?.to
@@ -32,14 +40,16 @@ async function enterWorkspace(event) {
       // A skipped visual transition must not turn a successful login into an error.
       void transition.ready.then(() => performance.mark('campus:arrival-ready')).catch(() => {})
       await transition.updateCallbackDone
-      await transition.finished.catch(() => {})
+      await settleVisualMotion(transition)
     } else {
       await navigate()
       if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-        await document.querySelector('.workspace')?.animate(
-          [{ opacity:0, transform:'translateY(12px)' }, { opacity:1, transform:'translateY(0)' }],
-          { duration:360, easing:'cubic-bezier(.22,1,.36,1)' },
-        ).finished
+        try {
+          await settleVisualMotion(document.querySelector('.workspace')?.animate?.(
+            [{ opacity:0, transform:'translateY(12px)' }, { opacity:1, transform:'translateY(0)' }],
+            { duration:360, easing:'cubic-bezier(.22,1,.36,1)' },
+          ))
+        } catch { /* Optional visual support cannot invalidate the completed route. */ }
       }
     }
     performance.mark('campus:arrival-finished')
@@ -61,11 +71,14 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="app-shell">
+    <PageRecovery v-if="routeLoadFailure?.retainPage && !userSessionEnded" :kind="routeLoadFailure.kind" inline @reload="reloadRoute" @dismiss="clearRouteFailure" />
     <SessionEnded v-if="userSessionEnded && router.currentRoute.value.meta.requiresAuth" />
+    <PageRecovery v-else-if="routeLoadFailure && !routeLoadFailure.retainPage" :kind="routeLoadFailure.kind" @reload="reloadRoute" />
     <RouterView v-else v-slot="{ Component, route }">
-      <Transition name="page" :mode="arriving ? undefined : 'out-in'" :css="!arriving" appear>
+      <Transition name="page" :css="!arriving" @before-enter="activateRoutePage" @before-leave="retireRoutePage" @leave-cancelled="activateRoutePage" appear>
         <div :key="route.matched[0]?.name || route.name || route.path" class="route-page">
-          <component :is="Component" />
+          <component :is="Component" v-if="Component" />
+          <PageRecovery v-else kind="loading" />
         </div>
       </Transition>
     </RouterView>
@@ -102,6 +115,7 @@ body,
 }
 
 .app-shell {
+  position: relative;
   min-height: 100svh;
   overflow-x: clip;
   background:
@@ -133,20 +147,20 @@ body,
 .page-enter-active {
   will-change: opacity, transform;
   transition:
-    opacity 300ms ease,
-    transform 380ms cubic-bezier(0.22, 1, 0.36, 1);
+    opacity 200ms ease,
+    transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .page-leave-active {
-  will-change: opacity, transform;
-  transition:
-    opacity 160ms ease,
-    transform 200ms ease;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transition: none;
 }
 
 .page-enter-from {
   opacity: 0;
-  transform: translateY(10px);
+  transform: translateX(6px);
 }
 
 .page-leave-to {

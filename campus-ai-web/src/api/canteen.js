@@ -1,21 +1,21 @@
 import http from './http'
 
-export async function getCanteens() {
-  const response = await http.get('/api/canteens')
+export async function getCanteens(options = {}) {
+  const response = await http.get('/api/canteens', options)
   return response.data
 }
 
-export async function getCanteenMerchants() {
-  const response = await http.get('/api/canteens/merchants')
+export async function getCanteenMerchants(options = {}) {
+  const response = await http.get('/api/canteens/merchants', options)
   return response.data
 }
 
-export async function getCanteenMerchantReviews(id) {
-  return (await http.get(`/api/canteens/merchants/${id}/reviews`)).data
+export async function getCanteenMerchantReviews(id, options = {}) {
+  return (await http.get(`/api/canteens/merchants/${id}/reviews`, options)).data
 }
 
-export async function likeCanteenReview(merchantId, reviewId, liked) {
-  return (await http.put(`/api/canteens/merchants/${merchantId}/reviews/${reviewId}/like`, { liked })).data
+export async function likeCanteenReview(merchantId, reviewId, liked, options = {}) {
+  return (await http.put(`/api/canteens/merchants/${merchantId}/reviews/${reviewId}/like`, { liked }, options)).data
 }
 
 export function canteenMerchantPhotoUrl(id, version = '') {
@@ -23,7 +23,7 @@ export function canteenMerchantPhotoUrl(id, version = '') {
   return `${base}/api/canteens/merchants/${id}/photo${version ? `?v=${version}` : ''}`
 }
 
-export async function rateCanteenMerchant(id, score, comment) {
-  const response = await http.put(`/api/canteens/merchants/${id}/rating`, { score, comment })
+export async function rateCanteenMerchant(id, score, comment, options = {}) {
+  const response = await http.put(`/api/canteens/merchants/${id}/rating`, { score, comment }, options)
   return response.data
 }

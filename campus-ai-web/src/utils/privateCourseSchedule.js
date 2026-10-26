@@ -12,7 +12,7 @@ export function validatedCourseSnapshot(snapshot) {
   )
     throw new Error('课程表格响应不完整')
   validateCourseMetadata(snapshot)
-  return { ...snapshot, courses: normalizeCourses(snapshot.courses) }
+  return { ...snapshot, courses: snapshot.emptyConfirmed === true && Array.isArray(snapshot.courses) && snapshot.courses.length === 0 ? [] : normalizeCourses(snapshot.courses) }
 }
 export function createPrivateCourseSchedule({ owner, state, read }) {
   let generation = 0,

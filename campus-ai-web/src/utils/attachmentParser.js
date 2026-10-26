@@ -55,12 +55,12 @@ function* elements(nodes, tag) {
 }
 const textContent = nodes => (nodes || []).map(node => Object.entries(node).filter(([key]) => key !== ':@').map(([key,value]) => key === '#text' ? String(value) : key === 'tab' ? '\t' : key === 'br' ? '\n' : Array.isArray(value) ? textContent(value) : '').join('')).join('')
 const texts = (tree, tag) => [...elements(tree,tag)].map(node => textContent(node.children))
-function textChoice(label, text) {
+function textChoice(label, text, maxText = 50000) {
   if (!text.trim()) throw new Error('没有提取到可用文字；扫描图片需要OCR，本工具尚不支持')
-  if (text.length > 50000) throw new Error('提取文字超过5万字，请拆分附件，不会静默截断')
+  if (text.length > maxText) throw new Error(`提取文字超过${maxText/10000}万字，请拆分附件，不会静默截断`)
   return {label, text}
 }
-export function parseDocx(files) {
+export function parseDocx(files, { maxText = 50000 } = {}) {
   const tree = xml(files.get('word/document.xml'))
   let tableNumber = 0, revisions = false
   const inline = nodes => (nodes || []).map(node => Object.entries(node).map(([tag,children]) => {
@@ -85,10 +85,10 @@ export function parseDocx(files) {
   }))
   const body=[...elements(tree,'body')][0]
   const text = blocks(body?.children).join('\n')
-  return {kind:'text', choices:[textChoice('Word 正文',text)], warnings:[`提取${tableNumber}个正文表格并标注行号；单元格以制表符分隔，单元格内段落以 / 分隔，合并及嵌套结构不保真`,'不包含图片、公式、批注、页眉页脚，也不保留原始版式','Word分页会随软件变化，段落位置为提取文本行号，请对照原文件复核',...(revisions?['文档含修订：忽略删除/移出文字，保留插入/移入文字；请先在Word核对修订状态']:[])]}
+  return {kind:'text', choices:[textChoice('Word 正文',text,maxText)], warnings:[`提取${tableNumber}个正文表格并标注行号；单元格以制表符分隔，单元格内段落以 / 分隔，合并及嵌套结构不保真`,'不包含图片、公式、批注、页眉页脚，也不保留原始版式','Word分页会随软件变化，段落位置为提取文本行号，请对照原文件复核',...(revisions?['文档含修订：忽略删除/移出文字，保留插入/移入文字；请先在Word核对修订状态']:[])]}
 }
 const csvCell = value => /[",\r\n]/.test(value) ? `"${value.replaceAll('"','""')}"` : value
-export function parseXlsx(files) {
+export function parseXlsx(files, { maxText = 50000 } = {}) {
   const workbook = xml(files.get('xl/workbook.xml')), relationships = xml(files.get('xl/_rels/workbook.xml.rels'))
   const rels = new Map([...elements(relationships,'Relationship')].filter(r => r.attrs['@_TargetMode'] !== 'External').map(r => [r.attrs['@_Id'], r.attrs['@_Target']]))
   const shared = files.has('xl/sharedStrings.xml') ? [...elements(xml(files.get('xl/sharedStrings.xml')),'si')].map(item => texts(item.children,'t').join('')) : []
@@ -119,13 +119,13 @@ export function parseXlsx(files) {
     }
     if (!maxRow) continue
     const csv = Array.from({length:maxRow},(_,i) => rows.has(i+1) ? Array.from({length:width},(_,j) => csvCell(rows.get(i+1).get(j+1) || '')).join(',') : '').join('\n')
-    choices.push({...textChoice(sheet.attrs['@_name'] || `工作表${choices.length+1}`,csv), formulaCount})
+    choices.push({...textChoice(sheet.attrs['@_name'] || `工作表${choices.length+1}`,csv,maxText), formulaCount})
     formulas += formulaCount
   }
   if (!choices.length) throw new Error('没有可导入的非空可见工作表')
   return {kind:'sheet',choices,warnings:[`检测到${formulas}个公式单元格，全部标记为未计算，不采用可能过期的缓存结果`,`忽略${hidden}个隐藏工作表；可见表中的隐藏行列仍会提取，导入前请检查隐私信息`,'只读取单元格值，不执行宏或访问外部链接；日期显示为Excel底层值，样式、图表与合并结构不保留','一次导入一个工作表；请选择表头所在区域，导入后仍需核对数据来源和单位']}
 }
-export function parseOffice(bytes, extension) {
+export function parseOffice(bytes, extension, options = {}) {
   const files = unzipOffice(bytes)
-  return extension === 'docx' ? parseDocx(files) : parseXlsx(files)
+  return extension === 'docx' ? parseDocx(files,options) : parseXlsx(files,options)
 }

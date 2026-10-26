@@ -35,7 +35,8 @@ class SecurityHttpBoundaryTest {
         mvc.perform(post("/api/auth/login").header("Origin","https://evil.example")
                 .contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isForbidden()).andExpect(header().string("Cache-Control","no-store"));
-        mvc.perform(get("/api/probe")).andExpect(status().isInternalServerError())
+        mvc.perform(get("/api/probe")).andExpect(status().isServiceUnavailable())
+                .andExpect(header().string("Retry-After","2"))
                 .andExpect(header().string("Cache-Control","no-store"))
                 .andExpect(content().string(not(containsString("private-host"))))
                 .andExpect(content().string(not(containsString("SECRET_PASSWORD"))));

@@ -5,6 +5,8 @@ import { userSessionGeneration } from '@/api/http'
 import { useAdminAuthStore } from '@/stores/adminAuth'
 import { createAdminCatalogScope, createAdminCatalogState, catalogId, sameCatalogEntry, validCatalogList } from '@/utils/adminCatalogScope'
 import { useScopedConfirmation } from '@/utils/useScopedConfirmation'
+import { createCatalogDraftTransition } from '@/utils/catalogDraftTransition'
+import MaterialIntakePanel from '@/components/MaterialIntakePanel.vue'
 
 const auth = useAdminAuthStore()
 const owner = computed(() => auth.isLoggedIn && auth.user?.schoolId
@@ -17,16 +19,29 @@ const canteenId = ref(null)
 const merchantId = ref(null)
 const canteenForm = reactive({ name: '' })
 const merchantForm = reactive({ canteenId: '', name: '', location: '', description: '' })
+const intakeOpen = ref(true), intakeState = reactive({ busy: false, pending: false }), manualEditors = ref()
+const canteenSnapshot = () => JSON.stringify({ id: canteenId.value, ...canteenForm })
+const merchantSnapshot = () => JSON.stringify({ id: merchantId.value, ...merchantForm })
+const savedCanteen = ref(canteenSnapshot()), savedMerchant = ref(merchantSnapshot())
+const canteenDirty = computed(() => canteenSnapshot() !== savedCanteen.value)
+const merchantDirty = computed(() => merchantSnapshot() !== savedMerchant.value)
+const dirty = computed(() => canteenDirty.value || merchantDirty.value || intakeState.pending)
 const canteenNames = computed(() => new Map(canteens.value.map((item) => [item.id, item.name])))
 let canteenGeneration = 0, merchantGeneration = 0, catalog
 const { confirming, confirm } = useScopedConfirmation(() => catalog?.key(), () => Boolean(owner.value))
-const locked = computed(() => loading.value || busy.value || confirming.value || !owner.value)
+const draftKey = () => catalog?.key() ? `${catalog.key()}:${canteenGeneration}:${merchantGeneration}` : null
+const { confirming: draftConfirming, confirm: confirmDraft } = useScopedConfirmation(draftKey, () => Boolean(owner.value))
+const catalogBusy = computed(() => busy.value || confirming.value || draftConfirming.value || intakeState.busy)
+const locked = computed(() => loading.value || catalogBusy.value || !owner.value)
 const writeLocked = computed(() => locked.value || needsReload.value)
+const transitions = createCatalogDraftTransition(draftKey, () => locked.value, confirmDraft)
+defineExpose({ dirty, busy: catalogBusy, draftKey })
 
-function resetCanteen() { canteenId.value = null; canteenForm.name = '' }
+function resetCanteen() { canteenId.value = null; canteenForm.name = ''; savedCanteen.value = canteenSnapshot() }
 function resetMerchant() {
   merchantId.value = null
   Object.assign(merchantForm, { canteenId: '', name: '', location: '', description: '' })
+  savedMerchant.value = merchantSnapshot()
 }
 function clearPhotos() {
   for (const id of Object.keys(photoPreviews)) {
@@ -54,19 +69,48 @@ watch(owner, () => catalog.reset(), { flush: 'sync' })
 watch(() => [canteenId.value, canteenForm.name], () => { canteenGeneration++ }, { flush: 'sync' })
 watch(() => [merchantId.value, ...Object.values(merchantForm)], () => { merchantGeneration++ }, { flush: 'sync' })
 onMounted(() => catalog.load())
-onBeforeUnmount(() => catalog.dispose())
+onBeforeUnmount(() => { transitions.dispose(); catalog.dispose() })
 const reload = () => catalog.load()
+function finishIntake(result) {
+  intakeOpen.value=false;intakeState.pending=false;intakeState.busy=false
+  if(result?.saved)void reload()
+}
+function intakeChanged(next) {
+  Object.assign(intakeState,next)
+  if(next.pending && !next.busy)state.success=''
+}
 
 function editCanteen(item) {
-  if (locked.value) return
-  canteenId.value = item.id
-  canteenForm.name = item.name
+  const snapshot = Object.freeze({ ...item })
+  return transitions.replace({
+    dirty: () => canteenDirty.value,
+    message: '当前食堂填写尚未保存。改为编辑这条食堂，会放弃当前食堂填写；商家填写不会清除。',
+    current: () => sameCatalogEntry(canteens.value, snapshot),
+    apply: () => { canteenId.value = snapshot.id; canteenForm.name = snapshot.name; savedCanteen.value = canteenSnapshot(); if(manualEditors.value)manualEditors.value.open=true },
+  })
 }
 function editMerchant(item) {
-  if (locked.value) return
-  merchantId.value = item.id
-  Object.assign(merchantForm, { canteenId: item.canteenId, name: item.name,
-    location: item.location || '', description: item.description || '' })
+  const snapshot = Object.freeze({ ...item })
+  return transitions.replace({
+    dirty: () => merchantDirty.value,
+    message: '当前商家填写尚未保存。编辑这条商家会放弃当前商家填写；食堂填写不会清除。',
+    current: () => sameCatalogEntry(merchants.value, snapshot),
+    apply: () => {
+      merchantId.value = snapshot.id
+      Object.assign(merchantForm, { canteenId: snapshot.canteenId, name: snapshot.name,
+        location: snapshot.location || '', description: snapshot.description || '' })
+      savedMerchant.value = merchantSnapshot()
+      if(manualEditors.value)manualEditors.value.open=true
+    },
+  })
+}
+function cancelCanteen() {
+  return transitions.replace({ dirty: () => canteenDirty.value, apply: resetCanteen,
+    message: '清空当前食堂填写？尚未保存的修改会放弃，不会删除已有食堂或清除商家填写。' })
+}
+function cancelMerchant() {
+  return transitions.replace({ dirty: () => merchantDirty.value, apply: resetMerchant,
+    message: '清空当前商家填写？尚未保存的修改会放弃，不会删除已有商家或清除食堂填写。' })
 }
 async function submitCanteen() {
   if (writeLocked.value || !canteenForm.name.trim() || canteenForm.name.trim().length > 120) return
@@ -153,23 +197,27 @@ async function moderate(review, status) {
   <section class="canteen-admin" :aria-busy="locked">
     <p v-if="!owner" role="alert">管理员身份已变化，请重新核验后打开管理。</p>
     <p v-if="success" role="status">{{ success }}</p>
+    <p v-if="dirty" class="panel-message" role="status">有未保存的填写，仅保留在当前页面；切换后台栏目不会丢失。</p>
     <p v-if="busy" role="status">正在处理。离开页面不会撤销已提交的操作。</p>
     <button class="catalog-refresh" type="button" :disabled="locked" @click="reload">刷新本校资料</button>
     <div class="panel-intro">
-      <p>先建食堂，再建商家。核实后发布；照片自动压缩并移除元数据。学生短评须审核，不进入 AI 知识库。</p>
+      <p>发来店名和所属食堂，程序先整理成草稿；核对后再保存、发布。照片选填，保存后在下方对应商家上传。学生短评仍单独审核，不进入 AI 知识库。</p>
     </div>
     <p v-if="loading" class="panel-message">正在加载本校食堂资料…</p>
     <div v-else-if="error" class="panel-message error" role="alert">
       <span>{{ error }}</span><button type="button" :disabled="locked" @click="reload">重试</button>
     </div>
     <template v-else>
+      <MaterialIntakePanel v-if="intakeOpen && owner" :scope="owner" :user="auth.user" :seed="{mode:'merchant'}" :active="Boolean(owner)" embedded @state="intakeChanged" @done="finishIntake" />
+      <button v-else type="button" class="catalog-refresh" :disabled="writeLocked" @click="intakeOpen=true">新增商家：发资料自动整理</button>
+      <details ref="manualEditors" class="manual-editors"><summary>手动新增食堂 / 填写商家 / 编辑已选条目</summary>
       <div class="editor-grid">
         <form class="editor" @submit.prevent="submitCanteen">
           <h3>{{ canteenId ? '编辑食堂' : '新增食堂' }}</h3>
           <label>食堂名称<input v-model="canteenForm.name" :disabled="locked" required maxlength="120" placeholder="填写真实名称" /></label>
           <div class="form-actions">
             <button type="submit" :disabled="writeLocked || !canteenForm.name.trim()">保存草稿</button>
-            <button v-if="canteenId" type="button" class="quiet" :disabled="locked" @click="resetCanteen">取消编辑</button>
+            <button v-if="canteenId || canteenDirty" type="button" class="quiet" :disabled="locked" @click="cancelCanteen">{{ canteenId ? '取消编辑' : '清空食堂填写' }}</button>
           </div>
         </form>
         <form class="editor" @submit.prevent="submitMerchant">
@@ -183,10 +231,11 @@ async function moderate(review, status) {
           <label>介绍<textarea v-model="merchantForm.description" :disabled="locked" maxlength="1000" rows="3" placeholder="只写已核实的信息，不填宣传文案" /></label>
           <div class="form-actions">
             <button type="submit" :disabled="writeLocked || !merchantForm.canteenId || !merchantForm.name.trim()">保存草稿</button>
-            <button v-if="merchantId" type="button" class="quiet" :disabled="locked" @click="resetMerchant">取消编辑</button>
+            <button v-if="merchantId || merchantDirty" type="button" class="quiet" :disabled="locked" @click="cancelMerchant">{{ merchantId ? '取消编辑' : '清空商家填写' }}</button>
           </div>
         </form>
       </div>
+      </details>
 
       <div class="list-section">
         <h3>食堂 <span>{{ canteens.length }}</span></h3>
@@ -230,6 +279,7 @@ async function moderate(review, status) {
 <style scoped>
 .canteen-admin { display: grid; gap: 28px; color: #252a31; }
 .panel-intro p { max-width: 70ch; margin: 0; color: #6b7480; font-size: 14px; line-height: 1.7; }
+.manual-editors summary { min-height:44px;display:flex;align-items:center;cursor:pointer;color:#31526d;font-size:16px;text-decoration:underline;text-underline-offset:4px;margin-bottom:12px; }
 .editor-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; gap: 16px; }
 .editor { display: grid; gap: 13px; padding: 24px; background: #fff; border: 1px solid #e2e6eb; border-radius: 16px; }
 .editor h3 { margin: 0 0 2px; font-size: 17px; }

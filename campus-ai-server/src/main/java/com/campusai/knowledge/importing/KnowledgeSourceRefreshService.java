@@ -45,6 +45,10 @@ public class KnowledgeSourceRefreshService {
             throw new IllegalArgumentException("document is not refreshable");
         }
         KnowledgeImportPreview preview = previews.url(schoolId, document.getSourceUrl());
+        if (preview.warnings() != null && preview.warnings().contains(OfficialHtmlContent.FALLBACK_WARNING)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "该页面未定位独立正文，请人工核对；未把导航或推荐新闻计为来源更新");
+        }
         String content = normalize(preview.content());
         String detectedHash = sha256(content);
         String reviewedSourceHash = reviewedSourceHash(schoolId, documentId, document.getSourceUrl());

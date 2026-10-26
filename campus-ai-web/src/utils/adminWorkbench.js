@@ -1,4 +1,15 @@
 // Administration helpers never infer privileges or replace server authorization.
+export function formatAdminDate(value, includeYear = false) {
+  if (!value || !Number.isFinite(new Date(value).getTime())) return '时间未知'
+  return new Intl.DateTimeFormat('zh-CN', {
+    ...(includeYear ? { year: 'numeric' } : {}),
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(value))
+}
+
 export async function loadAdminSections(loaders) {
   return Object.fromEntries(await Promise.all(Object.entries(loaders).map(async ([key, load]) => {
     try {
@@ -10,6 +21,11 @@ export async function loadAdminSections(loaders) {
       return [key, { data, error: null }]
     } catch (error) { return [key, { data: key === 'overview' ? null : [], error }] }
   })))
+}
+
+export function canShowEmptySourceReview({ loading, identityError, updatesError, updates } = {}) {
+  return loading === false && !identityError && !updatesError
+    && Array.isArray(updates) && updates.length === 0
 }
 
 export function filterAdminDocuments(documents, query = '', status = 'ALL') {

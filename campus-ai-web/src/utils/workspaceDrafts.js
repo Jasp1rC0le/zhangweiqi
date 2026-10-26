@@ -10,6 +10,9 @@ export function createWorkspaceDrafts() {
     read(model, conversationId = null) { return drafts.get(key(model, conversationId))?.text || '' },
     entries: () => [...drafts.values()].map(entry => ({...entry})),
     clear(model, conversationId = null) { drafts.delete(key(model, conversationId)) },
+    // Only this component's in-memory slots; persistent recovery has its own
+    // server-confirmed owner and must not be erased during a reactive cutover.
+    reset() { drafts.clear() },
     forgetConversation(conversationId) {
       for (const draftKey of drafts.keys()) {
         if (draftKey.endsWith(`:${conversationId}`)) drafts.delete(draftKey)

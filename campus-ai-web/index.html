@@ -12,9 +12,24 @@
       content="Campthink 面向大学生的校园与学习 AI 助手：查询校内信息、梳理论文与文献、解释和调试代码，也能查看食堂评分。选一个功能，说出你的问题。"
     />
     <title>Campthink · 校园问答、论文与代码助手</title>
+    <link rel="stylesheet" href="/startup.css" />
+    <script src="/startup-guard.js" defer></script>
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <section id="campthink-startup" class="campthink-startup" role="status" aria-labelledby="startup-title">
+        <div>
+          <svg class="startup-mark" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+            <path d="M4 13 21 3v11l-7 4v10L4 34V13Z" fill="currentColor" />
+            <path d="m36 27-17 10V26l7-4V12l10-6v21Z" fill="currentColor" />
+          </svg>
+          <h1 id="startup-title" data-startup-title>正在载入 Campthink</h1>
+          <p data-startup-message>若页面长时间未出现，请检查网络后刷新浏览器，或返回首页重试。</p>
+          <a href="/login?reauth=1">返回首页重试</a>
+          <noscript><p>此网站需要JavaScript。请启用后重新载入；当前不会提交任何内容。</p></noscript>
+        </div>
+      </section>
+    </div>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

@@ -78,7 +78,7 @@ onMounted(refresh)
 <template>
   <section class="budget-panel" aria-labelledby="budget-heading" :aria-busy="pending">
     <header>
-      <div><p>FREE LAUNCH / COST CONTROL</p><h2 id="budget-heading">免费版预算</h2></div>
+      <div><h2 id="budget-heading">免费版预算</h2></div>
       <button type="button" :disabled="pending || exportPending || !owner" @click="refresh">{{ pending ? '正在读取…' : '刷新预算' }}</button>
     </header>
     <p v-if="!owner" role="status">管理员身份已变化，请重新核验账号后再查看预算</p>

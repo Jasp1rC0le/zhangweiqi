@@ -22,6 +22,9 @@ public interface KnowledgeDocumentMapper {
 
     KnowledgeDocument findLockedByIdAndSchoolId(@Param("id") Long id, @Param("schoolId") Long schoolId);
 
+    int countEditable(@Param("schoolId") Long schoolId,@Param("pattern") String pattern);
+    List<KnowledgeDocument> pageEditable(@Param("schoolId") Long schoolId,@Param("pattern") String pattern,@Param("offset") int offset,@Param("size") int size);
+
     KnowledgeDocument findCurrentEvaluationTarget(@Param("id") Long id, @Param("schoolId") Long schoolId);
 
     List<KnowledgeDocument> findRecentBySchoolId(@Param("schoolId") Long schoolId);

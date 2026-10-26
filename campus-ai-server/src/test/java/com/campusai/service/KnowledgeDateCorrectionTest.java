@@ -86,4 +86,18 @@ class KnowledgeDateCorrectionTest {
         assertThatThrownBy(() -> service.revise(1L,93L,9L,request)).hasMessageContaining("最新版本");
         verify(documents,never()).updateDates(any(),any());
     }
+
+    @Test void chatPreviewLocksExactDocumentAndRejectsAChangedMetadataTokenBeforeMutation()throws Exception {
+        var input=request();var original=documents.findByIdAndSchoolId(93L,1L);original.setVersionNumber(1);original.setHasSuccessor(false);
+        input.setExpectedRevisionTag(original.getRevisionTag());when(documents.findLockedByIdAndSchoolId(93L,1L)).thenReturn(original);
+        original.setSourceUrl("https://example.invalid/new-source");
+        assertThatThrownBy(()->service.revise(1L,93L,9L,input)).hasMessageContaining("预览后更新");
+        verify(documents).findLockedByIdAndSchoolId(93L,1L);verify(documents,never()).updateDates(any(),any());verify(documents,never()).updateStatus(any(),any(),any(),any());verifyNoInteractions(audit,chunks,events);
+    }
+    @Test void matchingChatPreviewUsesExistingAuditAndMissingLockedTargetFailsClosed()throws Exception {
+        var input=request();var original=documents.findByIdAndSchoolId(93L,1L);original.setVersionNumber(1);original.setHasSuccessor(false);input.setExpectedRevisionTag(original.getRevisionTag());
+        assertThatThrownBy(()->service.revise(1L,93L,9L,input)).hasMessageContaining("不存在");verifyNoInteractions(audit,chunks,events);
+        when(documents.findLockedByIdAndSchoolId(93L,1L)).thenReturn(original);
+        assertThat(service.revise(1L,93L,9L,input).metadataUpdated()).isTrue();verify(audit).insert(eq(93L),eq(9L),eq("PUBLISHED"),eq("PUBLISHED"),contains("日期更正"));
+    }
 }

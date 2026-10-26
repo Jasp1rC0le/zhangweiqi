@@ -31,7 +31,10 @@ const scope = createBatchImportScope(() => owner.value)
 const { confirming, confirm } = useScopedConfirmation(scope.key, () => Boolean(owner.value))
 const busy = computed(() => parsing.value || publishing.value || confirming.value)
 const dirty = computed(() => drafts.value.length > 0 || Boolean(url.value.trim()))
-defineExpose({ busy, dirty })
+let draftGeneration = 0
+watch(() => [drafts.value, url.value], () => { draftGeneration++ }, { deep: true, flush: 'sync' })
+const draftKey = () => scope.key() ? `${scope.key()}:${draftGeneration}` : null
+defineExpose({ busy, dirty, draftKey })
 watch(owner, () => {
   scope.invalidate()
   drafts.value = []
@@ -66,6 +69,7 @@ function addPreviews(previews) {
       sourceType: preview.sourceType,
       duplicateDocumentId: preview.duplicateDocumentId,
       conflictingDocumentIds: preview.conflictingDocumentIds || [],
+      warnings: preview.warnings || [],
       revisionOf: preview.conflictingDocumentIds?.[0] || '',
     })
   }
@@ -260,6 +264,7 @@ async function publish() {
     <p v-if="dirty" class="batch-intro">未发布内容仅保留在当前页面；切换后台栏目不会清空，刷新或离开网站前请保留原文件和正文</p>
     <div v-for="(item, index) in drafts" :key="item.key" class="batch-draft">
       <div class="batch-draft-head"><strong>{{ index + 1 }} · {{ item.title || '待命名资料' }}</strong><button type="button" :disabled="busy" @click="drafts.splice(index, 1)">移除</button></div>
+      <p v-for="warning in item.warnings" :key="warning" class="batch-warning" role="status">{{ warning }}</p>
       <p v-if="item.duplicateDocumentId" class="batch-warning">正文与资料 #{{ item.duplicateDocumentId }} 相同；此项不会发布。</p>
       <label v-else-if="item.conflictingDocumentIds.length" class="batch-warning">标题或来源与旧资料冲突，选择要修订的版本
         <select v-model="item.revisionOf" :disabled="busy"><option value="">请选择</option><option v-for="id in item.conflictingDocumentIds" :key="id" :value="id">资料 #{{ id }}</option></select>

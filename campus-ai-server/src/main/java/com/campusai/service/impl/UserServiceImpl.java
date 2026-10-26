@@ -20,16 +20,19 @@ public class UserServiceImpl implements UserService {
     private final PasswordEncoder passwordEncoder;
     private final SchoolMapper schoolMapper;
     private final JdbcTemplate jdbc;
+    private final com.campusai.teaching.TeachingIdentityService identities;
 
     public UserServiceImpl(
             UserMapper userMapper,
             SchoolMapper schoolMapper,
             PasswordEncoder passwordEncoder,
-            JdbcTemplate jdbc) {
+            JdbcTemplate jdbc,
+            com.campusai.teaching.TeachingIdentityService identities) {
         this.userMapper = userMapper;
         this.schoolMapper = schoolMapper;
         this.passwordEncoder = passwordEncoder;
         this.jdbc = jdbc;
+        this.identities = identities;
     }
     @Override
     public User getById(Long id) {
@@ -39,6 +42,7 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public User register(CreateUserRequest request) {
+        String identity = identities.registrationRole(request.getTeachingIdentity());
         if (!Boolean.TRUE.equals(request.getPrivacyAccepted())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "请先阅读并同意隐私说明");
         }
@@ -78,6 +82,8 @@ public class UserServiceImpl implements UserService {
 
         jdbc.update("INSERT INTO user_privacy_consents (user_id, policy_version) VALUES (?, ?)",
                 user.getId(), request.getPolicyVersion());
+
+        if (!"STUDENT".equals(identity)) identities.apply(user.getId(), new com.campusai.teaching.TeachingIdentityService.Apply(identity, 0));
 
         return userMapper.findById(user.getId());
     }

@@ -243,6 +243,9 @@ export async function getKnowledgeDocument(id, options = {}) {
   const response = await http.get(`/api/admin/knowledge/documents/${id}`, options)
   return response.data
 }
+export async function getEditableKnowledgePage(page=0,search='',signal) {
+  return (await http.get('/api/admin/knowledge/documents/page',{params:{page,size:25,search},signal})).data
+}
 
 export async function getKnowledgeDocumentVersions(id, options = {}) {
   const response = await http.get(`/api/admin/knowledge/documents/${id}/versions`, options)

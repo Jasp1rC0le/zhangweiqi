@@ -120,7 +120,7 @@ test(
   'partial failure and malformed responses preserve old queue and block review',
   options,
   async () => {
-    for (const result of [null, [entry({ revision: 0 })], new Array(101).fill(entry())]) {
+    for (const result of [null, [entry({ revision: 0 })], Array.from({ length: 101 }, () => entry())]) {
       const f = fixture({ api: { wallQueue: async () => result } })
       f.state.entries = [entry({ title: '保留旧内容' })]
       assert.equal(await f.controller.load(), false)

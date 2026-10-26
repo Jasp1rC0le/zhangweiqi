@@ -30,6 +30,18 @@ class AiSpendGuardTest {
     @Autowired AiSpendGuard guard;
     private static final List<AiChatMessage> INPUT = List.of(new AiChatMessage("user", "测试"));
 
+    @Test void visionUsesTrustedTokenEstimateInExistingBudgetLedger() {
+        var ticket=guard.reserveVision("deepseek","deepseek-flash",1000,1000);
+        assertThat(guard.overview().today().occupiedCny()).isEqualByComparingTo("0.010000");
+        guard.complete(ticket,new AiModelResult("deepseek","deepseek-flash","recognized",1000,100,1100));
+        assertThat(guard.overview().today().occupiedCny()).isEqualByComparingTo("0.002800");
+    }
+    @Test void visionRejectsInvalidCountsAndMissingPriceWithoutStartingLedger() {
+        for(int n:new int[]{0,-1,4097})assertThatThrownBy(()->guard.reserveVision("kimi","kimi-k3",n,100)).hasMessageContaining("413");
+        assertThatThrownBy(()->guard.reserveVision("kimi","kimi-k3",100,100)).hasMessageContaining("503");
+        assertThat(guard.overview().today().attempts()).isZero();
+    }
+
     @BeforeEach void setup() throws Exception {
         jdbc.execute("DROP ALL OBJECTS");
         String schema = new String(getClass().getResourceAsStream("/schema.sql").readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);

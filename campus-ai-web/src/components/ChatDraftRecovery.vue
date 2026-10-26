@@ -6,6 +6,7 @@ const props = defineProps({
   pending: {type:Array, default:() => []},
   busy: Boolean,
   notice: {type:String, default:''},
+  settings: {type:Boolean, default:true},
 })
 defineEmits(['toggle', 'restore', 'discard'])
 const selected = ref(0)
@@ -27,7 +28,7 @@ const labels = {standard:'问答', kimi:'论文', glm:'代码'}
         <button type="button" :disabled="busy" @click="$emit('discard')">不恢复并清除</button>
       </div>
     </div>
-    <div class="draft-recovery-settings">
+    <div v-if="settings" class="draft-recovery-settings">
       <label>
         <input type="checkbox" :checked="state.enabled" :disabled="busy || Boolean(pending.length)"
           aria-describedby="draft-recovery-hint" @change="$emit('toggle', $event.target.checked)" />

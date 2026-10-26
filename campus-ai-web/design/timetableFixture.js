@@ -114,5 +114,5 @@ export function createTimetableFixture({ saved = false, coursesSaved = false } =
     } else throw new Error('Unsupported fixture operation')
     return { data, status: 200, statusText: 'OK', headers: {}, config }
   }
-  return { adapter }
+  return { adapter, hasSavedImage: () => !!timetable || saved }
 }

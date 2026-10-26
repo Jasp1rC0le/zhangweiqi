@@ -28,7 +28,6 @@ __pycache__/
 *.p12
 *.pfx
 docs/research/
-tools/research/
 *.log
 hs_err_pid*
 *.hprof
@@ -46,3 +45,15 @@ coverage/
 *.sqlite3-*
 *.db-*
 *.dump
+
+.local/private/
+网站/
+docs/previews/
+docs/*.docx
+docs/*.pdf
+
+tools/research/*.json
+tools/research/*.sqlite*
+tools/research/*.pdf
+tools/research/*.docx
+tools/research/__pycache__/

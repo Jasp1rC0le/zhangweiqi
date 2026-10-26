@@ -5,6 +5,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.UUID;
 import java.time.LocalDate;
 import java.time.ZoneId;
 
@@ -20,10 +21,11 @@ public class BackgroundJobRepository {
         String dedupe = schoolId + ":" + documentId;
         jdbc.update("INSERT INTO background_jobs (school_id, job_type, ref_id, dedupe_key) "
                         + "VALUES (?, 'KNOWLEDGE_INDEX', ?, ?) ON DUPLICATE KEY UPDATE "
-                        + "status = IF(status = 'FAILED', 'PENDING', status), "
-                        + "attempt_count = IF(status = 'FAILED', 0, attempt_count), "
-                        + "available_at = IF(status = 'FAILED', CURRENT_TIMESTAMP, available_at), "
-                        + "last_error = IF(status = 'FAILED', NULL, last_error)",
+                        // MySQL evaluates assignments left to right: change status only after its guards.
+                        + "attempt_count = CASE WHEN status = 'FAILED' THEN 0 ELSE attempt_count END, "
+                        + "available_at = CASE WHEN status = 'FAILED' THEN CURRENT_TIMESTAMP ELSE available_at END, "
+                        + "last_error = CASE WHEN status = 'FAILED' THEN NULL ELSE last_error END, "
+                        + "status = CASE WHEN status = 'FAILED' THEN 'PENDING' ELSE status END",
                 schoolId, documentId, dedupe);
     }
 
@@ -36,7 +38,7 @@ public class BackgroundJobRepository {
     }
 
     public void enqueueKnowledgeRefreshNow(Long schoolId, Long documentId) {
-        String dedupe = schoolId + ":" + documentId + ":manual:" + System.currentTimeMillis();
+        String dedupe = schoolId + ":" + documentId + ":manual:" + UUID.randomUUID();
         jdbc.update("INSERT INTO background_jobs (school_id, job_type, ref_id, dedupe_key) "
                         + "VALUES (?, 'KNOWLEDGE_REFRESH', ?, ?)", schoolId, documentId, dedupe);
     }

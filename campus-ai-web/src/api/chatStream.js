@@ -7,6 +7,7 @@ const oversized = () => createStreamError(413, { message: '回答数据超过安
 const serverFailure = status => {
   const safeStatus = Number.isInteger(status) && status >= 400 && status <= 599 ? status : 502
   const message = ({401:'登录已失效，请重新登录', 403:'无权访问这段对话', 404:'这段对话不存在或无权访问',
+    408:'回答等待超时，请核对历史记录后重试',504:'本次回答超时，请核对历史记录后重试',
     413:'请求内容过大，请精简后重试', 429:'当前额度或请求频率受限，请检查额度后稍后重试'})[safeStatus]
     || (safeStatus >= 500 ? '回答服务暂时不可用，请稍后重试' : '请求未能完成，请检查输入后重试')
   return createStreamError(safeStatus, {message})
@@ -19,13 +20,18 @@ export function createStreamError(status, data) {
 }
 
 // Keep the session lease alive through body consumption, not just headers.
-export async function readChatStream(response, handlers = {}, { signal, assertActive = () => {}, idleTimeoutMs = 90000, expectedConversationId } = {}) {
+export async function readChatStream(response, handlers = {}, { signal, assertActive = () => {}, idleTimeoutMs = 90000, firstAnswerTimeoutMs = 90000, expectedConversationId } = {}) {
   const check = () => { assertActive(); signal?.throwIfAborted() }
   check()
   if (!response.ok || !response.body) {
     // Do not consume an unbounded HTML/error body or expose internal messages.
     void response.body?.cancel().catch(() => {})
     throw serverFailure(response.status)
+  }
+  const contentType = response.headers?.get('content-type')
+  if (contentType && !/^text\/event-stream(?:;|$)/i.test(contentType)) {
+    void response.body.cancel().catch(() => {})
+    throw malformed()
   }
 
   const reader = response.body.getReader()
@@ -34,6 +40,7 @@ export async function readChatStream(response, handlers = {}, { signal, assertAc
   let receivedBytes = 0, answerChars = 0
   let completedResponse
   let completed = false
+  let progressAt = performance.now()
   const cancelReader = () => { void reader.cancel().catch(() => {}) }
   signal?.addEventListener('abort', cancelReader, { once: true })
   const readChunk = async () => {
@@ -44,7 +51,7 @@ export async function readChatStream(response, handlers = {}, { signal, assertAc
         new Promise((_, reject) => {
           timeout = setTimeout(() => reject(createStreamError(408, {
             message: '回答长时间没有新内容，请查看历史记录后重试',
-          })), idleTimeoutMs)
+          })), Math.max(0, (answerChars ? idleTimeoutMs : firstAnswerTimeoutMs) - (performance.now() - progressAt)))
         }),
       ])
     } finally { clearTimeout(timeout) }
@@ -67,6 +74,7 @@ export async function readChatStream(response, handlers = {}, { signal, assertAc
     if (event === 'delta') {
       if (typeof payload.content !== 'string') throw malformed()
       answerChars += payload.content.length
+      if (payload.content.length) progressAt = performance.now()
       if (answerChars > MAX_ANSWER_CHARS) throw oversized()
       handlers.onDelta?.(payload.content)
     }

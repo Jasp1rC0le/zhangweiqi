@@ -3,6 +3,7 @@ import {ref,onMounted,watch,onBeforeUnmount} from 'vue'
 import {useRoute,useRouter,onBeforeRouteLeave,onBeforeRouteUpdate} from 'vue-router'
 import http from '@/api/http'
 import CampMark from '@/components/CampMark.vue'
+import {ArrowRight} from '@element-plus/icons-vue'
 import {calculationSettingsText} from '@/utils/columnCalculation'
 import {useAuthStore} from '@/stores/auth'
 import FormDraftRecovery from '@/components/FormDraftRecovery.vue'
@@ -84,7 +85,7 @@ watch(()=>route.params.id,()=>{if(!recoveryNavigation)load()});onMounted(load)
         <form v-if="detail.canReview" :aria-busy="saving" @submit.prevent="save"><h2>你的审阅意见</h2><label class="text-label" for="review-note">指出具体位置、依据和修改建议</label><textarea id="review-note" v-model="note" :disabled="saving||restoring" maxlength="2000" rows="6" required placeholder="例如：第2项缺少样本来源，请补充实际采集范围；不要替对方编造数据"></textarea><p v-if="error && errorSource==='save'" class="studio-error" role="alert">{{ error }}</p><p v-if="conflict" class="data-help">请先复制保留当前意见，再重新加载核对，不会强行覆盖其他页面的更新 <button type="button" @click="mayLeave() && load()">重新加载最新意见</button></p><p class="data-help">{{ note.length }}/2000字 · 只发给项目所有者，再次发送会更新此前意见</p><p v-if="note!==savedNote && !saving" class="data-help">有尚未发送的修改</p><button class="primary" :disabled="saving||restoring||conflict||!note.trim()||note===savedNote">{{ saving?'发送中…':'发送审阅意见' }}</button></form>
         <RouterLink to="/reviews">返回审阅列表</RouterLink>
       </template>
-      <template v-else-if="!loading&&!error&&!route.params.id"><p>仅显示别人定向发给你的有效邀请；不会自动公开你的资料</p><ul class="received-reviews"><li v-for="entry in entries" :key="entry.id"><RouterLink :to="`/reviews/${entry.id}`"><strong>{{ entry.title }}</strong><span>来自 {{ entry.owner }} · v{{ entry.revision }} · {{ entry.reviewNote?'已反馈':'待审阅' }}</span></RouterLink></li></ul><p v-if="!entries.length">暂时没有邀请。让同校伙伴在项目的“协作审阅”中填写你的登录账号。</p></template>
+      <template v-else-if="!loading&&!error&&!route.params.id"><p>仅显示别人定向发给你的有效邀请；不会自动公开你的资料</p><ul class="received-reviews"><li v-for="entry in entries" :key="entry.id"><RouterLink :to="`/reviews/${entry.id}`"><strong>{{ entry.title }}</strong><span>来自 {{ entry.owner }} · v{{ entry.revision }} · {{ entry.reviewNote?'已反馈':'待审阅' }}</span><span class="review-entry-action">打开审阅<ArrowRight aria-hidden="true" /></span></RouterLink></li></ul><p v-if="!entries.length">暂时没有邀请。让同校伙伴在项目的“协作审阅”中填写你的登录账号。</p></template>
     </article>
   </main>
 </template>

@@ -5,6 +5,7 @@ import { userSessionGeneration } from '@/api/http'
 import { useAdminAuthStore } from '@/stores/adminAuth'
 import { createAdminCatalogScope, createAdminCatalogState, catalogId, sameCatalogEntry, validCatalogList } from '@/utils/adminCatalogScope'
 import { useScopedConfirmation } from '@/utils/useScopedConfirmation'
+import { createCatalogDraftTransition } from '@/utils/catalogDraftTransition'
 import { safeExternalUrl } from '@/utils/safeMarkdown'
 
 const auth = useAdminAuthStore()
@@ -17,20 +18,33 @@ const employerId = ref(null), candidateId = ref(null), jobId = ref(null)
 const candidateKeyword = ref('')
 const employer = reactive({ name: '', industry: '', websiteUrl: '', description: '' })
 const job = reactive({ employerId: '', title: '', employmentType: '', location: '', sourceUrl: '', description: '', postedAt: '', expiresAt: '' })
+const employerSnapshot = () => JSON.stringify({ id: employerId.value, candidate: candidateId.value, ...employer })
+const jobSnapshot = () => JSON.stringify({ id: jobId.value, ...job })
+const savedEmployer = ref(employerSnapshot()), savedJob = ref(jobSnapshot())
+const employerDirty = computed(() => employerSnapshot() !== savedEmployer.value)
+const jobDirty = computed(() => jobSnapshot() !== savedJob.value)
+const dirty = computed(() => employerDirty.value || jobDirty.value || Boolean(candidateKeyword.value))
 const employerForm = ref(null), jobForm = ref(null)
 const employerNames = computed(() => new Map(employers.value.map((item) => [item.id, item.name])))
 let employerGeneration = 0, jobGeneration = 0, keywordGeneration = 0, catalog
 const { confirming, confirm } = useScopedConfirmation(() => catalog?.key(), () => Boolean(owner.value))
-const locked = computed(() => loading.value || busy.value || confirming.value || !owner.value)
+const draftKey = () => catalog?.key() ? `${catalog.key()}:${employerGeneration}:${jobGeneration}:${keywordGeneration}` : null
+const { confirming: draftConfirming, confirm: confirmDraft } = useScopedConfirmation(draftKey, () => Boolean(owner.value))
+const catalogBusy = computed(() => busy.value || confirming.value || draftConfirming.value)
+const locked = computed(() => loading.value || catalogBusy.value || !owner.value)
 const writeLocked = computed(() => locked.value || needsReload.value)
+const transitions = createCatalogDraftTransition(draftKey, () => locked.value, confirmDraft)
+defineExpose({ dirty, busy: catalogBusy, draftKey })
 function resetEmployer() {
   employerId.value = null
   candidateId.value = null
   Object.assign(employer, { name: '', industry: '', websiteUrl: '', description: '' })
+  savedEmployer.value = employerSnapshot()
 }
 function resetJob() {
   jobId.value = null
   Object.assign(job, { employerId: '', title: '', employmentType: '', location: '', sourceUrl: '', description: '', postedAt: '', expiresAt: '' })
+  savedJob.value = jobSnapshot()
 }
 const validStatus = (item) => ['DRAFT', 'PUBLISHED', 'ARCHIVED'].includes(item.status)
 const validCandidate = (item) => typeof item.candidateName === 'string'
@@ -53,7 +67,7 @@ watch(() => [employerId.value, candidateId.value, ...Object.values(employer)], (
 watch(() => [jobId.value, ...Object.values(job)], () => { jobGeneration++ }, { flush: 'sync' })
 watch(candidateKeyword, () => { keywordGeneration++ }, { flush: 'sync' })
 onMounted(() => catalog.load())
-onBeforeUnmount(() => catalog.dispose())
+onBeforeUnmount(() => { transitions.dispose(); catalog.dispose() })
 const reload = () => catalog.load()
 function revealForm(form) {
   const key = catalog.key()
@@ -64,11 +78,17 @@ function revealForm(form) {
   })
 }
 function editEmployer(item) {
-  if (locked.value) return
-  employerId.value = item.id
-  candidateId.value = null
-  Object.assign(employer, { name: item.name, industry: item.industry || '', websiteUrl: item.websiteUrl || '', description: item.description || '' })
-  revealForm(employerForm)
+  const snapshot = Object.freeze({ ...item })
+  return transitions.replace({
+    dirty: () => employerDirty.value,
+    message: '当前企业填写尚未保存。编辑这条企业会放弃当前企业填写；岗位填写不会清除。',
+    current: () => sameCatalogEntry(employers.value, snapshot),
+    apply: () => {
+      employerId.value = snapshot.id; candidateId.value = null
+      Object.assign(employer, { name: snapshot.name, industry: snapshot.industry || '', websiteUrl: snapshot.websiteUrl || '', description: snapshot.description || '' })
+      savedEmployer.value = employerSnapshot(); revealForm(employerForm)
+    },
+  })
 }
 async function submitEmployer() {
   if (writeLocked.value || !employer.name.trim() || employer.name.trim().length > 200 || employer.industry.length > 100
@@ -97,31 +117,52 @@ async function discoverCandidates() {
   })
 }
 function prepareCandidate(item) {
-  if (locked.value) return
-  candidateId.value = item.id
-  employerId.value = null
-  Object.assign(employer, { name: item.candidateName || '', industry: '', websiteUrl: item.sourceUrl || '', description: item.sourceSummary || '' })
-  revealForm(employerForm)
+  const snapshot = Object.freeze({ ...item })
+  return transitions.replace({
+    dirty: () => employerDirty.value,
+    message: '当前企业填写尚未保存。核验这条线索会替换当前企业填写；岗位填写不会清除。',
+    current: () => sameCatalogEntry(candidates.value, snapshot),
+    apply: () => {
+      candidateId.value = snapshot.id; employerId.value = null
+      Object.assign(employer, { name: snapshot.candidateName || '', industry: '', websiteUrl: snapshot.sourceUrl || '', description: snapshot.sourceSummary || '' })
+      savedEmployer.value = employerSnapshot(); revealForm(employerForm)
+    },
+  })
 }
 async function rejectCandidate(item) {
   if (writeLocked.value) return
-  const snapshot = Object.freeze({ ...item })
+  const snapshot = Object.freeze({ ...item }), generation = employerGeneration
   return catalog.run({
     confirm: () => confirm(`确认忽略“${snapshot.candidateName}”？该线索不会进入公开企业库。`,
       { title: '忽略企业线索', confirmText: '确认忽略', cancelText: '取消，保留线索' }),
     targetCurrent: () => sameCatalogEntry(candidates.value, snapshot),
     execute: (signal) => api.rejectEmployerCandidate(snapshot.id, { signal }),
-    committed: () => { if (candidateId.value === snapshot.id) resetEmployer() },
+    committed: () => { if (candidateId.value === snapshot.id && generation === employerGeneration) resetEmployer() },
     success: '已忽略线索。',
   })
 }
 function editJob(item) {
-  if (locked.value) return
-  jobId.value = item.id
-  Object.assign(job, { employerId: item.employerId, title: item.title, employmentType: item.employmentType || '',
-    location: item.location || '', sourceUrl: item.sourceUrl || '', description: item.description || '',
-    postedAt: item.postedAt?.slice(0, 16) || '', expiresAt: item.expiresAt?.slice(0, 16) || '' })
-  revealForm(jobForm)
+  const snapshot = Object.freeze({ ...item })
+  return transitions.replace({
+    dirty: () => jobDirty.value,
+    message: '当前岗位填写尚未保存。编辑这条岗位会放弃当前岗位填写；企业填写不会清除。',
+    current: () => sameCatalogEntry(jobs.value, snapshot),
+    apply: () => {
+      jobId.value = snapshot.id
+      Object.assign(job, { employerId: snapshot.employerId, title: snapshot.title, employmentType: snapshot.employmentType || '',
+        location: snapshot.location || '', sourceUrl: snapshot.sourceUrl || '', description: snapshot.description || '',
+        postedAt: snapshot.postedAt?.slice(0, 16) || '', expiresAt: snapshot.expiresAt?.slice(0, 16) || '' })
+      savedJob.value = jobSnapshot(); revealForm(jobForm)
+    },
+  })
+}
+function cancelEmployer() {
+  return transitions.replace({ dirty: () => employerDirty.value, apply: resetEmployer,
+    message: '清空当前企业填写？尚未保存的修改会放弃，不会删除已有企业或清除岗位填写。' })
+}
+function cancelJob() {
+  return transitions.replace({ dirty: () => jobDirty.value, apply: resetJob,
+    message: '清空当前岗位填写？尚未保存的修改会放弃，不会删除已有岗位或清除企业填写。' })
 }
 async function submitJob() {
   if (writeLocked.value || !catalogId(Number(job.employerId)) || !job.title.trim() || !job.description.trim()
@@ -157,6 +198,7 @@ async function changeStatus(kind, item) {
   <section class="career-panel" aria-label="企业与招聘资料管理" :aria-busy="locked">
     <p v-if="!owner" role="alert">管理员身份已变化，请重新核验后打开管理。</p>
     <p v-if="success" role="status">{{ success }}</p>
+    <p v-if="dirty" class="career-note" role="status">有未保存的填写，仅保留在当前页面；切换后台栏目不会丢失。</p>
     <p v-if="busy" role="status">正在处理。离开页面不会撤销已提交的操作。</p>
     <div class="career-actions"><button type="button" :disabled="locked" @click="reload">刷新本校资料</button></div>
     <p v-if="error" class="career-error" role="alert">{{ error }} <button type="button" :disabled="locked" @click="reload">重试</button></p>
@@ -194,7 +236,7 @@ async function changeStatus(kind, item) {
           <label>行业<input v-model="employer.industry" :disabled="locked" maxlength="100" /></label>
           <label>官网链接<input v-model="employer.websiteUrl" :disabled="locked" type="url" maxlength="1000" /></label>
           <label>企业介绍<textarea v-model="employer.description" :disabled="locked" maxlength="5000" rows="4"></textarea></label>
-          <div class="career-actions"><button v-if="employerId || candidateId" type="button" :disabled="locked" @click="resetEmployer">取消</button><button type="submit" :disabled="writeLocked">{{ candidateId ? '确认并保存草稿' : '保存草稿' }}</button></div>
+          <div class="career-actions"><button v-if="employerId || candidateId || employerDirty" type="button" :disabled="locked" @click="cancelEmployer">{{ employerId || candidateId ? '取消编辑企业' : '清空企业填写' }}</button><button type="submit" :disabled="writeLocked">{{ candidateId ? '确认并保存草稿' : '保存草稿' }}</button></div>
         </form>
         <p v-if="loading" class="career-note">正在读取企业资料…</p>
         <p v-else-if="!employers.length" class="career-note">还没有企业资料。</p>
@@ -214,7 +256,7 @@ async function changeStatus(kind, item) {
           <label>招聘原始链接<input v-model="job.sourceUrl" :disabled="locked" type="url" maxlength="1000" /></label>
           <div class="career-form-row"><label>发布时间<input v-model="job.postedAt" :disabled="locked" type="datetime-local" /></label><label>截止时间<input v-model="job.expiresAt" :disabled="locked" type="datetime-local" /></label></div>
           <label>岗位说明<textarea v-model="job.description" :disabled="locked" maxlength="10000" rows="5" required></textarea></label>
-          <div class="career-actions"><button v-if="jobId" type="button" :disabled="locked" @click="resetJob">取消</button><button type="submit" :disabled="writeLocked">保存草稿</button></div>
+          <div class="career-actions"><button v-if="jobId || jobDirty" type="button" :disabled="locked" @click="cancelJob">{{ jobId ? '取消编辑岗位' : '清空岗位填写' }}</button><button type="submit" :disabled="writeLocked">保存草稿</button></div>
         </form>
         <p v-if="loading" class="career-note">正在读取岗位资料…</p>
         <p v-else-if="!jobs.length" class="career-note">还没有招聘岗位。</p>

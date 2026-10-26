@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Imports only into a NEW explicitly named drill database. Never drops or overwrites a database.
+# Legacy DB-only format; this does not restore private originals or prove app readiness.
 set -euo pipefail
 source "$(dirname "$0")/backup-common.sh"
 umask 077
@@ -29,13 +30,13 @@ trap 'echo "Drill failed; keep isolated drill database for investigation. Produc
 age -d -i "$identity" "$backup_job/database.sql.gz.age" | gzip -d \
   | mysql --defaults-extra-file="$credentials" "$restore_db"
 table_count=$(mysql --defaults-extra-file="$credentials" -Nse "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$restore_db'")
-[[ "$table_count" -ge 49 ]] || { echo 'Schema incomplete: current release requires at least 49 tables. Keep old restores isolated and apply the required migrations before validation.' >&2; exit 1; }
+[[ "$table_count" -ge 54 ]] || { echo 'Schema incomplete: current release requires at least 54 core tables. Keep old restores isolated; do not apply migrations without approval.' >&2; exit 1; }
 receipt_table=$(mysql --defaults-extra-file="$credentials" -Nse "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$restore_db' AND table_name='contact_submission_keys'")
 [[ "$receipt_table" = 1 ]] || { echo 'Schema incomplete: feedback retry receipt table is missing' >&2; exit 1; }
-timetable_tables=$(mysql --defaults-extra-file="$credentials" -Nse "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$restore_db' AND table_name IN ('student_timetable_versions','student_timetables','student_course_schedule_versions','student_course_schedules')")
-[[ "$timetable_tables" = 4 ]] || { echo 'Schema incomplete: private timetable tables are missing' >&2; exit 1; }
+material_tables=$(mysql --defaults-extra-file="$credentials" -Nse "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$restore_db' AND table_name IN ('material_command_receipts','private_material_files','private_material_quota','personal_schedule_terms','personal_schedule_history')")
+[[ "$material_tables" = 5 ]] || { echo 'Schema incomplete: material/history tables are missing' >&2; exit 1; }
 mysql --defaults-extra-file="$credentials" "$restore_db" -e \
   "SELECT COUNT(*) AS users FROM users; SELECT COUNT(*) AS projects FROM student_projects; SELECT COUNT(*) AS conversations FROM ai_conversations; SELECT COUNT(*) AS attempts FROM ai_provider_attempts;"
-echo "Import drill passed in $((SECONDS-started)) seconds; isolated database: $restore_db"
+echo "DB-only import passed in $((SECONDS-started)) seconds; isolated database: $restore_db; originals and current application readiness not verified"
 echo 'Next: point an isolated backend at this DB with outbound model/SMTP keys removed; verify login, export and owner isolation.'
 echo 'No production data was overwritten. Delete the drill DB only after explicit review; it contains personal data.'

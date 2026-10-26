@@ -5,31 +5,47 @@ import {
   saveCourseSchedule,
   confirmCourseSchedule,
   deleteCourseSchedule,
+  readCourseSchedule,
 } from '@/api/courseSchedule'
 import {
   COURSE_TEMPLATE,
-  parseCourseTable,
-  diffCourses,
+  PERIOD_TEMPLATE,
+  isPeriodCourse,
+  courseTimeLabel,
   courseConflicts,
   weekCourses,
   nextImportedCourse,
   validateCourseMetadata,
   courseKey,
 } from '@/utils/courseSchedule'
-import { chinaDate, dayNumber, defaultSemester } from '@/utils/timetable'
+import { addDays, chinaDate, dayNumber, defaultSemester } from '@/utils/timetable'
+import CourseWeekGrid from './CourseWeekGrid.vue'
+import PersonalScheduleOperations from './PersonalScheduleOperations.vue'
+import SchoolTimetableGuide from './SchoolTimetableGuide.vue'
+import CourseImageImport from './CourseImageImport.vue'
+import { parseCourseText, coursesToCsv, describeCourseChanges } from '@/utils/courseImport'
+import { readCourseUpload } from '@/utils/courseUpload'
 import { useTimetableClock } from '@/utils/useTimetableClock'
 import { useUnsavedChanges } from '@/utils/useUnsavedChanges'
 import { useScopedConfirmation } from '@/utils/useScopedConfirmation'
-import { readCourseFile, takeCourseFile } from '@/utils/courseFile'
+import { takeCourseFile } from '@/utils/courseFile'
 import { captureDraftFields, hasDraftFieldChanges } from '@/utils/formDraft'
+import { createPrivateCourseExport, privateCourseReadState } from '@/utils/privateCourseExport'
+import { captureAuditFocusIntent as captureExportFocusIntent } from '@/utils/teachingAdministrativeAudit'
+import { focusWorkflowElement, cancelWorkflowFocus } from '@/utils/teachingWorkflows'
+
+const props = defineProps({ manageOnly: { type: Boolean, default: false }, layoutReady: { type: String, default: 'ready' }, exportRequested: { type: Boolean, default: false }, manageRequested: { type: Boolean, default: false } })
 
 const store = useCourseScheduleStore(),
   clock = useTimetableClock()
 const editing = ref(false),
+  operationsBusy = ref(false), operationsDirty = ref(false),
+  operationsPanel = ref(),
   raw = ref(''),
   preview = ref(null),
   busy = ref(false),
   reading = ref(false),
+  imageBusy = ref(false), imagePending = ref(false),
   error = ref(''),
   versionConflict = ref(false),
   notice = ref(''),
@@ -37,17 +53,25 @@ const editing = ref(false),
   selectedWeek = ref(1),
   heading = ref(),
   fileError = ref(),
-  importHeading = ref()
+  fileLabel = ref(''),
+  fileNotice = ref(''),
+  importHeading = ref(), emptyHeading = ref(), previewTarget = ref()
 const form = reactive({ semester: defaultSemester(), firstMonday: '', remindDays: 7 })
+const exportState = reactive({ busy: false, preview: null, error: '', notice: '' })
+const courseRoot = ref(), readErrorTarget = ref(), exportNotice = ref(), exportTarget = ref(), exportStart = ref(), exportPreview = ref(), exportFeedback = ref()
 const draftFields = ['semester', 'firstMonday', 'remindDays']
 const draftBaseline = ref(captureDraftFields(form, draftFields))
 const dirty = computed(
-    () => editing.value && (!!raw.value.trim() || hasDraftFieldChanges(form, draftBaseline.value)),
+    () => editing.value && (!!raw.value.trim() || imagePending.value || hasDraftFieldChanges(form, draftBaseline.value)),
   ),
-  unavailable = computed(() => busy.value || reading.value || confirming.value)
-defineExpose({ dirty, unavailable })
+  baseUnavailable = computed(() => busy.value || reading.value || confirming.value || exportState.busy || operationsBusy.value),
+  unavailable = computed(() => baseUnavailable.value || imageBusy.value)
+async function openOperations(){if(unavailable.value||editing.value)return;await operationsPanel.value?.openPanel()}
+async function openTeacherEditing(){if(unavailable.value||editing.value||operationsDirty.value)return;await operationsPanel.value?.openPanel({operation:'BATCH',missingTeachersOnly:true,firstMonday:store.schedule?.firstMonday})}
+const filledTeachers=computed(()=>store.schedule?.courses.filter(course=>course.teacher?.trim()).length||0)
+defineExpose({ dirty:computed(()=>dirty.value||operationsDirty.value), unavailable, openImport, openExport, openManagement, openOperations })
 useUnsavedChanges(
-  () => dirty.value,
+  () => dirty.value || operationsDirty.value,
   () => unavailable.value,
 )
 let disposed = false,
@@ -57,6 +81,67 @@ const { confirming, confirm } = useScopedConfirmation(
   () => (store.principal ? `${store.principal}:${fileGeneration}` : null),
   () => !disposed,
 )
+const privateExport = createPrivateCourseExport({
+  owner: () => store.principal,
+  active: () => !disposed && !busy.value && !reading.value && !confirming.value && !editing.value,
+  state: exportState, read: readCourseSchedule,
+  onFile: (blob, filename) => download(blob, filename, blob.type),
+})
+let exportFocusIntent, navigationFocusIntent
+function resetPrivateExport() { exportFocusIntent?.dispose(); privateExport.reset() }
+function cancelExportNavigation() {
+  navigationFocusIntent?.dispose()
+  for (const target of [exportStart.value, exportNotice.value, importHeading.value, readErrorTarget.value, heading.value, emptyHeading.value]) cancelWorkflowFocus(target)
+}
+async function openManagement(force = false) {
+  const owner=store.principal,generation=fileGeneration
+  cancelExportNavigation()
+  const intent=captureExportFocusIntent(courseRoot.value?.closest('.workspace-page') || courseRoot.value)
+  navigationFocusIntent=intent
+  try {
+    await store.load(force)
+    if(disposed || !owner || owner!==store.principal || generation!==fileGeneration || !intent.current())return
+    notice.value=store.error?'':'这里只管理本人导入副本。更新请上传新表并比较差异后确认；删除整份副本需在下方另行确认，不会改正式教学安排。'
+    await nextTick()
+    if(disposed || owner!==store.principal || generation!==fileGeneration || !intent.current())return
+    const target=store.error?readErrorTarget.value:editing.value?importHeading.value:store.schedule?heading.value:emptyHeading.value
+    focusWorkflowElement(target,()=>!disposed && owner===store.principal && generation===fileGeneration && props.manageRequested)
+  } finally { intent.dispose() }
+}
+async function exportStep(method) {
+  exportFocusIntent?.dispose()
+  const intent = captureExportFocusIntent(courseRoot.value?.closest('.workspace-page') || courseRoot.value), owner = store.principal, generation = fileGeneration
+  exportFocusIntent = intent
+  await privateExport[method]()
+  await nextTick()
+  if (!disposed && owner === store.principal && generation === fileGeneration && intent.current()) {
+    const target = exportState.preview ? exportPreview.value : exportFeedback.value
+    target?.focus({ preventScroll: true }); target?.scrollIntoView({ block: 'nearest', behavior: 'auto' })
+  }
+  intent.dispose()
+}
+async function openExport(force = false) {
+  const owner = store.principal, generation = fileGeneration
+  cancelExportNavigation()
+  const intent = captureExportFocusIntent(courseRoot.value?.closest('.workspace-page') || courseRoot.value)
+  navigationFocusIntent = intent
+  try {
+    await store.load(force)
+    if (disposed || !owner || owner !== store.principal || generation !== fileGeneration || !intent.current()) return
+    const outcome = privateCourseReadState(store)
+    if (outcome === 'error' || outcome === 'waiting') notice.value = ''
+    else if (outcome === 'empty') notice.value = '当前账号没有已保存的个人课表，不能导出；可先导入并确认保存。'
+    else if (editing.value) notice.value = '请先完成或取消当前导入；未保存草稿不会混入导出文件。'
+    await nextTick()
+    if (disposed || owner !== store.principal || generation !== fileGeneration || !intent.current()) return
+    const target = outcome === 'error' || outcome === 'waiting' ? readErrorTarget.value : outcome === 'empty' ? exportNotice.value : editing.value ? importHeading.value : exportStart.value
+    if (target) focusWorkflowElement(target, () => !disposed && owner === store.principal && generation === fileGeneration && props.exportRequested)
+  } finally { intent.dispose() }
+}
+watch(editing, resetPrivateExport, { flush: 'sync' })
+watch(() => store.schedule, resetPrivateExport, { flush: 'sync' })
+watch(() => props.exportRequested, value => { if (!value) cancelExportNavigation() }, { flush: 'sync' })
+watch(() => props.manageRequested, value => { if (!value) cancelExportNavigation() }, { flush: 'sync' })
 const currentWeek = computed(() =>
   store.schedule
     ? Math.floor((dayNumber(chinaDate(clock.value)) - dayNumber(store.schedule.firstMonday)) / 7) +
@@ -65,10 +150,17 @@ const currentWeek = computed(() =>
 )
 const days = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
 const displayed = computed(() => weekCourses(store.schedule, Number(selectedWeek.value)))
+const gridCourses = computed(() => displayed.value.filter(isPeriodCourse))
+const weekMonday = computed(() =>
+  store.schedule ? addDays(store.schedule.firstMonday, (Number(selectedWeek.value) - 1) * 7) : '',
+)
+const periodGridSafe = computed(
+  () => gridCourses.value.length && !courseConflicts(gridCourses.value).length,
+)
 const nextCourse = computed(() => nextImportedCourse(store.schedule, clock.value))
 const conflicts = computed(() => courseConflicts(displayed.value))
 const difference = computed(() =>
-  diffCourses(store.schedule?.courses || [], preview.value?.courses || []),
+  describeCourseChanges(store.schedule?.courses || [], preview.value?.courses || []),
 )
 const metadataChange = computed(
   () =>
@@ -89,7 +181,7 @@ const checkMessage = computed(() => {
   if (!weekCourses(schedule, currentWeek.value).length)
     return `第${currentWeek.value}周没有导入的课程，不代表这周停课，请核对教务`
   if (schedule.remindDays && (age === null || age >= schedule.remindDays))
-    return `已${age ?? '多'}天未核对，请查看教务或老师通知；本站未检测实时调课`
+    return `已${age ?? '多'}天未核对，请查看学校或老师通知；个人副本不自动同步教务变更`
   return '按你导入的表格展示，临时调课仍需核对教务或老师通知'
 })
 const dateLabel = (value) =>
@@ -98,13 +190,26 @@ function invalidatePreview() {
   preview.value = null
   confirmed.value = false
   notice.value = ''
+  fileNotice.value = ''
 }
-watch([raw, () => form.semester, () => form.firstMonday, () => form.remindDays], () => {
+async function openImport() {
+  if (!editing.value) { await startImport(); return }
+  await nextTick()
+  importHeading.value?.focus({ preventScroll: true })
+  importHeading.value?.scrollIntoView({ block: 'start', behavior: 'auto' })
+}
+watch(raw, () => {
   if (editing.value) invalidatePreview()
+  if (!reading.value) fileLabel.value = ''
+})
+watch([() => form.semester, () => form.firstMonday, () => form.remindDays], () => {
+  confirmed.value = false
 })
 watch(
   () => store.principal,
   () => {
+    cancelExportNavigation()
+    resetPrivateExport()
     fileGeneration++
     fileRead?.abort()
     fileRead = null
@@ -113,10 +218,14 @@ watch(
     preview.value = null
     busy.value = false
     reading.value = false
+    imageBusy.value = false
+    imagePending.value = false
     error.value = ''
     versionConflict.value = false
     notice.value = ''
     confirmed.value = false
+    fileLabel.value = ''
+    fileNotice.value = ''
     Object.assign(form, { semester: defaultSemester(), firstMonday: '', remindDays: 7 })
     draftBaseline.value = captureDraftFields(form, draftFields)
   },
@@ -130,6 +239,8 @@ watch(
   { immediate: true },
 )
 async function startImport(fromAction = true) {
+  if(operationsDirty.value||unavailable.value){notice.value='请先完成或收起当前个人安排草稿，再导入新表；没有覆盖草稿。';return}
+  if (fromAction !== false) cancelExportNavigation()
   const owner = store.principal,
     generation = fileGeneration
   editing.value = true
@@ -139,6 +250,8 @@ async function startImport(fromAction = true) {
   preview.value = null
   confirmed.value = false
   raw.value = ''
+  fileLabel.value = ''
+  fileNotice.value = ''
   Object.assign(form, {
     semester: store.schedule?.semester || defaultSemester(),
     firstMonday: store.schedule?.firstMonday || '',
@@ -177,8 +290,11 @@ function inspect() {
   preview.value = null
   confirmed.value = false
   try {
-    validateCourseMetadata({ ...form, remindDays: Number(form.remindDays) })
-    preview.value = { ...parseCourseTable(raw.value), revision: store.schedule?.revision || 0 }
+    const result = parseCourseText(raw.value)
+    if (result.metadata?.semester) form.semester = result.metadata.semester
+    if (result.metadata?.firstMonday) form.firstMonday = result.metadata.firstMonday
+    preview.value = { ...result, revision: store.schedule?.revision || 0 }
+    fileNotice.value = `已解析${result.courses.length}条课程；请核对学期、日期和下方差异，尚未保存`
   } catch (failure) {
     error.value = failure.message
   }
@@ -194,18 +310,34 @@ async function chooseFile(event) {
   invalidatePreview()
   error.value = ''
   reading.value = true
+  fileLabel.value = file.name
+  fileNotice.value = '正在本机解析…'
   try {
-    const text = await readCourseFile(file, { signal: controller.signal })
+    const result = await readCourseUpload(file, { signal: controller.signal })
     if (disposed || generation !== fileGeneration || owner !== store.principal) return
-    raw.value = text
+    if (result.metadata?.semester) form.semester = result.metadata.semester
+    if (result.metadata?.firstMonday) form.firstMonday = result.metadata.firstMonday
+    raw.value =
+      coursesToCsv(result.courses) ||
+      JSON.stringify({
+        semester: form.semester,
+        firstMonday: form.firstMonday,
+        courses: result.courses,
+      })
+    await nextTick()
+    if (disposed || generation !== fileGeneration || owner !== store.principal) return
+    preview.value = { ...result, revision: store.schedule?.revision || 0 }
+    fileNotice.value = `已在本机解析${result.courses.length}条课程；下方可核对差异，尚未保存`
   } catch (failure) {
     if (
       !disposed &&
       generation === fileGeneration &&
       owner === store.principal &&
       failure.name !== 'AbortError'
-    )
+    ) {
       error.value = `${failure.message}。当前填写和已保存课表没有改变，可重选文件或继续粘贴`
+      fileNotice.value = '此文件未能解析，未生成新预览；之前的填写与已保存课表保持不变'
+    }
   } finally {
     if (fileRead === controller) fileRead = null
     if (!disposed && generation === fileGeneration && owner === store.principal) {
@@ -218,8 +350,31 @@ async function chooseFile(event) {
     }
   }
 }
+async function adoptCourseImage(result) {
+  if(disposed||unavailable.value||result.owner!==store.principal)return
+  const owner=store.principal,generation=++fileGeneration
+  fileRead?.abort();fileRead=null;invalidatePreview();error.value=''
+  if(result.metadata.semester)form.semester=result.metadata.semester
+  if(result.metadata.firstMonday)form.firstMonday=result.metadata.firstMonday
+  raw.value=coursesToCsv(result.courses)||JSON.stringify({semester:form.semester,firstMonday:form.firstMonday,courses:result.courses})
+  await nextTick()
+  if(disposed||owner!==store.principal||generation!==fileGeneration)return
+  preview.value={courses:result.courses,metadata:result.metadata,warnings:result.warnings,conflicts:result.conflicts,duplicates:result.duplicates,source:result.source,revision:store.schedule?.revision||0}
+  fileLabel.value='本人核对后的图片识别结果';fileNotice.value=`待保存${result.courses.length}条课程；请核对学期、第1周日期和下方新增/移除差异，尚未保存`
+  result.onApplied()
+  await nextTick()
+  if(!disposed&&owner===store.principal&&generation===fileGeneration){previewTarget.value?.focus({preventScroll:true});previewTarget.value?.scrollIntoView({block:'start',behavior:'auto'})}
+}
 async function save() {
-  if (unavailable.value || !preview.value || !confirmed.value || !store.loaded || store.error)
+  if(imagePending.value){notice.value='请先采用或清除上方图片识别候选，再保存课程；现有课表没有改变';return}
+  if (
+    unavailable.value ||
+    versionConflict.value ||
+    !preview.value ||
+    !confirmed.value ||
+    !store.loaded ||
+    store.error
+  )
     return
   const owner = store.principal,
     proposal = preview.value,
@@ -228,6 +383,7 @@ async function save() {
   error.value = ''
   versionConflict.value = false
   notice.value = ''
+  let acknowledged = false
   try {
     validateCourseMetadata({ ...form, remindDays: Number(form.remindDays) })
     const response = await saveCourseSchedule({
@@ -237,13 +393,14 @@ async function save() {
       remindDays: Number(form.remindDays),
       courses: proposal.courses,
     })
+    acknowledged = true
     if (disposed || generation !== fileGeneration || !store.adopt(response.data.schedule, owner))
       return
     editing.value = false
     raw.value = ''
     preview.value = null
     confirmed.value = false
-    notice.value = '课程表格已保存，仅本人可见；截图版保持不变'
+    notice.value = '课程已保存，仅本人可见；下次登录直接查看'
     await nextTick()
     if (disposed || generation !== fileGeneration || owner !== store.principal) return
     heading.value?.focus({ preventScroll: true })
@@ -253,9 +410,10 @@ async function save() {
     })
   } catch (failure) {
     if (!disposed && generation === fileGeneration && owner === store.principal) {
-      versionConflict.value = failure.response?.status === 409
-      error.value =
-        failure.response?.data?.message || failure.message || '保存未确认，请保留原文件并重试'
+      versionConflict.value = acknowledged || failure.response?.status === 409
+      error.value = acknowledged
+        ? '服务端已保存，但本页未能显示新数据。请刷新页面后查看，不要重复提交；当前填写仍保留'
+        : failure.response?.data?.message || failure.message || '保存未确认，请保留原文件并重试'
     }
   } finally {
     if (!disposed && generation === fileGeneration && owner === store.principal) busy.value = false
@@ -281,14 +439,14 @@ async function reloadForComparison() {
   }
 }
 async function mutate(action) {
-  if (unavailable.value || !store.schedule) return
+  if (unavailable.value || operationsDirty.value || !store.schedule) return
   const owner = store.principal,
     revision = store.schedule.revision,
     generation = fileGeneration
   if (
     !(await confirm(
       action === 'delete'
-        ? '删除本站保存的课程表格后，需要重新导入。截图版和教务数据不会改变'
+        ? '删除本站保存的课程表格后，需要重新导入。历史原件和教务数据不会改变'
         : '只有你已经对照教务或老师通知核对后，才记录本次核对时间；本站不会自动核对',
       {
         title: action === 'delete' ? '删除本站课程表格？' : '确认课程表格没有变化？',
@@ -305,7 +463,7 @@ async function mutate(action) {
     if (action === 'delete') {
       await deleteCourseSchedule(revision)
       if (!disposed && generation === fileGeneration && store.adopt(null, owner))
-        notice.value = '本站课程表格已删除，截图版保持不变'
+        notice.value = '本站课程表格已删除，历史原件保持不变'
     } else {
       const response = await confirmCourseSchedule(revision)
       if (!disposed && generation === fileGeneration && store.adopt(response.data.schedule, owner))
@@ -343,6 +501,8 @@ onMounted(async () => {
     startImport(false)
 })
 onBeforeUnmount(() => {
+  cancelExportNavigation()
+  resetPrivateExport()
   disposed = true
   fileGeneration++
   fileRead?.abort()
@@ -350,26 +510,24 @@ onBeforeUnmount(() => {
 })
 </script>
 <template>
-  <section class="course-panel" aria-label="私人课程表格" :aria-busy="unavailable || store.loading">
-    <p class="course-boundary">
-      按明确的周次和时间展示，不识别截图、不读取教务密码、不发送给AI。表格与截图分别保存，不会自动相互更新
-    </p>
+  <section ref="courseRoot" class="course-panel" aria-label="私人课程表格" :aria-busy="unavailable || store.loading">
+    <PersonalScheduleOperations ref="operationsPanel" v-if="store.principal && !editing" :scope="store.principal" :disabled="busy||reading||confirming||exportState.busy" @state="operationsBusy=$event.busy;operationsDirty=$event.dirty" @changed="store.load(true)" />
     <p v-if="store.loading" role="status">正在读取课程表格…</p>
-    <div v-if="store.error" class="course-alert" role="alert">
+    <div v-if="store.error" ref="readErrorTarget" class="course-alert" role="alert" tabindex="-1" :data-workflow-ready="layoutReady">
       <p>{{ store.error }}</p>
       <button
         class="work-button"
         :disabled="store.loading || unavailable"
-        @click="store.load(true)"
+        @click="props.exportRequested ? openExport(true) : props.manageRequested ? openManagement(true) : store.load(true)"
       >
         重新读取并核对差异
       </button>
     </div>
-    <p v-if="notice" class="course-notice" role="status">{{ notice }}</p>
+    <p v-if="notice" ref="exportNotice" class="course-notice" role="status" tabindex="-1" :data-workflow-ready="layoutReady">{{ notice }}</p>
     <section v-if="store.schedule" class="course-saved" aria-label="已保存课程表格">
       <header class="course-head">
         <div>
-          <h2 ref="heading" tabindex="-1">{{ store.schedule.semester }}</h2>
+          <h2 ref="heading" tabindex="-1" :data-workflow-ready="layoutReady">{{ store.schedule.semester }}</h2>
           <p>
             {{ store.schedule.courses.length }}条课程安排 · 核对于
             {{ dateLabel(store.schedule.checkedAt) }}
@@ -378,12 +536,101 @@ onBeforeUnmount(() => {
         <button
           v-if="!editing"
           class="work-button"
-          :disabled="unavailable || !store.loaded"
+          :disabled="unavailable || operationsDirty || !store.loaded"
           @click="startImport"
         >
           导入新表并比较
         </button>
       </header>
+      <p class="course-teacher-summary">任课教师已填{{ filledTeachers }}/{{ store.schedule.courses.length }}项
+        <button class="work-button" type="button" :disabled="unavailable||editing||operationsDirty" @click="openTeacherEditing">补充任课教师</button>
+      </p>
+      <p class="course-teacher-note">个人记录的教师姓名不会建立教师端权限；正式课程由教学配置绑定教师账号，各日期和节次共用同一课程记录。</p>
+      <template v-if="!manageOnly">
+        <p v-if="nextCourse && !nextCourse.timeUnknown" class="course-next">
+          <strong>{{
+            nextCourse.timeUnknown
+              ? '已导入的最近上课日 · 按节次查看'
+              : nextCourse.current
+                ? '导入表格中正在上的课'
+                : '导入表格里的下一节'
+          }}</strong
+          ><br />{{ nextCourse.date }} · {{ courseTimeLabel(nextCourse) }} · {{ nextCourse.name }} ·
+          {{ nextCourse.room || '教室未填写' }} · {{ nextCourse.teacher || '任课教师未录入' }}
+          <small v-if="nextCourse.timeUnknown" class="course-time-note"
+            >未设置作息钟点，不判断这节课是否已结束；当天全部安排见下方</small
+          >
+        </p>
+        <p v-else-if="!nextCourse">
+          已导入的课程没有后续安排，不代表之后没有课，请核对是否需要导入新学期
+        </p>
+        <div class="course-week">
+          <button
+            class="work-button"
+            :disabled="Number(selectedWeek) <= 1"
+            @click="selectedWeek = Number(selectedWeek) - 1"
+          >
+            上一周
+          </button>
+          <label
+            >查看周次<select v-model="selectedWeek">
+              <option v-for="week in 30" :key="week" :value="week">
+                第{{ week }}周{{ week === currentWeek ? ' · 本周' : '' }}
+              </option>
+            </select></label
+          >
+          <button
+            class="work-button"
+            :disabled="Number(selectedWeek) >= 30"
+            @click="selectedWeek = Number(selectedWeek) + 1"
+          >
+            下一周
+          </button>
+          <button
+            v-if="currentWeek >= 1 && currentWeek <= 30 && Number(selectedWeek) !== currentWeek"
+            class="work-button"
+            @click="selectedWeek = currentWeek"
+          >
+            回到本周
+          </button>
+        </div>
+        <p v-if="gridCourses.length" class="course-time-note">
+          按节次展示 · 尚无作息钟点，不推算正在上课或下课时间
+        </p>
+        <p v-if="!displayed.length">这一周没有导入的课程；不要据此判断停课</p>
+        <p v-if="conflicts.length" class="course-alert">
+          本周有{{ conflicts.length }}组时间重叠，请回教务核对，不自动删掉其中任何一门
+        </p>
+        <CourseWeekGrid
+          v-if="periodGridSafe"
+          class="course-desktop-grid"
+          :courses="gridCourses"
+          :monday="weekMonday"
+          :today="chinaDate(clock)"
+        />
+        <div
+          v-for="(day, i) in days"
+          :key="day"
+          class="course-day"
+          :class="{ 'course-mobile-list': periodGridSafe && displayed.every(isPeriodCourse) }"
+        >
+          <template v-if="displayed.some((c) => c.weekday === i + 1)"
+            ><h3>
+              {{ day }} <small>{{ addDays(weekMonday, i).slice(5).replace('-', '/') }}</small>
+            </h3>
+            <ul>
+              <li
+                v-for="course in displayed.filter((c) => c.weekday === i + 1)"
+                :key="courseKey(course)"
+              >
+                <span>{{ courseTimeLabel(course) }}</span
+                ><strong>{{ course.name }}</strong
+                ><span>{{ course.room || '教室未填写' }} · {{ course.teacher || '任课教师未录入' }}</span>
+              </li>
+            </ul></template
+          >
+        </div>
+      </template>
       <p class="course-check">
         {{ checkMessage }}
         <a
@@ -393,56 +640,25 @@ onBeforeUnmount(() => {
           >打开教务核对 ↗</a
         >
       </p>
-      <p v-if="nextCourse" class="course-next">
-        <strong>{{ nextCourse.current ? '导入表格中正在上的课' : '导入表格里的下一节' }}</strong
-        ><br />{{ nextCourse.date }} · {{ nextCourse.startTime }}—{{ nextCourse.endTime }} ·
-        {{ nextCourse.name }} · {{ nextCourse.room || '教室未填写' }}
-      </p>
-      <p v-else>已导入的课程没有后续安排，不代表之后没有课，请核对是否需要导入新学期</p>
-      <label class="course-week"
-        >查看周次<select v-model="selectedWeek">
-          <option v-for="week in 30" :key="week" :value="week">
-            第{{ week }}周{{ week === currentWeek ? '（按日期计算的本周）' : '' }}
-          </option>
-        </select></label
-      >
-      <p v-if="!displayed.length">这一周没有导入的课程；不要据此判断停课</p>
-      <p v-if="conflicts.length" class="course-alert">
-        本周有{{ conflicts.length }}组时间重叠，请回教务核对，不自动删掉其中任何一门
-      </p>
-      <div v-for="(day, i) in days" :key="day" class="course-day">
-        <template v-if="displayed.some((c) => c.weekday === i + 1)"
-          ><h3>{{ day }}</h3>
-          <ul>
-            <li
-              v-for="course in displayed.filter((c) => c.weekday === i + 1)"
-              :key="courseKey(course)"
-            >
-              <span>{{ course.startTime }}—{{ course.endTime }}</span
-              ><strong>{{ course.name }}</strong
-              ><span>{{ course.room || '教室未填写' }}</span>
-            </li>
-          </ul></template
-        >
-      </div>
       <div class="course-actions">
-        <button class="work-button" :disabled="unavailable || editing" @click="mutate('checked')">
+        <button class="work-button" :disabled="unavailable || operationsDirty || editing" @click="mutate('checked')">
           我已核对，表格没变</button
-        ><button
-          class="work-button"
-          @click="
-            download(
-              JSON.stringify(store.schedule, null, 2),
-              '我的课程表格.json',
-              'application/json',
-            )
-          "
-        >
-          下载私有表格数据</button
-        ><button class="course-delete" :disabled="unavailable || editing" @click="mutate('delete')">
+        ><button class="course-delete" :disabled="unavailable || operationsDirty || editing" @click="mutate('delete')">
           删除本站表格
         </button>
       </div>
+      <section ref="exportTarget" class="course-export" aria-label="导出本人已保存课表">
+        <button ref="exportStart" :data-workflow-ready="layoutReady" class="work-button" :disabled="unavailable || editing || store.loading || !!store.error" @click="exportStep('prepare')">{{ exportState.busy ? '正在重新读取并核验…' : '导出已保存课表' }}</button>
+        <p class="course-export-scope">仅导出本人保存的课程、任课教师、学期和周次 JSON，可重新导入。未保存草稿、教学名单和考勤不包含在内。</p>
+        <div v-if="exportState.preview" ref="exportPreview" class="course-export-preview" tabindex="-1">
+          <h3>核对这份个人课表</h3>
+          <p>{{ exportState.preview.semester }} · 完整 {{ exportState.preview.count }} 项安排 · 版本 {{ exportState.preview.revision }}</p>
+          <p>第1周周一 {{ exportState.preview.firstMonday }}。准备5分钟内有效；下载前再次读取校验，数据变化则重新准备。</p>
+          <details><summary>查看文件校验值</summary><code>{{ exportState.preview.sha256 }}</code></details>
+          <div class="course-actions"><button class="work-button primary course-export-download" :disabled="unavailable" @click="exportStep('download')">核验并下载本人课表 JSON</button><button class="work-button" :disabled="unavailable" @click="resetPrivateExport">取消准备</button></div>
+        </div>
+        <p v-if="exportState.error || exportState.notice" ref="exportFeedback" tabindex="-1" :role="exportState.error ? 'alert' : 'status'" :class="exportState.error ? 'course-alert' : 'course-notice'">{{ exportState.error || exportState.notice }}</p>
+      </section>
     </section>
     <div v-if="error" ref="fileError" class="course-alert" role="alert" tabindex="-1">
       <p>{{ error }}</p>
@@ -456,34 +672,36 @@ onBeforeUnmount(() => {
       </button>
     </div>
     <div v-if="!store.schedule && !editing && store.loaded && !store.error">
-      <h2>还没有导入课程表格</h2>
-      <button class="work-button primary" @click="startImport">导入CSV或粘贴表格</button>
+      <h2 ref="emptyHeading" tabindex="-1" :data-workflow-ready="layoutReady">还没有导入课程表格</h2>
+      <button class="work-button primary" @click="startImport">上传课表文件</button>
     </div>
     <form v-if="editing" class="course-import" @submit.prevent="inspect">
-      <h2 ref="importHeading" tabindex="-1">
-        {{ store.schedule ? '预览差异，再替换表格' : '导入可按周查看的课程表格' }}
+      <h2 ref="importHeading" tabindex="-1" :data-workflow-ready="layoutReady">
+        {{ store.schedule ? '上传新课表，看看哪里变了' : '上传课表，自动生成课程安排' }}
       </h2>
       <p>
-        当前支持通用六列表格，不保证教务原始导出能直接识别。按照示例保留表头，填写准确时间和周次；教室可以留空。若只有截图，请使用截图版
+        首选本站工具导出的整学期 JSON；也支持带课程、星期、周次、节次或钟点列的 XLSX /
+        CSV，不需要按本站模板重排列。课表图片可在下方单独使用模型识别并核对；扫描PDF暂不支持，未知周次不能自动补猜。
       </p>
+      <CourseImageImport :scope="store.principal" :disabled="baseUnavailable" @busy="imageBusy=$event" @pending="imagePending=$event" @adopt="adoptCourseImage" />
+      <SchoolTimetableGuide />
       <fieldset :disabled="unavailable">
         <div class="course-actions">
-          <button
-            type="button"
-            class="work-button"
-            @click="download(COURSE_TEMPLATE, '课程表格模板.csv', 'text/csv;charset=utf-8')"
-          >
-            下载六列CSV示例</button
-          ><label class="course-file"
-            >选择CSV / TSV文件<input
+          <label class="course-file"
+            >选择课表文件，自动解析<input
               type="file"
-              accept=".csv,.tsv,.txt"
+              accept=".json,.xlsx,.csv,.tsv,.txt"
               aria-describedby="course-file-help"
               @change="chooseFile"
           /></label>
         </div>
-        <p id="course-file-help">读取成功后替换下方文字；失败保留当前填写。选择文件不会保存课表</p>
-        <p v-if="reading" role="status">正在本机读取文件…</p>
+        <p id="course-file-help">
+          此处表格文件只在本机解析，确认后仅保存课程数据。失败不覆盖原课表；XLSX限10MB，文本限100KB。图片识别需在上方单独同意发送。
+        </p>
+        <p v-if="fileLabel || fileNotice" class="course-file-status" role="status">
+          <strong v-if="fileLabel">{{ fileLabel }}</strong>
+          <span>{{ fileNotice || '课程数据待重新检查' }}</span>
+        </p>
         <div class="course-fields">
           <label>学期<input v-model="form.semester" maxlength="100" required /></label
           ><label
@@ -499,18 +717,37 @@ onBeforeUnmount(() => {
             </select></label
           >
         </div>
-        <label class="course-text"
-          >粘贴课程表格（含表头）<textarea
-            v-model="raw"
-            maxlength="50000"
-            rows="7"
-            placeholder="课程名称,星期,开始时间,结束时间,周次,教室&#10;课程示例,1,08:00,09:40,1-16单,教室示例"
-          /><small
-            >星期填1至7；时间填08:00；周次可填1-16、1-16单、1-16双或1;3;5。最多120条，不导入姓名、学号或成绩</small
-          ></label
-        >
+        <details class="course-advanced">
+          <summary>粘贴表格或调整识别数据（可选）</summary>
+          <div class="course-actions">
+            <button
+              type="button"
+              class="work-button"
+              @click="download(COURSE_TEMPLATE, '课程表格模板.csv', 'text/csv;charset=utf-8')"
+            >
+              时间版示例</button
+            ><button
+              type="button"
+              class="work-button"
+              @click="download(PERIOD_TEMPLATE, '课程节次模板.csv', 'text/csv;charset=utf-8')"
+            >
+              节次版示例
+            </button>
+          </div>
+          <label class="course-text"
+            >课程数据<textarea
+              v-model="raw"
+              maxlength="50000"
+              rows="7"
+              placeholder="课程名称,星期,开始时间,结束时间,周次,教室,任课教师&#10;课程示例,1,08:00,09:40,1-16单,教室示例,教师示例"
+            /><small
+              >星期填1至7；只有节次时，将开始时间、结束时间表头改为开始节次、结束节次，填1至16。周次填6、1-16单或1;3;5。任课教师可留空，也兼容原6列表格；最多120条，不导入学生姓名、学号或成绩</small
+            ></label
+          >
+        </details>
         <div class="course-actions">
           <button
+            v-if="!preview"
             class="work-button primary"
             type="submit"
             :disabled="!raw.trim() || !store.loaded || !!store.error"
@@ -518,12 +755,20 @@ onBeforeUnmount(() => {
             检查并预览差异</button
           ><button class="work-button" type="button" @click="cancel">取消，保留已保存内容</button>
         </div>
-        <section v-if="preview" class="course-preview" aria-label="待保存课程及差异">
+        <section v-if="preview" ref="previewTarget" class="course-preview" aria-label="待保存课程及差异" tabindex="-1">
           <h3>待保存{{ preview.courses.length }}条课程安排</h3>
           <p>
             合并{{ preview.duplicates }}条完全重复行 · 与本站已保存内容比较：新增{{
               difference.added.length
-            }}条、移除{{ difference.removed.length }}条、未变{{ difference.unchanged }}条
+            }}条、调整{{ difference.modified.length }}条、移除{{
+              difference.removed.length
+            }}条、未变{{ difference.unchanged }}条
+          </p>
+          <p v-if="!form.firstMonday" class="course-alert">
+            文件没有提供开学日期：请在上方确认一次“第1周周一日期”，不用逐条整理课程。
+          </p>
+          <p v-for="warning in preview.warnings || []" :key="warning" class="course-alert">
+            {{ warning }}
           </p>
           <p v-if="metadataChange" class="course-alert">
             学期、第1周日期或提醒设置发生变化；同一课程也可能因此对应不同日期，请逐项核对
@@ -545,10 +790,35 @@ onBeforeUnmount(() => {
             <summary>将移除的{{ difference.removed.length }}条安排</summary>
             <ul>
               <li v-for="course in difference.removed" :key="courseKey(course)">
-                {{ course.name }} · {{ days[course.weekday - 1] }} · {{ course.startTime }}—{{
-                  course.endTime
-                }}
-                · 第{{ course.weeks.join('、') }}周 · {{ course.room || '教室未填' }}
+                {{ course.name }} · {{ days[course.weekday - 1] }} · {{ courseTimeLabel(course) }} ·
+                第{{ course.weeks.join('、') }}周 · {{ course.room || '教室未填' }} · {{ course.teacher || '任课教师未录入' }}
+              </li>
+            </ul>
+          </details>
+          <section
+            v-if="difference.modified.length"
+            class="course-changes"
+            aria-label="课程具体变化"
+          >
+            <h3>这些安排有调整</h3>
+            <div
+              v-for="change in difference.modified"
+              :key="courseKey(change.before)"
+              class="course-change"
+            >
+              <strong>{{ change.after.name }}</strong>
+              <p v-for="field in change.changes" :key="field.label">
+                <span>{{ field.label }}</span
+                >：<del>{{ field.before }}</del> → <ins>{{ field.after }}</ins>
+              </p>
+            </div>
+          </section>
+          <details v-if="difference.added.length && store.schedule">
+            <summary>新增的{{ difference.added.length }}条安排</summary>
+            <ul>
+              <li v-for="course in difference.added" :key="courseKey(course)">
+                {{ course.name }} · {{ days[course.weekday - 1] }} · {{ courseTimeLabel(course) }} ·
+                第{{ course.weeks.join('、') }}周 · {{ course.room || '教室未填' }} · {{ course.teacher || '任课教师未录入' }}
               </li>
             </ul>
           </details>
@@ -556,10 +826,8 @@ onBeforeUnmount(() => {
             <summary>核对全部{{ preview.courses.length }}条待保存安排</summary>
             <ul>
               <li v-for="course in preview.courses" :key="courseKey(course)">
-                {{ course.name }} · {{ days[course.weekday - 1] }} · {{ course.startTime }}—{{
-                  course.endTime
-                }}
-                · 第{{ course.weeks.join('、') }}周 · {{ course.room || '教室未填' }}
+                {{ course.name }} · {{ days[course.weekday - 1] }} · {{ courseTimeLabel(course) }} ·
+                第{{ course.weeks.join('、') }}周 · {{ course.room || '教室未填' }} · {{ course.teacher || '任课教师未录入' }}
               </li>
             </ul>
           </details>
@@ -569,10 +837,13 @@ onBeforeUnmount(() => {
               type="checkbox"
             />我已核对日期、周次、全部课程及移除项；重叠课程也已确认</label
           >
+          <p v-if="imagePending" class="course-alert">上方图片还有未采用的内容，请先采用识别结果或清除本次图片，再保存此预览。</p>
           <button
             class="work-button primary"
             type="button"
-            :disabled="!confirmed || !store.loaded || !!store.error"
+            :disabled="
+              !confirmed || imagePending || !form.firstMonday || versionConflict || !store.loaded || !!store.error
+            "
             @click="save"
           >
             {{ busy ? '正在保存…' : store.schedule ? '确认替换课程表格' : '确认保存课程表格' }}
@@ -581,11 +852,54 @@ onBeforeUnmount(() => {
       </fieldset>
     </form>
     <p class="course-boundary">
-      没有导入的周次或课程不会补猜；下一节仅在页面打开时展示，不提供后台推送。没有实时教务同步，调课后请重新导入
+      课表保存在统一数据库，按当前账号权限读取。聊天由模型理解问题，并根据查到的课程、教师、时间和地点回答；不发送学号、名单、成绩或考勤。图片识别仅在你主动同意时发送本次选图。未导入周次不补猜，不自动同步教务。正式教学另有站内提醒，尚无微信/离线推送；不索取教务密码。
     </p>
   </section>
 </template>
 <style scoped>
+.course-teacher-summary { display:flex;flex-wrap:wrap;align-items:center;gap:12px;font-size:14px;line-height:1.7; }
+.course-teacher-note { max-width:70ch;font-size:14px;line-height:1.7;color:var(--assistant-muted,#5d6876); }
+.course-export { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--assistant-line, #e2e7ec); }
+.course-panel .course-export .work-button { font-size: 16px; }
+.course-export-scope { color: var(--assistant-muted, #5d6876); font-size: 14px; }
+.course-export-preview { padding-block: 12px; scroll-margin-top: 90px; }
+.course-export-preview h3 { margin: 0 0 8px; font-size: 18px; font-weight: 600; }
+.course-export-preview code { display: block; overflow-wrap: anywhere; font-size: 14px; }
+.course-export-preview summary { min-height: 44px; align-content: center; cursor: pointer; }
+.course-export-download { background: var(--assistant-accent, #0b62db); color: #fff; border-color: transparent; }
+@media (max-width: 600px) { .course-export .work-button { width: 100%; min-height: 44px; } }
+.course-file-status strong,
+.course-file-status span {
+  display: block;
+}
+.course-file-status {
+  color: #34513d;
+  overflow-wrap: anywhere;
+}
+.course-advanced {
+  margin: 20px 0;
+}
+.course-advanced summary {
+  cursor: pointer;
+  min-height: 44px;
+  align-content: center;
+}
+.course-change {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--ct-line);
+}
+.course-change p {
+  margin: 6px 0;
+}
+.course-change del {
+  color: #675a55;
+  text-decoration-thickness: 1px;
+}
+.course-change ins {
+  color: #24553b;
+  text-decoration: none;
+  font-weight: 600;
+}
 .course-panel {
   color: var(--ct-ink);
   font-size: 16px;
@@ -671,11 +985,38 @@ onBeforeUnmount(() => {
   align-items: center;
   flex-wrap: wrap;
   gap: 12px;
-  margin: 24px 0;
+  margin: 20px 0 12px;
   font-weight: 600;
 }
 .course-week select {
   max-width: 100%;
+}
+.course-week label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 160px;
+}
+.course-week label select {
+  width: auto;
+  flex: 1;
+}
+.course-time-note {
+  display: block;
+  color: #526377;
+  font-size: 14px;
+  margin-top: 8px;
+  margin-bottom: 16px;
+}
+.course-day h3 small {
+  color: #526377;
+  font-size: 14px;
+  font-weight: 400;
+  margin-left: 6px;
+}
+.course-mobile-list {
+  display: none;
 }
 .course-day:empty {
   display: none;
@@ -814,7 +1155,22 @@ onBeforeUnmount(() => {
   height: 20px;
   margin-top: 4px;
 }
+@media (max-width: 1100px) {
+  .course-desktop-grid {
+    display: none;
+  }
+  .course-mobile-list {
+    display: block;
+  }
+}
 @media (max-width: 760px) {
+  .course-week {
+    gap: 8px;
+  }
+  .course-week label {
+    order: -1;
+    flex-basis: 100%;
+  }
   .course-head {
     flex-direction: column;
     gap: 16px;

@@ -1,6 +1,6 @@
 import { parseOffice } from './attachmentParser.js'
 
-self.onmessage = async ({data:{buffer,extension}}) => {
+self.onmessage = async ({data:{buffer,extension,maxText=50000}}) => {
   try {
     const bytes = new Uint8Array(buffer)
     let result
@@ -26,10 +26,10 @@ self.onmessage = async ({data:{buffer,extension}}) => {
         if (emptyPages.length === doc.numPages) throw new Error('这份PDF未提取到文字，可能是扫描件；本工具尚不支持OCR')
         result = {kind:'text',choices:[{label:`PDF正文 · ${doc.numPages}页`,text}],warnings:['保留PDF页码标记；多栏、表格和公式的阅读顺序可能变化，请对照原件复核','不执行PDF脚本、不读取嵌入文件；图片与扫描文字未做OCR',...(emptyPages.length ? [`第${emptyPages.join('、')}页未提取到文字，不代表原页为空`] : [])]}
       } finally { await task.destroy() }
-    } else if (['docx','xlsx'].includes(extension)) result = parseOffice(bytes,extension)
+    } else if (['docx','xlsx'].includes(extension)) result = parseOffice(bytes,extension,{maxText:Math.min(maxText,500000)})
     else {
       const text = new TextDecoder('utf-8',{fatal:true}).decode(bytes)
-      if (text.includes('\0') || text.length > 50000) throw new Error('文本需为5万字以内的UTF-8纯文本')
+      if (text.includes('\0') || text.length > Math.min(maxText,500000)) throw new Error(`文本需为${Math.min(maxText,500000)/10000}万字以内的UTF-8纯文本`)
       result = {kind:extension === 'csv' ? 'sheet' : 'text',choices:[{label:'纯文本',text}],warnings:[]}
     }
     self.postMessage({type:'campthink-attachment-result',result})

@@ -1,9 +1,9 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { ElMessage } from 'element-plus'
 import http from '@/api/http'
 import CampMark from '@/components/CampMark.vue'
+import { Check, Lock } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const mode = computed(() => route.name)
@@ -48,7 +48,6 @@ async function submit() {
     done.value = true
   } catch (error) {
     errorText.value = error.response?.data?.message || '操作失败，请稍后再试'
-    ElMessage.error(errorText.value)
   } finally { busy.value = false }
 }
 </script>
@@ -57,8 +56,7 @@ async function submit() {
   <main class="action-page">
     <RouterLink to="/login" class="brand"><CampMark /> Campthink.</RouterLink>
     <section class="action-card">
-      <p class="eyebrow">ACCOUNT SECURITY</p>
-      <div class="action-symbol" aria-hidden="true">{{ done ? '✓' : '↗' }}</div>
+      <div class="action-symbol" :class="{ 'is-done': done }" aria-hidden="true"><Check v-if="done" /><Lock v-else /></div>
       <h1>{{ mode === 'verify-email' ? '验证邮箱' : mode === 'reset-password' ? '设置新密码' : '找回密码' }}</h1>
       <p v-if="done" class="description">
         {{ mode === 'verify-email' ? '邮箱验证成功，现在可以用于找回密码。' :

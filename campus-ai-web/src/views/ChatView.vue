@@ -1,8 +1,9 @@
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { computed,defineAsyncComponent,h, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { isNavigationFailure, NavigationFailureType,onBeforeRouteUpdate, useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { isCancel } from 'axios'
+import { userSessionGeneration } from '@/api/http'
 import { renderMarkdown, safeExternalUrl } from '@/utils/safeMarkdown'
 import {
   ArrowDown,
@@ -11,7 +12,6 @@ import {
   Delete as DeleteIcon,
   DocumentCopy,
   EditPen,
-  Menu,
   Promotion,
   Search,
   Star,
@@ -34,30 +34,116 @@ import { getModelOptions } from '@/api/model'
 import { useAuthStore } from '@/stores/auth'
 import WorkspaceIcon from '@/components/WorkspaceIcon.vue'
 import NavigationIcon from '@/components/NavigationIcon.vue'
+import WorkspaceToolsMenu from '@/components/WorkspaceToolsMenu.vue'
+import SidebarToggleIcon from '@/components/SidebarToggleIcon.vue'
+import { primaryNavigation } from '@/utils/workspaceNavigation.js'
+import { previousScheduleQuery, resolveScheduleQuestion, readPrivateScheduleQuery, scopeScheduleHistory, clearDeniedScheduleResults, deniedScheduleIntent, scheduleFocusOrigin } from '@/utils/scheduleChat.js'
+import {validPendingSchedule} from '@/utils/scheduleIntent.js'
+import { refineScheduleQuery } from '@/utils/scheduleRefinement.js'
+import { queryOwnTimetable, askOwnTimetable } from '@/api/unifiedTimetable'
+import { readNaturalSchedule, naturalScheduleNotice } from '@/utils/naturalSchedule'
+import { chinaDate } from '@/utils/timetable'
 import CampMark from '@/components/CampMark.vue'
 import QuickActionIcon from '@/components/QuickActionIcon.vue'
 import CampusDirectory from '@/components/CampusDirectory.vue'
 import ProDialog from '@/components/ProDialog.vue'
 import ChatDraftRecovery from '@/components/ChatDraftRecovery.vue'
-import TimetableTeaser from '@/components/TimetableTeaser.vue'
+import AssistantAvatar from '@/components/AssistantAvatar.vue'
+import ChatAttachmentPreview from '@/components/ChatAttachmentPreview.vue'
+import ChatStart from '@/components/ChatStart.vue'
+import HoldToTalk from '@/components/HoldToTalk.vue'
+import ScheduleAnswerCard from '@/components/ScheduleAnswerCard.vue'
+import { resolveAcademicIntent } from '@/utils/academicRecords'
+import { appendChatAttachment, chatInputLimit, composerHeight, scrollBehavior, shouldSendOnEnter, followAfterScroll } from '@/utils/chatPresentation.js'
 import { chatDraftRecovery, chatDraftRecoveryState } from '@/utils/chatDraftRecovery.js'
 import { createWorkspaceDrafts } from '@/utils/workspaceDrafts.js'
 import { createChatRun } from '@/utils/chatRun.js'
 import { createLatestRequest } from '@/utils/latestRequest.js'
+import { retireRoutePage, activateRoutePage } from '@/utils/routeMotion.js'
 import { isAdministrator } from '@/utils/adminAccess.js'
 import { singleCitedKnowledgeSource } from '@/utils/answerSource.js'
 import { quotaPresentation } from '@/utils/quotaPresentation.js'
+import { resolveChatAction } from '@/utils/chatActions'
+import { materialRouteText, privateMaterialReason, resolveMaterialIntake } from '@/utils/materialIntake'
+import {previousAttendanceClarification,resolveAttendanceContinuation} from '@/utils/attendanceActionIntent'
+import { resolveTeachingWorkflow,previousTeachingWorkflow,TEACHING_WORKFLOWS } from '@/utils/teachingWorkflows'
+const ChatActionPanel=defineAsyncComponent({loader:()=>import('@/components/ChatActionPanel.vue'),timeout:12000,errorComponent:{render:()=>h('p',{role:'alert'},'操作面板未加载，请刷新页面重试；没有提交修改。')}})
+const MaterialIntakePanel=defineAsyncComponent({loader:()=>import('@/components/MaterialIntakePanel.vue'),timeout:12000,errorComponent:{render:()=>h('p',{role:'alert'},'资料整理面板暂时无法加载。没有提交资料或发给模型，请刷新重试。')}})
+const ChatWorkflowCard=defineAsyncComponent({loader:()=>import('@/components/ChatWorkflowCard.vue'),timeout:12000,errorComponent:{render:()=>h('p',{role:'alert'},'业务入口未加载，没有发给模型或执行修改。请刷新后重试。')}})
+const OwnAcademicCard=defineAsyncComponent({loader:()=>import('@/components/OwnAcademicCard.vue'),timeout:12000,errorComponent:{render:()=>h('p',{role:'alert'},'本人学业工具未加载，没有将问题或资料发送模型。请刷新重试。')}})
 import '@/styles/chat-tools.css'
 import '@/styles/workspace-shell.css'
+import '@/styles/chat-assistant.css'
+import '@/styles/workspace-calm.css'
+import '@/styles/workspace-navigation.css'
+import '@/styles/apple-workspace.css'
+import '@/styles/workspace-refinement.css'
+import '@/styles/chat-refinement.css'
 
 const router = useRouter()
 const route = useRoute()
 const expandedWorkspace = ref(false)
+// Keep the same sidebar state while switching between chat and workspaces.
+const chatSidebarCollapsed = expandedWorkspace
+const chatTools = ref()
+const chatAttachment = ref()
+const keyboardHeight = ref('100dvh')
+function updateChatViewport() {
+  keyboardHeight.value = `${window.visualViewport?.height || window.innerHeight}px`
+  nextTick(resizeComposer)
+}
+function toggleChatSidebar() {
+  if (mobileLayout.value) mobileSidebarOpen.value = !mobileSidebarOpen.value
+  else chatSidebarCollapsed.value = !chatSidebarCollapsed.value
+}
+function closeChatTools() { if (chatTools.value) chatTools.value.open = false }
+function dismissChatTools(event) { if (chatTools.value?.open && !chatTools.value.contains(event.target)) closeChatTools() }
+function addChatAttachment(payload) {
+  if (activeChatAction.value || sending.value || loadingMessages.value || switchingWorkspace.value) { answerNotice.value='请先完成或取消当前操作；文件预览保留，没有发送。'; return }
+  const privacy=privateMaterialReason(payload.text)
+  if(privacy){answerNotice.value=privacy;return}
+  if (['knowledge','merchant'].includes(payload.purpose)) {
+    const combined=draft.value.trim()?`${draft.value}\n\n${payload.text}`:payload.text
+    if(combined.length>50000){answerNotice.value='草稿和文件合计超过5万字符，请删减后重试；两份内容均保留，没有截断或提交。';return}
+    if(openMaterialIntake({mode:payload.purpose,text:combined,fileName:payload.name},`整理文件：${payload.name}`))chatAttachment.value?.reset()
+    return
+  }
+  try {
+    draft.value = appendChatAttachment(draft.value, payload.name, payload.text, chatInputLimit(selectedModelKey.value))
+    chatAttachment.value?.reset()
+    nextTick(() => { resizeComposer(); composerInput.value?.focus() })
+  } catch (error) { ElMessage.warning(error.message) }
+}
+function openMaterialIntake(seed, content) {
+  if (!scheduleScope.value || activeChatAction.value || sending.value || loadingMessages.value || switchingWorkspace.value) return false
+  const id=`local-intake-${crypto.randomUUID()}`
+  messages.value.push({id:`${id}-request`,role:'user',content,sources:[],webSources:[],localAction:true,localMaterial:true,actionScope:scheduleScope.value})
+  messages.value.push({id,role:'assistant',content:'本步只整理文字草稿，再核对用途和内容；没有调用模型或公开发布。原件保存状态以附件回执为准。',action:{kind:'MATERIAL_INTAKE',seed},actionScope:scheduleScope.value,sources:[],webSources:[],localAction:true,localMaterial:true})
+  activeChatAction.value=id; draft.value=''; answerNotice.value='资料整理 · 仅人工确认后提交；商家与校园资料分开处理。'
+  workspaceDrafts.clear(selectedModelKey.value,activeConversationId.value)
+  void nextTick(()=>{resizeComposer();if(stickToBottom.value)void scrollToBottom('smooth')})
+  return true
+}
+function editAndRetry(message) {
+  if (sending.value || loadingMessages.value || switchingWorkspace.value) return
+  const question = questionForAnswer(message.id)
+  if (!question) return
+  if (draft.value.trim() && draft.value !== question) { ElMessage.info('输入框已有草稿，请先发送或保存它，再重试这条问题'); return }
+  draft.value = question
+  scheduleRetry.value = message.localSchedule && message.scheduleQuery?.resolved
+    ? { ...message.scheduleQuery, question } : null
+  answerNotice.value = '问题已放回输入框。可以修改，再点击发送；不会自动重复扣费。'
+  nextTick(() => { resizeComposer(); composerInput.value?.focus() })
+}
 const workspaceContent = ref()
 function resetWorkspaceScroll(){ workspaceContent.value?.scrollTo({top:0,left:0,behavior:'instant'}) }
+function workspaceReady(element){element.dispatchEvent(new CustomEvent('campthink-workspace-ready'))}
+function cancelWorkspaceFocus(element){element.dispatchEvent(new CustomEvent('campthink-workspace-cancelled'))}
 const isChatRoute = computed(() => route.name === 'chat' || !route.name)
-const contentTitle = computed(() => ({wall:'校园墙',canteens:'食堂评分',projects:'我的项目',reviews:'协作审阅',account:'个人信息',admin:'管理后台',instruments:'仪器资料',study:'实验与作业',timetable:'我的课表',feedback:'提交意见',pro:'Campthink Pro'})[route.name] || '工作区')
+const contentTitle = computed(() => ({wall:'校园墙',canteens:'食堂评分',projects:'我的项目',reviews:'协作审阅',account:'个人信息',admin:'管理后台',instruments:'仪器资料',study:'实验与作业',timetable:'我的课表',teaching:'教学考勤',feedback:'提交意见',pro:'Campthink Pro'})[route.name] || '工作区')
 watch(() => route.name, async () => {
+  closeChatTools()
+  chatAttachment.value?.reset()
   const transition = ++routeReadSequence
   if (!isChatRoute.value) {
     cancelAnswer()
@@ -68,14 +154,12 @@ watch(() => route.name, async () => {
   await nextTick()
   if (disposed || transition !== routeReadSequence) return
   if (isChatRoute.value) {
-    expandedWorkspace.value=false
     resizeComposer()
     await Promise.all([
       loadConversationList(),
       historyNeedsReload.value && activeConversationId.value ? historyRequests.run(activeConversationId.value) : undefined,
     ])
   }
-  else resetWorkspaceScroll()
 })
 const authStore = useAuthStore()
 const draft = ref('')
@@ -83,6 +167,34 @@ const conversations = ref([])
 const historyQuery = ref('')
 const historySearchInput = ref()
 const messages = ref([])
+const activeChatAction=ref(null),chatActionBusy=ref(false),actionFollowupBusy=ref(false)
+const chatActionPanels=new Map()
+let actionFollowupSequence=0
+function pendingChatAction(){if(!activeChatAction.value)return false;answerNotice.value='当前操作还未结束：可以继续补字段或输入“预览”；切换任务或页面前请确认或取消，不会自动保存。';return true}
+function bindChatActionPanel(id,panel){if(panel)chatActionPanels.set(id,panel);else chatActionPanels.delete(id)}
+function finishChatAction(message,result){if(message.id!==activeChatAction.value)return;message.content=typeof result==='string'?result:result.message;message.savedAction=result?.saved===true;message.actionClosed=true;activeChatAction.value=null;chatActionBusy.value=false;answerNotice.value=message.savedAction?result?.verified===false?'已收到提交回执，最新记录仍需重新读取核对；不要重复提交。':'已保存，结果已核对。':'本次操作已收起，具体状态见上方结果。'}
+function actionState(message,state){if(message.id===activeChatAction.value){message.actionReady=true;chatActionBusy.value=state.busy}}
+async function submitActionFollowup(content){
+  const id=activeChatAction.value,owner=scheduleScope.value,message=messages.value.find(m=>m.id===id),panel=chatActionPanels.get(id)
+  if(!message||message.actionScope!==owner||!panel?.handleFollowup){answerNotice.value='操作面板或归属尚未就绪，请稍后重试；输入保留，没有发给模型。';return}
+  if(actionFollowupBusy.value||chatActionBusy.value){answerNotice.value='当前操作正在读取或保存，补充暂未处理；输入保留。';return}
+  if((message.actionFollowups?.length||0)>=20){answerNotice.value='本次补充已达20条，请先在原面板预览确认或取消；输入未发送模型。';return}
+  const sequence=++actionFollowupSequence;actionFollowupBusy.value=true
+  try{
+    const result=await panel.handleFollowup(content,owner)
+    if(disposed||sequence!==actionFollowupSequence||owner!==scheduleScope.value||activeChatAction.value!==id&&!result?.closed)return
+    answerNotice.value=result?.message||'补充未应用，请核对原面板；没有保存。'
+    if(result?.accepted&&(activeChatAction.value===id||result.closed&&message.actionClosed)){
+      message.actionFollowups||=[];message.actionFollowups.push({content,notice:result.message})
+      if(draft.value.trim()===content)draft.value=''
+      workspaceDrafts.clear(selectedModelKey.value,activeConversationId.value)
+      await nextTick();resizeComposer()
+    }
+  }catch{if(sequence===actionFollowupSequence&&owner===scheduleScope.value)answerNotice.value='补充处理未完成，请核对原面板；输入保留，没有自动保存或发给模型。'}
+  finally{if(sequence===actionFollowupSequence)actionFollowupBusy.value=false}
+}
+function actionPrompt(text){if(pendingChatAction())return;if(draft.value.trim()){answerNotice.value='输入框已有草稿，请先处理；没有覆盖你的内容。';return}closeChatTools();draft.value=text;nextTick(()=>{resizeComposer();composerInput.value?.focus()})}
+onBeforeRouteUpdate((to,from)=>{if(to.path!==from.path&&authStore.user&&pendingChatAction())return false})
 const activeConversationId = ref(null)
 const loadingConversations = ref(false)
 const loadingMessages = ref(false)
@@ -101,7 +213,7 @@ const historyRequests = createLatestRequest({
   load:getMessages,
   onStart:() => { loadingMessages.value=true; historyError.value=''; historyNeedsReload.value=false },
   onSuccess:(result, request) => {
-    messages.value=result
+    messages.value=scopeScheduleHistory(result, scheduleScope.value, chinaDate())
     void nextTick(() => {
       if (!request.isCurrent() || !isChatRoute.value) return
       const element=messageScroller.value
@@ -126,6 +238,14 @@ const waitingForAnswer = ref(false)
 const messageScroller = ref()
 const composerInput = ref()
 const composerComposing = ref(false)
+const voiceMode = ref(false)
+function focusKeyboard(){nextTick(()=>composerInput.value?.focus())}
+function voiceQuestion(text) {
+  if (sending.value || switchingWorkspace.value || loadingMessages.value || !isChatRoute.value) return
+  if (draft.value.trim()) { answerNotice.value='输入框已有草稿，语音没有覆盖或发送。请先处理原草稿再按住说话。'; return }
+  draft.value=text
+  void submitPrompt()
+}
 const stickToBottom = ref(true)
 const showJumpToLatest = ref(false)
 const submittingContribution = ref(false)
@@ -142,6 +262,8 @@ const contactLoading = ref(false)
 const mobileSidebarOpen = ref(false)
 const mobileLayout = ref(window.matchMedia('(max-width: 760px)').matches)
 const sidebarElement = ref()
+const accountTrigger = ref()
+const accountPanel = ref()
 const menuTrigger = ref()
 const mobileMedia = window.matchMedia('(max-width: 760px)')
 function updateMobileLayout(event) {
@@ -169,6 +291,45 @@ function savePreferredModel(model) {
   try { localStorage.setItem('preferredModel', model) } catch { /* Preference is optional. */ }
 }
 const selectedModelKey = ref(readPreferredModel())
+const scheduleRetry = ref(null)
+const scheduleScope = computed(() => authStore.user
+  ? `${authStore.user.id}:${authStore.user.schoolId}:${userSessionGeneration.value}:${selectedModelKey.value}:${activeConversationId.value ?? 'new'}:${isChatRoute.value}` : '')
+watch(scheduleScope, () => { scheduleRetry.value = null;actionFollowupSequence++;actionFollowupBusy.value=false;chatActionPanels.clear();for(const message of messages.value)if(message.actionClarification){message.actionClarification=null;message.content='上次考勤澄清已因页面、账号或模式变化结束；请重新说明操作，没有继承旧目标或自动保存。'}if(activeChatAction.value){const message=messages.value.find(m=>m.id===activeChatAction.value);if(message){message.actionClosed=true;message.content='操作归属已变化，旧草稿已收起。未自动重发；如之前提交过请求，请在原业务页核对结果。'}activeChatAction.value=null;chatActionBusy.value=false} }, { flush: 'sync' })
+watch(scheduleScope, () => { for(const message of messages.value)if(message.localMaterial&&message.actionScope!==scheduleScope.value){message.action=null;message.actionClosed=true;message.actionFollowups=[];message.content='之前的资料整理已因账号、页面或对话变化清除；不会在新归属显示旧资料或重发。'} }, { flush:'sync' })
+watch(scheduleScope, () => {
+  for(const message of messages.value)if(message.localSchedule && (message.scheduleQuery?.scope || message.scheduleOwner)!==scheduleScope.value){
+    message.scheduleResult=null
+    message.scheduleQuery=null
+    message.content='上次本人课表查询已因账号、页面或对话变化清除；请重新查询。'
+  }
+}, { flush:'sync' })
+onBeforeUnmount(()=>{actionFollowupSequence++;chatActionPanels.clear()})
+const draftOwnerScope = computed(() => `${authStore.user?.id}:${authStore.user?.schoolId}:${userSessionGeneration.value}`)
+watch(draftOwnerScope, async owner => {
+  // Pause the post-flush checkpoint before changing any input or slot. It must
+  // never copy the previous account's composer into the next account's recovery.
+  draftsReady.value = false
+  draft.value = ''
+  workspaceDrafts.reset()
+  pendingDrafts.value = []
+  draftRecoveryNotice.value = ''
+  chatAttachment.value?.reset()
+  activeChatAction.value=null;chatActionBusy.value=false
+  chatRuns.cancel()
+  historyRequests.cancel()
+  messages.value = []
+  activeConversationId.value = null
+  sending.value = false
+  waitingForAnswer.value = false
+  answerNotice.value = ''
+  await nextTick()
+  // The auth store binds recovery after its server-confirmed user assignment.
+  // Never restore text automatically, and ignore a superseded/anonymous owner.
+  if (disposed || owner !== draftOwnerScope.value || !authStore.user) return
+  offerRecoveredDrafts()
+  draftsReady.value = true
+  resizeComposer()
+}, { flush: 'sync' })
 const membershipVisible = ref(false)
 const membershipPresent = ref(false)
 watch(() => route.query.pro, async (requested) => {
@@ -187,6 +348,15 @@ const workspaceDrafts = createWorkspaceDrafts()
 const pendingDrafts = ref([])
 const draftRecoveryNotice = ref('')
 const draftsReady = ref(false)
+function offerRecoveredDrafts() {
+  const saved = chatDraftRecovery.snapshot()
+  const owner = authStore.user ? `${authStore.user.id}:${authStore.user.schoolId}` : null
+  pendingDrafts.value = saved?.owner === owner ? saved.entries : []
+  // Offer only this verified owner's slots, without placing any text in input.
+  if (saved?.owner === owner && saved.active) pendingDrafts.value.sort((a, b) =>
+    Number(b.model === saved.active.model && b.conversationId === saved.active.conversationId)
+    - Number(a.model === saved.active.model && a.conversationId === saved.active.conversationId))
+}
 function checkpointDrafts() {
   if (!draftsReady.value || disposed || !authStore.user || pendingDrafts.value.length) return
   workspaceDrafts.save(selectedModelKey.value, activeConversationId.value, draft.value)
@@ -237,6 +407,47 @@ async function restoreChatDraft(entry) {
 let workspaceTransitionId = 0
 let workspaceAnimation
 const profileMenuOpen = ref(false)
+watch(profileMenuOpen, async open => {
+  if (open) {
+    closeChatTools()
+    await nextTick()
+    accountPanel.value?.querySelector('button')?.focus()
+  }
+})
+function closeProfileMenu(returnFocus = false) {
+  profileMenuOpen.value = false
+  if (returnFocus) nextTick(() => accountTrigger.value?.focus())
+}
+function navigationCompleted(failure) {
+  return !failure || isNavigationFailure(failure, NavigationFailureType.duplicated)
+}
+async function navigatePrimary(path) {
+  if (disposed) return
+  try {
+    const failure = await router.push(path)
+    if (disposed) return
+    if (navigationCompleted(failure)) {
+      mobileSidebarOpen.value = false
+      closeProfileMenu()
+    }
+  } catch {
+    if (!disposed) ElMessage.error('页面暂时没能打开，请再试一次')
+  }
+}
+async function navigateAccount(path) {
+  if (disposed) return
+  try {
+    const failure = await router.push(path)
+    if (disposed) return
+    if (navigationCompleted(failure)) {
+      closeProfileMenu()
+      if (mobileLayout.value) mobileSidebarOpen.value = false
+      await nextTick()
+      if (mobileLayout.value) menuTrigger.value?.focus()
+      else accountTrigger.value?.focus()
+    }
+  } catch { if (!disposed) ElMessage.error('页面暂时没能打开，请再试一次') }
+}
 const logoutConfirmVisible = ref(false)
 const logoutBusy = ref(false)
 const logoutError = ref('')
@@ -273,7 +484,7 @@ const workspaceDefinitions = [
     label: '问答',
     provider: 'DeepSeek',
     subtitle: '查询校园资料、最新信息和日常问题',
-    placeholder: '询问校园事务、课程、实习或最新信息',
+    placeholder: '随时问我',
     waiting: '正在整理回答',
     suggestions: [
       { title: '校园速查', description: '开放时间、办事流程，一步选好', icon: 'campus', action: 'campus', label: '选择要查的事' },
@@ -319,7 +530,6 @@ const workspaceOptions = computed(() => workspaceDefinitions.map((workspace) => 
   model: modelOptions.value.find((model) => model.key === workspace.key) || null,
 })))
 const suggestions = computed(() => activeWorkspace.value.suggestions)
-const waitingCopy = computed(() => activeWorkspace.value.waiting)
 const composerPlaceholder = computed(() => activeWorkspace.value.placeholder)
 const campusLookups = [
   { label: '图书馆开放时间', prompt: '请查找本校图书馆的开放时间，注明适用日期和资料来源。如果没有已核实的信息，请明确说明。' },
@@ -454,18 +664,6 @@ function campusServiceResult(message) {
   }
 }
 
-function hasAdditionalServiceDetail(message) {
-  const content = message.content || ''
-  const plainAnswer = content
-    .replace(/```[\s\S]*?```/g, ' ')
-    .replace(/[#>*_`~]/g, ' ')
-    .replace(/\[(\d+)]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-
-  return plainAnswer.length > 118 || /\r|\n|```|\[[^\]]+\]\([^)]+\)/.test(content)
-}
-
 async function copyAnswer(message) {
   try {
     await navigator.clipboard.writeText(`【Campthink AI 生成内容，请核实】\n\n${message.content || ''}`)
@@ -482,8 +680,12 @@ function isNearBottom() {
   return element.scrollHeight - element.scrollTop - element.clientHeight < 96
 }
 
+let lastMessageScrollTop = 0
 function handleMessageScroll() {
-  stickToBottom.value = isNearBottom()
+  const element = messageScroller.value
+  if (!element) return
+  stickToBottom.value = followAfterScroll(stickToBottom.value, lastMessageScrollTop, element.scrollTop, element.scrollHeight, element.clientHeight)
+  lastMessageScrollTop = element.scrollTop
   showJumpToLatest.value = !stickToBottom.value && messages.value.length > 0
 }
 
@@ -492,9 +694,10 @@ async function scrollToBottom(behavior = 'smooth') {
   const element = messageScroller.value
   if (!element) return
 
-  element.scrollTo({ top: element.scrollHeight, behavior })
   stickToBottom.value = true
   showJumpToLatest.value = false
+  lastMessageScrollTop = element.scrollTop
+  element.scrollTo({ top: element.scrollHeight, behavior: scrollBehavior(behavior, window.matchMedia('(prefers-reduced-motion: reduce)').matches) })
 }
 
 function scheduleStreamScroll() {
@@ -515,14 +718,14 @@ function resizeComposer() {
   if (!element) return
 
   element.style.height = 'auto'
-  const height = element.scrollHeight
-  element.style.height = `${Math.max(38, Math.min(height, 138))}px`
-  element.style.overflowY = height > 138 ? 'auto' : 'hidden'
+  const size = composerHeight(element.scrollHeight, window.visualViewport?.height || window.innerHeight)
+  element.style.height = `${size.height}px`
+  element.style.overflowY = size.overflowY
 }
 
 function handleComposerEnter(event) {
   // Enter confirms a Chinese IME candidate before it should send a message.
-  if (composerComposing.value || event.isComposing || event.keyCode === 229) return
+  if (!shouldSendOnEnter(event, composerComposing.value, mobileLayout.value)) return
   event.preventDefault()
   submitPrompt()
 }
@@ -566,6 +769,7 @@ async function loadDailyQuota() {
 }
 
 async function chooseWorkspace(workspace) {
+  if(pendingChatAction())return
   if (sending.value || loadingMessages.value || deletingConversationId.value) return
   const model = workspace.model
   if (!model) {
@@ -616,8 +820,8 @@ async function chooseWorkspace(workspace) {
   workspaceAnimation?.cancel()
   if (!reducedMotion && workspaceScene.value) {
     workspaceAnimation = workspaceScene.value.animate(
-      [{ opacity: 0, transform: 'translateY(12px)' }, { opacity: 1, transform: 'translateY(0)' }],
-      { duration: 330, easing: 'cubic-bezier(.22,1,.36,1)', fill: 'forwards' },
+      [{ opacity: 0, transform: 'translateY(4px)' }, { opacity: 1, transform: 'translateY(0)' }],
+      { duration: 200, easing: 'cubic-bezier(.22,1,.36,1)', fill: 'forwards' },
     )
     await workspaceAnimation.finished.catch(() => {})
   }
@@ -628,19 +832,24 @@ async function chooseWorkspace(workspace) {
 }
 
 function openMembership() {
+  closeProfileMenu()
+  accountTrigger.value?.focus()
   mobileSidebarOpen.value = false
   membershipVisible.value = true
 }
 
 function openAdminConsole() {
-  mobileSidebarOpen.value = false
-  router.push('/admin')
+  if (isAdmin.value) return navigateAccount('/admin')
 }
 
 async function selectConversation(conversationId) {
+  if(pendingChatAction())return
   if (!isChatRoute.value) { await router.push('/chat'); if (!isChatRoute.value) return }
   if (disposed || sending.value || switchingWorkspace.value || deletingConversationId.value) return
-  if (activeConversationId.value === conversationId && !historyError.value && !historyNeedsReload.value) return
+  if (activeConversationId.value === conversationId && !historyError.value && !historyNeedsReload.value) {
+    mobileSidebarOpen.value = false
+    return
+  }
 
   workspaceDrafts.save(selectedModelKey.value, activeConversationId.value, draft.value)
   activeConversationId.value = conversationId
@@ -664,6 +873,7 @@ async function selectConversation(conversationId) {
 }
 
 async function startNewConversation() {
+  if(pendingChatAction())return
   if (!isChatRoute.value) { await router.push('/chat'); if (!isChatRoute.value) return }
   if (disposed || sending.value || switchingWorkspace.value || deletingConversationId.value) return
 
@@ -855,18 +1065,8 @@ async function loadCurrentSchool() {
   }
 }
 
-function scrollToMessageSources(messageId) {
-  const details = document.getElementById(`sources-${messageId}`)
-  if (details) details.open = true
-  details?.scrollIntoView({
-    behavior: 'smooth',
-    block: 'center',
-  })
-}
-
 function openContact() {
-  mobileSidebarOpen.value = false
-  router.push('/feedback')
+  return navigateAccount('/feedback')
 }
 
 function closeContact() {
@@ -919,13 +1119,15 @@ function handleEscape(event) {
   }
   if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
     event.preventDefault()
+    chatSidebarCollapsed.value = false
     if (mobileLayout.value) mobileSidebarOpen.value = true
     nextTick(() => historySearchInput.value?.focus())
     return
   }
   if (event.key !== 'Escape') return
+  if (chatTools.value?.open) { closeChatTools(); chatTools.value.querySelector('summary')?.focus(); return }
   if (logoutConfirmVisible.value) { if (!logoutBusy.value) logoutConfirmVisible.value = false }
-  else if (profileMenuOpen.value) profileMenuOpen.value = false
+  else if (profileMenuOpen.value) closeProfileMenu(true)
   else if (membershipVisible.value) membershipVisible.value = false
   else if (contactVisible.value) closeContact()
   else if (pendingDeleteConversation.value) pendingDeleteConversation.value = null
@@ -933,11 +1135,13 @@ function handleEscape(event) {
 }
 
 function requestDeleteConversation(conversation) {
+  if(pendingChatAction())return
   if (sending.value || loadingMessages.value || switchingWorkspace.value || deletingConversationId.value) return
   pendingDeleteConversation.value = conversation
 }
 
 async function confirmDeleteConversation() {
+  if(pendingChatAction())return
   const conversation = pendingDeleteConversation.value
   if (!conversation || deletingConversationId.value || loadingMessages.value || sending.value || switchingWorkspace.value) return
 
@@ -985,10 +1189,75 @@ function cancelAnswer() {
   }
   // Recovery is opt-in and bound to a server-confirmed account, never automatic resending.
   if (!draft.value) draft.value = run.content
-  answerNotice.value = '已停止接收，问题已放回输入框；服务端可能仍在处理，请先查看历史记录再决定是否重发'
+  answerNotice.value = run.privateSchedule
+    ? '已停止接收，问题已放回输入框；模型调用可能仍在处理并计入额度，此课表查询不写入AI历史。'
+    : '已停止接收，问题已放回输入框；服务端可能仍在处理，请先查看历史记录再决定是否重发'
   waitingForAnswer.value = false
   sending.value = false
   nextTick(resizeComposer)
+}
+
+async function runScheduleQuery(privateQuery, content, interpretText = null) {
+  if (!scheduleScope.value || sending.value || switchingWorkspace.value || loadingMessages.value || historyError.value || deletingConversationId.value || activeChatAction.value) return
+  const run = chatRuns.start({ content, privateSchedule: true, streamingAssistantId: `local-schedule-${crypto.randomUUID()}` })
+  const scope = scheduleScope.value
+  const isCurrent = () => run.isCurrent() && scope === scheduleScope.value
+  const shouldFollow = isNearBottom()
+  sending.value = true; waitingForAnswer.value = Boolean(interpretText && !privateQuery.cancelled); answerNotice.value = ''
+  try {
+    const prior = previousScheduleQuery(messages.value, scope)
+    let result, narration = null, interpreted = false
+    if (interpretText && !privateQuery.cancelled) {
+      const natural = await readNaturalSchedule(interpretText, prior, run.signal, askOwnTimetable)
+      if (!isCurrent()) return
+      privateQuery = natural.query; result = natural.result; narration = natural.narration; interpreted = true
+    } else result = privateQuery.clarification ? null : await readPrivateScheduleQuery(privateQuery, run.signal, queryOwnTimetable)
+    const answer = privateQuery.clarification || result.answer
+    if (!isCurrent()) return
+    const priorQuery = privateQuery.cancelled ? null : previousScheduleQuery(messages.value, scope)
+    const returnedNames = result?.display ? [...new Set(result.display.entries.map(row => row.name))] : []
+    const focusName = returnedNames.length === 1 ? returnedNames[0] : null
+    const pendingSchedule=validPendingSchedule(privateQuery.pendingSchedule)?privateQuery.pendingSchedule:priorQuery?.pendingSchedule
+    const scheduleQuery = { ...(result ? privateQuery : priorQuery),...(!result&&validPendingSchedule(pendingSchedule)?{pendingSchedule:{...pendingSchedule}}:{}), ...(interpreted ? { naturalQuestion: interpretText } : priorQuery?.naturalQuestion ? { naturalQuestion: priorQuery.naturalQuestion } : {}), focus: result ? result.focus : priorQuery?.focus || null, focusOrigin: result ? scheduleFocusOrigin(privateQuery, result.focus, priorQuery) : priorQuery?.focusOrigin || null, focusName: result ? focusName : priorQuery?.focusName || null, scope, awaiting: !result&&!privateQuery.cancelled, resolved: !!result }
+    messages.value.push({ id: `local-question-${crypto.randomUUID()}`, role: 'user', content, sources: [], webSources: [], localSchedule: true, scheduleOwner: scope })
+    messages.value.push({ id: run.streamingAssistantId, role: 'assistant', content: answer, sources: [], webSources: [], localSchedule: true, scheduleQuery, scheduleNarration: narration, scheduleResult: result?.display ? result : null })
+    if (draft.value.trim() === content) draft.value = ''
+    scheduleRetry.value = null
+    run.completed = true
+    answerNotice.value = interpreted
+      ? `${naturalScheduleNotice(narration)} · 计入AI额度，不写入AI历史`
+      : '本人已保存课表 · 本次直接查询未调用模型；此私有查询不写入AI历史。'
+    await nextTick(); resizeComposer()
+    if (!isCurrent()) return
+    if (shouldFollow && stickToBottom.value) await scrollToBottom('smooth')
+    else showJumpToLatest.value = true
+  } catch (failure) {
+    if (isCurrent()) {
+      const status=failure.response?.status
+      if([401,403].includes(status)){
+        messages.value=clearDeniedScheduleResults(messages.value,scope,status)
+        scheduleRetry.value=null
+        const intent=deniedScheduleIntent(privateQuery)
+        const reason=status===401?'登录状态已失效，请重新登录。':'当前账号没有此课表查询范围，请核对任课绑定或查看权限。'
+        messages.value.push({id:`local-denied-question-${crypto.randomUUID()}`,role:'user',content,sources:[],webSources:[],localSchedule:true,scheduleOwner:scope})
+        messages.value.push({id:run.streamingAssistantId,role:'assistant',content:`${reason}\n\n已收起本对话的旧课表结果。问题还在输入框；核对权限后可以再试，不会改查其他身份或让模型猜测。`,sources:[],webSources:[],localSchedule:true,scheduleQuery:{...intent,scope,awaiting:true,resolved:false},scheduleResult:null})
+        answerNotice.value='权限核对未通过，旧课表结果已收起；未修改任何已保存课程。'
+        await nextTick();resizeComposer()
+        if(isCurrent() && shouldFollow && stickToBottom.value)await scrollToBottom('smooth')
+      }else answerNotice.value = interpretText && status === 404
+        ? '本机后端尚未加载课表语义查询能力，请更新后端后重试；问题已保留。'
+        : `${failure.response?.data?.message || failure.message || '模型理解或本人课表读取暂时未完成'}${String(failure.response?.data?.message || failure.message || '').includes('问题已保留') ? '' : '。问题已保留，可编辑后重试。'}`
+    }
+  } finally { if (isCurrent()) { sending.value = false; waitingForAnswer.value = false; run.finish() } }
+}
+
+async function chooseScheduleCourse(message, name) {
+  if (sending.value || switchingWorkspace.value || loadingMessages.value || activeChatAction.value || !isChatRoute.value) return
+  try {
+    const query = refineScheduleQuery(message, name, scheduleScope.value)
+    const range = query.from === query.to ? query.from : `${query.from}至${query.to}`
+    await runScheduleQuery(query, `查${range}的${name ? `《${name}》课表` : '课表（不限课程名称）'}`)
+  } catch (error) { answerNotice.value = error.message || '候选课程已失效，请重新查询。' }
 }
 
 async function submitPrompt() {
@@ -1005,6 +1274,53 @@ async function submitPrompt() {
 
   if (sending.value || switchingWorkspace.value || loadingMessages.value || historyError.value || deletingConversationId.value) return
 
+  if(activeChatAction.value){await submitActionFollowup(content);return}
+
+  const routeText=materialRouteText(content)
+  const academic = resolveAcademicIntent(routeText)
+  if(academic && scheduleScope.value){
+    const id=`local-academic-${crypto.randomUUID()}`
+    messages.value.push({id:`${id}-request`,role:'user',content,sources:[],webSources:[],localAction:true})
+    messages.value.push({id,role:'assistant',content:'使用本人授权资料核对，不调用公共模型。',academic,academicScope:scheduleScope.value,sources:[],webSources:[],localAction:true})
+    draft.value='';answerNotice.value='仅本人绑定身份或明确选定的成绩资料；不写入模型历史。';workspaceDrafts.clear(selectedModelKey.value,activeConversationId.value)
+    await nextTick();resizeComposer();if(stickToBottom.value)await scrollToBottom('smooth');return
+  }
+  const intake=resolveMaterialIntake(routeText)
+  if(intake){if(content!==routeText){answerNotice.value='这份附件当前选的是“本次问答”。请重新选择文件用途为校园资料或商家资料后整理；没有将附件指令当作操作执行。';return}openMaterialIntake(intake.seed,content);return}
+  let action=scheduleScope.value?(resolveAttendanceContinuation(routeText,{scope:scheduleScope.value,previous:previousAttendanceClarification(messages.value,scheduleScope.value)})||resolveChatAction(routeText)):null
+  let workflow=scheduleScope.value?resolveTeachingWorkflow(routeText,{today:chinaDate(),scope:scheduleScope.value,previous:previousTeachingWorkflow(messages.value,scheduleScope.value)}):null
+  if(['TEACHING_LESSON_CHANGE','PERSONAL_COURSE_EDIT'].includes(workflow?.handoff)){action={kind:workflow.handoff,seed:{instructions:workflow.instructions}};workflow=null}
+  else if(action?.kind==='TEACHING_LESSON_CHANGE'&&!['PERSONAL_MANAGE','SCHEDULE_SOURCE'].includes(workflow?.workflow))workflow=null
+  if(workflow){
+    const id=`local-workflow-${crypto.randomUUID()}`
+    messages.value.push({id:`${id}-request`,role:'user',content,sources:[],webSources:[],localAction:true})
+    messages.value.push({id,role:'assistant',content:workflow.clarification||`${TEACHING_WORKFLOWS[workflow.workflow].title}通过本地业务入口处理；没有提交修改。`,workflow,workflowContext:{...workflow,scope:scheduleScope.value},sources:[],webSources:[],localAction:true})
+    draft.value='';answerNotice.value='本地业务路由 · 未调用模型；仍由原业务接口检查权限、目标和确认。'
+    workspaceDrafts.clear(selectedModelKey.value,activeConversationId.value)
+    await nextTick();resizeComposer();if(stickToBottom.value)await scrollToBottom('smooth');return
+  }
+  if(action){
+    const id=`local-action-${crypto.randomUUID()}`
+    const clarify=action.kind==='CLARIFY_ACTION'
+    messages.value.push({id:`${id}-request`,role:'user',content,sources:[],webSources:[],localAction:true})
+    messages.value.push({id,role:'assistant',content:clarify?(action.seed?.message||'先明确要改哪类记录：本人的课表、班级教学安排、考勤，还是本校知识资料？请重新说明一种操作和具体对象。这条请求没有执行，也没有发给模型；不会把他人的课表当作你的课表修改。'):'请核对操作对象与变更内容；确认之前不会保存。',action:clarify?null:action,actionScope:scheduleScope.value,actionClarification:clarify&&action.seed?.pendingAttendance?{...action.seed.pendingAttendance,scope:scheduleScope.value}:null,sources:[],webSources:[],localAction:true})
+    activeChatAction.value=clarify?null:id;draft.value='';answerNotice.value='授权业务操作 · 不调用模型；具体权限由服务器校验。'
+    workspaceDrafts.clear(selectedModelKey.value,activeConversationId.value)
+    await nextTick();resizeComposer();if(stickToBottom.value)await scrollToBottom('smooth');return
+  }
+
+  // Personal schedule answers remain factual and ephemeral.
+  // Natural language is interpreted by the model-backed protected endpoint.
+  // It reads facts locally; no course rows enter a model conversation/history.
+  const privateQuery = scheduleScope.value
+    ? resolveScheduleQuestion(routeText, { today: chinaDate(), previous: previousScheduleQuery(messages.value, scheduleScope.value), retry: scheduleRetry.value, scope: scheduleScope.value }) : null
+  if (privateQuery) {
+    await runScheduleQuery(privateQuery, content, routeText)
+    return
+  }
+
+  const privateContentWarning=privateMaterialReason(content)
+  if(privateContentWarning){answerNotice.value=`${privateContentWarning} 可只保留私有原件，再使用本人学业或教学工具。`;return}
   sending.value = true
   answerNotice.value = ''
   waitingForAnswer.value = true
@@ -1082,9 +1398,10 @@ async function submitPrompt() {
     const preservedAnswerScroll = messageScroller.value?.scrollTop ?? 0
     const temporaryIndex = messages.value.findIndex((message) => message.id === temporaryId)
 
-    if (temporaryIndex >= 0) messages.value[temporaryIndex] = response.userMessage
+    if (temporaryIndex >= 0) messages.value[temporaryIndex] = { ...response.userMessage, uiKey: temporaryId }
     const completedAssistant = {
       ...response.assistantMessage,
+      uiKey: streamingAssistantId,
       sources: response.sources || [],
       webSources: response.webSources || [],
       streaming: false,
@@ -1120,6 +1437,7 @@ async function submitPrompt() {
       sending.value = false
       return
     }
+    answerNotice.value = `${resolveErrorMessage(error, '回答服务暂时不可用，请稍后重试')}。问题保留在输入框，请先核对历史再重发。`
     ElMessage.error(resolveErrorMessage(error, '回答服务暂时不可用，请稍后重试'))
     // Do not erase a newer draft typed while the previous request was running.
     if (!draft.value) {
@@ -1144,7 +1462,7 @@ async function submitPrompt() {
       try {
         const recovered = await getMessages(activeConversationId.value, {signal:run.signal})
         if (!run.isCurrent()) return
-        messages.value = recovered
+        messages.value = scopeScheduleHistory(recovered, scheduleScope.value, chinaDate())
         await nextTick()
         if (!run.isCurrent()) return
 
@@ -1180,15 +1498,19 @@ async function confirmLogout() {
   logoutBusy.value = true
   logoutError.value = ''
   try {
-    await authStore.logout()
-    window.location.replace('/login')
+    const result = await authStore.logout()
+    if (result?.navigationHandled !== true) window.location.replace('/login')
   } catch {
     logoutError.value = '未能确认退出成功，请检查网络后重试。在公共设备上，请勿直接离开'
   } finally { logoutBusy.value = false }
 }
 
 onMounted(async () => {
+  updateChatViewport()
+  window.visualViewport?.addEventListener('resize', updateChatViewport)
+  window.addEventListener('resize', updateChatViewport)
   window.addEventListener('keydown', handleEscape)
+  window.addEventListener('pointerdown', dismissChatTools)
   mobileMedia.addEventListener('change', updateMobileLayout)
   try {
     await authStore.loadCurrentUser()
@@ -1198,12 +1520,8 @@ onMounted(async () => {
 
   if (disposed) return
 
-  const savedDrafts = chatDraftRecovery.snapshot()
-  pendingDrafts.value = savedDrafts?.entries || []
-  // Prefer the last active draft without putting its text into an input yet.
-  if (savedDrafts?.active) pendingDrafts.value.sort((a, b) =>
-    Number(b.model === savedDrafts.active.model && b.conversationId === savedDrafts.active.conversationId)
-    - Number(a.model === savedDrafts.active.model && a.conversationId === savedDrafts.active.conversationId))
+  const owner = draftOwnerScope.value
+  offerRecoveredDrafts()
 
   await Promise.all([
     loadConversationList(),
@@ -1212,13 +1530,15 @@ onMounted(async () => {
     loadMyKnowledgeSubmissions(),
     loadCurrentSchool(),
   ])
-  if (!disposed) {
+  if (!disposed && owner === draftOwnerScope.value && authStore.user) {
     draftsReady.value = true
     if (draft.value.trim()) checkpointDrafts()
   }
 })
 
 onBeforeUnmount(() => {
+  window.visualViewport?.removeEventListener('resize', updateChatViewport)
+  window.removeEventListener('resize', updateChatViewport)
   disposed = true
   routeReadSequence++
   cancelAnswer()
@@ -1227,14 +1547,15 @@ onBeforeUnmount(() => {
   workspaceTransitionId += 1
   workspaceAnimation?.cancel()
   window.removeEventListener('keydown', handleEscape)
+  window.removeEventListener('pointerdown', dismissChatTools)
   mobileMedia.removeEventListener('change', updateMobileLayout)
   if (streamScrollFrame !== null) window.cancelAnimationFrame(streamScrollFrame)
 })
 </script>
 
 <template>
-  <div class="workspace persistent-workspace" :class="{ 'workspace-expanded': expandedWorkspace }" :inert="membershipVisible || membershipPresent">
-    <aside ref="sidebarElement" class="sidebar" :class="{ 'mobile-open': mobileSidebarOpen }" :inert="logoutConfirmVisible || (mobileLayout && !mobileSidebarOpen)" aria-label="校园导航">
+  <div class="workspace persistent-workspace" :class="{ 'workspace-expanded': !isChatRoute && expandedWorkspace, 'chat-focused': isChatRoute, 'calm-workspace': !isChatRoute && route.name !== 'pro', 'chat-sidebar-collapsed': isChatRoute && chatSidebarCollapsed && !mobileLayout }" :style="isChatRoute ? { '--chat-viewport-height': keyboardHeight, ...(mobileLayout ? { height: keyboardHeight } : {}) } : undefined" :inert="membershipVisible || membershipPresent">
+    <aside ref="sidebarElement" id="campus-sidebar" class="sidebar" :class="{ 'mobile-open': mobileSidebarOpen }" :inert="logoutConfirmVisible || (mobileLayout && !mobileSidebarOpen) || (!mobileLayout && (isChatRoute ? chatSidebarCollapsed : expandedWorkspace))" aria-label="校园导航">
       <div class="sidebar-top">
         <div class="brand">
           <CampMark />
@@ -1246,50 +1567,23 @@ onBeforeUnmount(() => {
 
         <button class="compose-button" type="button" @click="startNewConversation">
           <el-icon><EditPen /></el-icon>
-          <span>新对话</span><kbd>↗</kbd>
+          <span>新对话</span>
         </button>
       </div>
 
-      <nav class="sidebar-nav">
-        <p class="nav-label">我的校园 / WORKSPACE</p>
-        <button class="nav-item" :class="{active:isChatRoute}" type="button" @click="router.push('/chat')">
-          <WorkspaceIcon mode="standard" />
-          <span>校园助手</span>
-        </button>
-        <button class="nav-item" :class="{active:route.name==='wall'}" type="button" @click="router.push('/wall')">
-          <NavigationIcon name="wall" /><span>校园墙</span>
-        </button>
-        <button class="nav-item" :class="{active:route.name==='study'}" type="button" @click="router.push('/study')">
-          <NavigationIcon name="study" /><span>实验与作业</span>
-        </button>
-        <button class="nav-item" :class="{active:route.name==='timetable'}" type="button" @click="router.push('/timetable')">
-          <NavigationIcon name="timetable" /><span>我的课表</span>
-        </button>
-        <button class="nav-item" :class="{active:route.name==='canteens'}" type="button" @click="router.push('/canteens')">
-          <NavigationIcon name="canteen" />
-          <span>食堂评分</span>
-        </button>
-        <button class="nav-item" :class="{active:route.name==='projects'}" type="button" @click="router.push('/projects')">
-          <NavigationIcon name="projects" />
-          <span>我的项目</span>
-        </button>
-        <button class="nav-item" :class="{active:route.name==='instruments'}" type="button" @click="router.push('/instruments')">
-          <NavigationIcon name="instruments" /><span>仪器资料</span>
-        </button>
-        <button class="nav-item" :class="{active:route.name==='reviews'}" type="button" @click="router.push('/reviews')"><NavigationIcon name="projects" /><span>收到的审阅</span></button>
-        <button v-if="isAdmin" class="nav-item" :class="{active:route.name==='admin'}" type="button" @click="openAdminConsole">
-          <NavigationIcon name="admin" />
-          <span>管理后台</span>
-        </button>
-        <button class="nav-item" :class="{active:route.name==='feedback'}" type="button" @click="openContact">
-          <NavigationIcon name="feedback" />
-          <span>提交意见</span>
-        </button>
-        <button class="nav-item membership-entry" aria-haspopup="dialog" type="button" @click="openMembership">
-          <el-icon><Star /></el-icon>
-          <span>Campthink Pro</span>
-          <small>即将开放</small>
-        </button>
+      <nav class="sidebar-nav" aria-label="主要功能与对话">
+        <p class="nav-label">我的校园</p>
+        <div class="primary-navigation">
+          <button v-for="item in primaryNavigation" :key="item.name" class="nav-item"
+            :data-destination="item.name"
+            :class="{active: route.name === item.name || (item.name === 'chat' && isChatRoute)}"
+            :aria-current="route.name === item.name || (item.name === 'chat' && isChatRoute) ? 'page' : undefined"
+            type="button" @click="navigatePrimary(item.path)">
+            <WorkspaceIcon v-if="item.icon === 'assistant'" mode="standard" />
+            <NavigationIcon v-else :name="item.icon" />
+            <span>{{ item.label }}</span>
+          </button>
+        </div>
 
         <p class="nav-label recent-label">最近对话</p>
         <label class="history-search">
@@ -1353,11 +1647,11 @@ onBeforeUnmount(() => {
             class="profile-menu-scrim"
             type="button"
             aria-label="关闭账户菜单"
-            @click="profileMenuOpen = false"
+            @click="closeProfileMenu(true)"
           ></button>
         </Transition>
         <Transition name="profile-menu">
-          <section v-if="profileMenuOpen" class="profile-menu" aria-label="账户菜单">
+          <section v-if="profileMenuOpen" id="workspace-account-menu" ref="accountPanel" class="profile-menu" aria-label="账户菜单">
             <div class="profile-menu-user">
               <span class="avatar">{{ displayName.slice(0, 1) }}</span>
               <div>
@@ -1366,10 +1660,18 @@ onBeforeUnmount(() => {
                 <small>{{ isAdmin ? '学校管理员' : '校园用户' }}</small>
               </div>
             </div>
-            <div class="pure-service"><i></i><span>全站无广告，不出售用户数据</span></div>
-            <button type="button" class="profile-entry" @click="profileMenuOpen = false; router.push('/account')">
+            <button type="button" class="profile-entry" :aria-current="route.name === 'account' ? 'page' : undefined" @click="navigateAccount('/account')">
               <el-icon><User /></el-icon>
               <span>个人信息</span>
+            </button>
+            <button v-if="isAdmin" type="button" class="profile-entry" :aria-current="route.name === 'admin' ? 'page' : undefined" @click="openAdminConsole">
+              <NavigationIcon name="admin" /><span>管理后台</span>
+            </button>
+            <button type="button" class="profile-entry" :aria-current="route.name === 'feedback' ? 'page' : undefined" @click="openContact">
+              <NavigationIcon name="feedback" /><span>提交意见</span>
+            </button>
+            <button type="button" class="profile-entry" aria-haspopup="dialog" @click="openMembership">
+              <el-icon><Star /></el-icon><span>Campthink Pro</span><small>即将开放</small>
             </button>
             <button type="button" class="logout-entry" @click="requestLogout">
               <el-icon><SwitchButton /></el-icon>
@@ -1379,16 +1681,19 @@ onBeforeUnmount(() => {
         </Transition>
 
         <button
+          ref="accountTrigger"
           class="profile"
           type="button"
           :aria-expanded="profileMenuOpen"
+          aria-controls="workspace-account-menu"
           @click="profileMenuOpen = !profileMenuOpen"
         >
           <span class="avatar">{{ displayName.slice(0, 1) }}</span>
           <span class="profile-copy">
             <strong>{{ displayName }}</strong>
-            <small>账户与退出</small>
+            <small>{{ isAdmin ? '账户与管理' : '账户与设置' }}</small>
           </span>
+          <el-icon class="profile-chevron" aria-hidden="true"><ArrowUp /></el-icon>
         </button>
       </div>
     </aside>
@@ -1407,44 +1712,26 @@ onBeforeUnmount(() => {
       <header class="chat-header">
         <button
           ref="menuTrigger"
-          class="mobile-menu-button"
+          class="mobile-menu-button chat-menu-button"
           type="button"
-          aria-label="打开菜单"
-          @click="mobileSidebarOpen = true"
+          :aria-label="mobileLayout ? '打开菜单' : chatSidebarCollapsed ? '展开侧栏' : '收起侧栏'"
+          :aria-expanded="mobileLayout ? mobileSidebarOpen : !chatSidebarCollapsed"
+          aria-controls="campus-sidebar"
+          @click="toggleChatSidebar"
         >
-          <el-icon><Menu /></el-icon>
+          <SidebarToggleIcon />
         </button>
-        <div class="connection-state">
-          <span>{{ currentSchoolName }}空间</span>
+        <div class="assistant-identity">
+          <AssistantAvatar />
+          <div><strong>Campthink</strong><span>{{ selectedModelKey === 'standard' ? '校园助手' : `${activeWorkspace.label} · ${activeWorkspace.provider}` }}</span></div>
         </div>
-
-        <div class="header-center">
-          <nav class="workspace-switcher" :class="`is-${pendingWorkspaceKey || selectedModelKey}`" aria-label="选择工作模块">
-          <button
-            v-for="workspace in workspaceOptions"
-            :key="workspace.key"
-            type="button"
-            :disabled="sending || loadingMessages"
-            :class="{
-              active: workspace.key === (pendingWorkspaceKey || selectedModelKey),
-              unavailable: !workspace.model?.available,
-            }"
-            :aria-pressed="workspace.key === selectedModelKey"
-            :title="workspace.model?.configured === false
-              ? `${workspace.provider} 尚未配置`
-              : sending ? '回答完成后可切换模块' : `${workspace.subtitle} · 切换后开始独立新对话`"
-            @click="chooseWorkspace(workspace)"
-          >
-            <WorkspaceIcon :mode="workspace.key" />
-            <span>{{ workspace.label }}</span>
-            <small>{{ workspace.model?.configured === false ? '未配置' : workspace.provider }}</small>
-          </button>
-          </nav>
+        <div class="workspace-header-actions">
+          <WorkspaceToolsMenu v-if="isChatRoute" />
+          <button class="chat-new-button" type="button" aria-label="开始新对话" :disabled="sending || loadingMessages || switchingWorkspace" @click="startNewConversation"><el-icon><EditPen /></el-icon><span>新对话</span></button>
         </div>
-
       </header>
 
-      <section ref="messageScroller" class="message-scroller" @scroll="handleMessageScroll">
+      <section ref="messageScroller" class="message-scroller" tabindex="0" aria-label="对话内容" @scroll="handleMessageScroll">
         <div ref="workspaceScene" class="workspace-scene" :aria-busy="switchingWorkspace" :inert="switchingWorkspace">
         <div v-if="loadingMessages" class="loading-state" role="status">
           <span></span>
@@ -1458,23 +1745,22 @@ onBeforeUnmount(() => {
           <button class="work-button primary" type="button" @click="selectConversation(activeConversationId)">重新读取对话</button>
           <button class="work-button" type="button" @click="startNewConversation">另开新对话</button>
         </section>
-        <section v-else-if="messages.length === 0" class="welcome">
-          <p class="welcome-eyebrow">CAMPTHINK / {{ selectedModelKey === 'standard' ? 'ASK' : selectedModelKey === 'kimi' ? 'RESEARCH' : 'BUILD' }}</p>
+        <section v-else-if="messages.length === 0" class="welcome" :class="{ 'welcome--expressive': selectedModelKey === 'standard', 'welcome--mode': selectedModelKey !== 'standard' }">
+          <ChatStart v-if="selectedModelKey === 'standard'" :active="isChatRoute" :suggestions="suggestions" :campus-open="selectedQuickAction === 'campus'" :disabled="sending || switchingWorkspace || loadingMessages || Boolean(activeChatAction)" @activate="activateQuickAction" />
+          <template v-else>
           <div class="welcome-heading">
-            <span class="welcome-mode-icon"><WorkspaceIcon :mode="selectedModelKey" /></span>
             <div>
-              <h1>你好，{{ displayName }}</h1>
-              <p class="welcome-subtitle">{{ activeWorkspace.subtitle }}</p>
+              <h1>{{ selectedModelKey === 'standard' ? '今天想聊什么？' : selectedModelKey === 'kimi' ? '一起把想法写清楚' : '一起把问题理顺' }}</h1>
+              <p class="welcome-subtitle">{{ selectedModelKey === 'standard' ? '校园里的小事，或是卡住你的难题，都可以从这里说起。' : activeWorkspace.subtitle }}</p>
             </div>
           </div>
-          <p class="welcome-invitation">{{ selectedModelKey === 'standard' ? '今天，从哪件事开始？' : selectedModelKey === 'kimi' ? '把一个想法，写得更清楚' : '让灵感，变成可以运行的东西' }}</p>
-          <div class="quick-tools-label"><span>你的快捷工具</span><small>先选工具，再补充需求</small></div>
           <div class="suggestion-grid">
             <button
               v-for="item in suggestions"
               :key="item.title"
               class="suggestion-card"
               type="button"
+              :disabled="sending || switchingWorkspace || loadingMessages || Boolean(activeChatAction)"
               :aria-expanded="item.action === 'campus' ? selectedQuickAction === 'campus' : undefined"
               :aria-controls="item.action === 'campus' ? 'campus-quick-lookups' : undefined"
               @click="activateQuickAction(item)"
@@ -1484,14 +1770,13 @@ onBeforeUnmount(() => {
                 <strong>{{ item.title }}</strong>
                 <small>{{ item.description }}</small>
               </span>
-              <span class="quick-tool-action">{{ item.label }}<span aria-hidden="true">{{ item.route ? '↗' : item.action === 'campus' ? '+' : '→' }}</span></span>
             </button>
           </div>
-          <TimetableTeaser />
+          </template>
           <Transition name="quick-disclosure">
             <div v-if="selectedQuickAction === 'campus'" id="campus-quick-lookups" class="campus-quick-lookups">
-              <div><strong>你想了解什么？</strong><button type="button" aria-label="收起校园速查" @click="selectedQuickAction = null">收起 −</button></div>
-              <div class="lookup-options"><button v-for="item in campusLookups" :key="item.label" type="button" @click="chooseSuggestion(item.prompt)">{{ item.label }}<span aria-hidden="true">↗</span></button></div>
+              <div><strong>你想了解什么？</strong><button type="button" aria-label="收起校园速查" @click="selectedQuickAction = null">收起 <el-icon aria-hidden="true"><ArrowUp /></el-icon></button></div>
+              <div class="lookup-options"><button v-for="item in campusLookups" :key="item.label" type="button" @click="chooseSuggestion(item.prompt)">{{ item.label }}<el-icon aria-hidden="true"><Promotion /></el-icon></button></div>
               <small>选择后填入输入框，确认再发送；回答以已核实资料为准</small>
               <CampusDirectory v-if="currentSchoolName === '天津中德应用技术大学'" />
             </div>
@@ -1501,97 +1786,45 @@ onBeforeUnmount(() => {
         <div v-else class="message-list">
           <article
             v-for="message in messages"
-            :key="message.id"
+            :key="message.uiKey || message.id"
             class="message-row"
             :class="message.role"
           >
-            <CampMark v-if="message.role === 'assistant'" class="assistant-avatar" />
+            <AssistantAvatar v-if="message.role === 'assistant'" />
             <div class="message-content">
               <span class="message-role">{{
-                message.role === 'assistant' ? '校园助手 · AI 生成内容，请核实' : '你'
+                message.role === 'assistant' ? 'Campthink' : '你'
               }}</span>
               <p v-if="message.interrupted" class="answer-interrupted" role="status">
                 {{ message.stopped ? '已停止接收，以下内容可能不完整；可稍后查看历史记录核对' : '回答中途断开，以下内容不完整；请查看历史记录后重试' }}
               </p>
               <p v-if="message.role === 'user'">{{ message.content }}</p>
               <div v-else class="answer-bubble" :class="{ 'is-streaming': message.streaming }">
-              <div v-if="message.streaming" class="answer-streaming">
+              <template v-if="message.localSchedule && message.scheduleQuery?.scope===scheduleScope && message.scheduleResult">
+                <div v-if="message.scheduleNarration?.mode==='model'" class="schedule-response-prose answer-markdown" v-html="renderMarkdown(message.content)"></div>
+                <ScheduleAnswerCard :result="message.scheduleResult" :active="!sending && !switchingWorkspace && !loadingMessages && !activeChatAction && isChatRoute" @select-course="chooseScheduleCourse(message, $event)" />
+              </template>
+              <OwnAcademicCard v-else-if="message.academic && message.academicScope===scheduleScope" :scope="scheduleScope" :owner="`${authStore.user?.schoolId}:${authStore.user?.id}`" :kind="message.academic.kind" :active="message.academicScope===scheduleScope" :foreground="messages.at(-1)?.id===message.id" />
+              <ChatWorkflowCard v-else-if="message.workflow && message.workflowContext?.scope===scheduleScope" :intent="message.workflow" :user="authStore.user" />
+              <MaterialIntakePanel v-else-if="message.action?.kind==='MATERIAL_INTAKE' && !message.actionClosed" :ref="panel=>bindChatActionPanel(message.id,panel)" :seed="message.action.seed" :scope="scheduleScope" :user="authStore.user" :active="activeChatAction===message.id" @state="actionState(message,$event)" @done="finishChatAction(message,$event)" />
+              <ChatActionPanel v-else-if="message.action && !message.actionClosed" :ref="panel=>bindChatActionPanel(message.id,panel)" :intent="message.action" :scope="scheduleScope" :user="authStore.user" :active="activeChatAction===message.id" @state="actionState(message,$event)" @done="finishChatAction(message,$event)" />
+              <div v-else-if="message.streaming" class="answer-markdown">
                 <span v-if="!message.content" class="typing-indicator" role="status" aria-label="正在整理回答"><b></b><b></b><b></b></span>
-                <template v-else>{{ message.content }}<i aria-hidden="true"></i></template>
+                <div v-else v-html="renderMarkdown(message.content)"></div>
               </div>
-              <section
-                v-else-if="campusServiceResult(message)"
-                class="campus-service-result"
-              >
-                <header>
-                  <span class="service-result-icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24">
-                      <path d="M4 20V8.6L12 4l8 4.6V20h-6v-5h-4v5H4Zm2-2h2v-5h8v5h2V9.8l-6-3.4-6 3.4V18Z" />
-                    </svg>
-                  </span>
-                  <div>
-                    <small>校内事务</small>
-                    <strong>{{ campusServiceResult(message).title }}</strong>
-                  </div>
-                  <span
-                    class="service-result-state"
-                    :class="campusServiceResult(message).stateTone"
-                  >
-                    <i></i>{{ campusServiceResult(message).stateLabel }}
-                  </span>
-                </header>
-
-                <p v-if="!hasAdditionalServiceDetail(message)">
-                  {{ campusServiceResult(message).summary }}
-                </p>
-
-                <div class="service-result-meta">
-                  <span>
-                    <small>负责单位</small>
-                    <strong>{{ campusServiceResult(message).department }}</strong>
-                  </span>
-                  <span>
-                    <small>事务分类</small>
-                    <strong>{{ campusServiceResult(message).category }}</strong>
-                  </span>
-                  <span>
-                    <small>资料时间</small>
-                    <strong>{{ formatSourceDate(campusServiceResult(message).publishedAt) }}</strong>
-                  </span>
-                </div>
-
-                <footer>
-                  <span>回答引用 {{ campusServiceResult(message).sourceCount }} 份本校资料</span>
-                  <a
-                    v-if="campusServiceResult(message).sourceUrl"
-                    :href="campusServiceResult(message).sourceUrl"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    查看办事原文
-                    <el-icon><Promotion /></el-icon>
-                  </a>
-                  <button v-else type="button" @click="scrollToMessageSources(message.id)">
-                    查看资料依据
-                  </button>
-                </footer>
-              </section>
               <div v-else class="answer-markdown" v-html="renderMarkdown(message.content)"></div>
-
-              <div
-                v-if="campusServiceResult(message) && hasAdditionalServiceDetail(message)"
-                class="answer-markdown service-answer-detail"
-                v-html="renderMarkdown(message.content)"
-              ></div>
+              <details v-if="message.actionFollowups?.length" class="chat-action-followups"><summary>本次操作的 {{ message.actionFollowups.length }} 条补充</summary><ol><li v-for="(followup,index) in message.actionFollowups" :key="index"><p>你：{{ followup.content }}</p><p>{{ followup.notice }}</p></li></ol></details>
+              <RouterLink v-if="message.savedAction" :to="message.action.kind==='KNOWLEDGE'?'/admin':['ATTENDANCE','TEACHING_COURSE','TEACHING_LESSON_CHANGE'].includes(message.action.kind)?'/teaching':'/timetable'">{{ ['TEACHING_COURSE','TEACHING_LESSON_CHANGE'].includes(message.action.kind)?'查看教学配置':message.action.kind==='KNOWLEDGE'?'查看知识库管理':message.action.kind==='ATTENDANCE'?'查看考勤记录':'查看我的课表' }}</RouterLink>
+              <button v-if="message.action && !message.actionClosed && !message.actionReady" type="button" class="work-button" @click="finishChatAction(message,'操作面板已取消，没有提交修改。')">取消操作面板</button>
               </div>
 
               <details
                 v-if="message.sources?.length"
                 :id="`sources-${message.id}`"
                 class="message-sources citation-details"
-                :class="{ 'compact-service-sources': campusServiceResult(message) }"
               >
-                <summary>本校参考片段 <span>{{ message.sources.length }} 条</span><i aria-hidden="true">⌄</i></summary>
+                <summary>本校参考片段 <span>{{ message.sources.length }} 条</span><el-icon aria-hidden="true"><ArrowDown /></el-icon></summary>
+                <p v-if="campusServiceResult(message)?.stateTone === 'caution'" class="source-age-note">{{ campusServiceResult(message).stateLabel }}，请以学校现行通知为准。</p>
                 <div class="source-reference-list">
                   <component
                     v-for="(source, index) in message.sources"
@@ -1611,7 +1844,7 @@ onBeforeUnmount(() => {
                 v-if="citedWebSources(message).length"
                 class="message-sources web-sources citation-details"
               >
-                <summary>引用网页 <span>{{ citedWebSources(message).length }} 项</span><i aria-hidden="true">⌄</i></summary>
+                <summary>引用网页 <span>{{ citedWebSources(message).length }} 项</span><el-icon aria-hidden="true"><ArrowDown /></el-icon></summary>
                 <div class="web-source-list">
                   <a
                     v-for="(source, index) in citedWebSources(message)"
@@ -1635,12 +1868,12 @@ onBeforeUnmount(() => {
               </details>
 
               <div
-                v-if="showKnowledgeGap(message)"
+                v-if="!message.localAction && showKnowledgeGap(message)"
                 class="knowledge-gap"
               >
                 <div>
                   <strong>这条回答暂未引用本校资料</strong>
-                  <span>如果你知道可靠信息，可以继续在当前对话补充</span>
+                  <span>有可靠的公开资料？可通过下方入口主动提交审核</span>
                 </div>
                 <span v-if="submissionStatusLabel(message.id)" class="submission-status">
                   {{ submissionStatusLabel(message.id) }}
@@ -1684,7 +1917,7 @@ onBeforeUnmount(() => {
                   />
 
                   <div class="contribution-actions">
-                    <span>提交后先由管理员审核，不会直接进入知识库</span>
+                    <span>仅提交公开资料，不要填写私人课表或个人信息。审核通过后才进入公共知识库，普通聊天不会自动提交。</span>
                     <button type="submit" :disabled="submittingContribution">
                       {{ submittingContribution ? '正在提交…' : '提交审核' }}
                     </button>
@@ -1692,11 +1925,11 @@ onBeforeUnmount(() => {
                 </form>
               </Transition>
 
-              <div v-if="message.role === 'assistant' && !message.streaming && !message.interrupted" class="answer-feedback">
+              <button v-if="message.role === 'assistant' && !message.streaming && !message.localAction" class="retry-answer" type="button" :disabled="sending || loadingMessages || switchingWorkspace" @click="editAndRetry(message)">编辑问题并重试</button>
+              <div v-if="message.role === 'assistant' && !message.streaming && !message.interrupted && !message.localSchedule && !message.localAction" class="answer-feedback">
                 <button class="copy-answer" type="button" @click="copyAnswer(message)">
                   <el-icon><DocumentCopy /></el-icon><span>复制回答</span>
                 </button>
-                <span>这条回答有帮助吗？</span>
                 <div class="feedback-buttons">
                   <button
                     type="button"
@@ -1748,12 +1981,12 @@ onBeforeUnmount(() => {
           </article>
 
           <article v-if="waitingForAnswer" class="message-row assistant waiting-row">
-            <CampMark class="assistant-avatar" />
+            <AssistantAvatar />
             <div class="message-content">
-              <span class="message-role">校园助手</span>
+              <span class="message-role">Campthink</span>
               <div class="answer-bubble thinking-bubble" role="status">
                 <span class="typing-indicator" aria-hidden="true"><b></b><b></b><b></b></span>
-                <span>{{ waitingCopy }}</span>
+                <span>正在等待回答…</span>
               </div>
             </div>
           </article>
@@ -1761,33 +1994,55 @@ onBeforeUnmount(() => {
         </div>
       </section>
 
-      <Transition name="jump">
-        <button
-          v-if="showJumpToLatest"
-          class="jump-latest"
-          type="button"
-          @click="scrollToBottom('smooth')"
-        >
-          <el-icon><ArrowDown /></el-icon>
-          回到最新回答
-        </button>
-      </Transition>
-
       <section class="composer-wrap">
+        <Transition name="jump">
+          <button
+            v-if="showJumpToLatest && !activeChatAction"
+            class="jump-latest"
+            type="button"
+            @click="scrollToBottom('smooth')"
+          >
+            <el-icon><ArrowDown /></el-icon>
+            回到最新回答
+          </button>
+        </Transition>
+        <ChatAttachmentPreview ref="chatAttachment" :scope="`${authStore.user?.id}:${authStore.user?.schoolId}:${userSessionGeneration}:${selectedModelKey}:${activeConversationId}:${isChatRoute}`" :disabled="sending || switchingWorkspace || loadingMessages || Boolean(activeChatAction)" :limit="chatInputLimit(selectedModelKey)" @apply="addChatAttachment" />
         <div class="composer" :class="{ disabled: sending || switchingWorkspace }">
           <textarea
+            v-show="!voiceMode || !!draft.trim() || sending"
             ref="composerInput"
             v-model="draft"
             aria-label="输入消息"
+            aria-describedby="chat-composer-help"
             rows="1"
             :maxlength="selectedModelKey === 'kimi' ? 50000 : 10000"
             :disabled="sending || switchingWorkspace || loadingMessages"
-            :placeholder="sending ? '正在生成回答…' : composerPlaceholder"
+            :placeholder="activeChatAction ? '继续补充当前操作，或输入“预览”；不会直接保存' : sending ? '正在生成回答…' : composerPlaceholder"
             @input="resizeComposer"
             @compositionstart="composerComposing = true"
             @compositionend="composerComposing = false"
             @keydown.enter.exact="handleComposerEnter"
           ></textarea>
+          <div class="composer-controls">
+          <details v-show="!voiceMode || !!draft.trim() || sending" ref="chatTools" class="chat-tools-menu">
+            <summary aria-label="附件、模式和草稿设置"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg><span>{{ activeWorkspace.label }}</span><el-icon><ArrowDown /></el-icon></summary>
+            <section class="chat-tools-panel" aria-label="聊天工具">
+              <header><strong>聊天工具</strong><button type="button" @click="closeChatTools">收起</button></header>
+              <button class="composer-upload" type="button" aria-describedby="chat-upload-hint" :disabled="sending || switchingWorkspace || loadingMessages || Boolean(activeChatAction)" @click="closeChatTools(); chatAttachment.open()"><el-icon><DocumentCopy /></el-icon><span>上传资料<small>图片、视频文字、文档 · 10 MB 内</small></span></button>
+              <button class="composer-upload" type="button" :disabled="sending || switchingWorkspace || loadingMessages || Boolean(activeChatAction)" @click="closeChatTools(); chatAttachment.openLibrary()"><el-icon><Clock /></el-icon><span>我的原件<small>读取或下载本人保留的资料</small></span></button>
+              <span id="chat-upload-hint" class="composer-upload-hint">图片、视频文字、文档 · 核对后使用</span>
+              <p>资料与商家 · 整理后人工确认</p><div class="chat-mode-options"><button v-for="prompt in ['上传资料','新增商家']" :key="prompt" type="button" :disabled="sending || loadingMessages || switchingWorkspace || !!activeChatAction" @click="actionPrompt(prompt)">{{ prompt }}</button></div>
+              <template v-if="selectedModelKey==='standard'"><p>校园操作 · 发送请求后核对，不直接保存</p><div class="chat-mode-options"><button v-for="prompt in ['新增课程','记录考勤','修改知识库','查考勤']" :key="prompt" type="button" :disabled="sending || loadingMessages || switchingWorkspace || chatActionBusy || !!activeChatAction" @click="actionPrompt(prompt)">{{ prompt }}</button></div></template>
+              <p>选择模式 · 切换后开始独立对话</p>
+              <div class="chat-mode-options">
+                <button v-for="workspace in workspaceOptions" :key="workspace.key" type="button" :disabled="sending || loadingMessages || switchingWorkspace" :aria-pressed="workspace.key === selectedModelKey" @click="closeChatTools(); chooseWorkspace(workspace)"><WorkspaceIcon :mode="workspace.key" /><span>{{ workspace.label }}<small>{{ workspace.model?.configured === false || !workspace.model ? '暂未配置' : workspace.provider }}</small></span></button>
+              </div>
+              <ChatDraftRecovery :state="chatDraftRecoveryState" :busy="!draftsReady || pendingDrafts.length > 0 || sending || switchingWorkspace || loadingMessages || Boolean(deletingConversationId)" @toggle="toggleDraftRecovery" />
+              <p v-if="quotaDisplay" :title="quotaDisplay.hint">{{ quotaDisplay.label }}</p>
+            </section>
+          </details>
+          <span id="chat-composer-help" class="composer-key-hint">{{ mobileLayout ? '换行继续写' : 'Enter 发送 · Shift + Enter 换行' }}</span>
+          <HoldToTalk compact-entry :scope="`${authStore.user?.id}:${authStore.user?.schoolId}:${userSessionGeneration}:${selectedModelKey}:${activeConversationId}:${isChatRoute}`" :disabled="sending||switchingWorkspace||loadingMessages||!isChatRoute||!!draft.trim()" @question="voiceQuestion" @mode="voiceMode=$event" @keyboard="focusKeyboard" />
           <button
             v-if="sending"
             class="send-button"
@@ -1800,38 +2055,35 @@ onBeforeUnmount(() => {
           </button>
           <button
             v-else
+            v-show="!voiceMode || !!draft.trim()"
             class="send-button"
             type="button"
             aria-label="发送"
-            :disabled="sending || switchingWorkspace || loadingMessages || Boolean(historyError) || Boolean(deletingConversationId) || !draft.trim()"
+            :disabled="sending || switchingWorkspace || loadingMessages || chatActionBusy || actionFollowupBusy || Boolean(historyError) || Boolean(deletingConversationId) || !draft.trim()"
             @click="submitPrompt"
           >
             <el-icon><ArrowUp /></el-icon>
           </button>
+          </div>
         </div>
         <p v-if="answerNotice" class="answer-notice" role="status">{{ answerNotice }}</p>
-        <ChatDraftRecovery :state="chatDraftRecoveryState" :pending="pendingDrafts" :notice="draftRecoveryNotice"
+        <ChatDraftRecovery v-if="pendingDrafts.length || draftRecoveryNotice || chatDraftRecoveryState.error" :settings="false" :state="chatDraftRecoveryState" :pending="pendingDrafts" :notice="draftRecoveryNotice"
           :busy="!draftsReady || sending || switchingWorkspace || loadingMessages || Boolean(deletingConversationId)"
           @toggle="toggleDraftRecovery" @restore="restoreChatDraft" @discard="discardRecoveredDrafts" />
         <p class="composer-meta">
-          <span>{{ activeWorkspace.label }}模块 · {{ activeWorkspace.provider }}</span>
-          <span v-if="quotaDisplay" :title="quotaDisplay.hint">{{ quotaDisplay.label }}</span>
-          <span>Enter 发送 · Shift + Enter 换行</span>
+          <span>AI 回答可能有误，重要信息请核对来源</span>
         </p>
       </section>
     </main>
     <section v-if="!isChatRoute" class="workspace-pane workspace-reveal" :inert="logoutConfirmVisible || (mobileLayout && mobileSidebarOpen)" aria-label="功能工作区">
       <header class="workspace-toolbar">
-        <button ref="menuTrigger" class="mobile-menu-button" type="button" aria-label="打开菜单" @click="mobileSidebarOpen=true"><el-icon><Menu /></el-icon></button>
-        <span>{{ contentTitle }}</span>
-        <button class="expand-workspace" type="button" :aria-pressed="expandedWorkspace" @click="expandedWorkspace=!expandedWorkspace">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5" /></svg>
-          {{ expandedWorkspace ? '还原侧栏' : '展开工作区' }}
-        </button>
+        <button ref="menuTrigger" class="workspace-menu-button" type="button" :aria-label="mobileLayout ? '打开菜单' : expandedWorkspace ? '展开侧栏' : '收起侧栏'" :aria-expanded="mobileLayout ? mobileSidebarOpen : !expandedWorkspace" aria-controls="campus-sidebar" @click="mobileLayout ? mobileSidebarOpen=true : expandedWorkspace=!expandedWorkspace"><SidebarToggleIcon /></button>
+        <span class="workspace-location">{{ contentTitle }}</span>
+        <div class="workspace-header-actions"><WorkspaceToolsMenu /></div>
       </header>
       <div ref="workspaceContent" class="workspace-content">
         <RouterView v-slot="{Component}">
-          <Transition name="workspace-content" mode="out-in" @before-enter="resetWorkspaceScroll" @after-enter="resetWorkspaceScroll">
+          <Transition name="workspace-content" @before-enter="resetWorkspaceScroll" @after-enter="workspaceReady" @enter-cancelled="cancelWorkspaceFocus" @before-leave="cancelWorkspaceFocus" @leave="retireRoutePage" @leave-cancelled="activateRoutePage">
             <div :key="route.name" class="workspace-page"><component :is="Component" /></div>
           </Transition>
         </RouterView>
@@ -1938,6 +2190,7 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.chat-action-followups{margin-top:16px;font-size:14px;color:var(--assistant-muted,#5d6876)}.chat-action-followups summary{min-height:44px;align-content:center;cursor:pointer}.chat-action-followups ol{padding-left:22px}.chat-action-followups p{font-size:14px;margin:8px 0;overflow-wrap:anywhere}.chat-action-followups li{margin-bottom:14px}
 .history-recovery { max-width: 660px; margin: 48px auto; padding: 28px; color: #273344; }
 .history-recovery h2 { font-size: 25px; margin: 0 0 16px; }
 .history-recovery p { font-size: 16px; line-height: 1.8; color: #596454; overflow-wrap: anywhere; }
@@ -2747,6 +3000,10 @@ a:focus-visible {
 
 .answer-markdown :deep(> :last-child) {
   margin-bottom: 0;
+}
+
+.schedule-response-prose {
+  margin-block-end: 20px;
 }
 
 .answer-markdown :deep(p) {

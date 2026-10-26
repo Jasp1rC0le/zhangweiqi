@@ -64,6 +64,16 @@ public class KnowledgeDocumentServiceImpl
         return documentMapper.scanBySchoolId(schoolId, beforeId);
     }
 
+    @Override @Transactional(readOnly=true,isolation=org.springframework.transaction.annotation.Isolation.REPEATABLE_READ,timeout=8)
+    public DocumentPage editablePage(Long schoolId,int page,int size,String search) {
+        String q=search==null?"":search.trim();
+        if(schoolId==null || schoolId<1 || page<0 || page>100000 || size<1 || size>100 || q.length()>100)throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"资料页码或搜索无效");
+        String pattern=q.isEmpty()?null:"%"+q.replace("!","!!").replace("%","!%").replace("_","!_")+"%";
+        int total=documentMapper.countEditable(schoolId,pattern),pages=(total+size-1)/size;
+        if(page>0&&page>=pages)throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"资料页已变化，请回到第一页");
+        return new DocumentPage(documentMapper.pageEditable(schoolId,pattern,page*size,size).stream().map(d->new DocumentOption(d.getId(),d.getTitle(),d.getCategory())).toList(),page,size,total,pages,q);
+    }
+
     @Override
     public KnowledgeDocument findOne(Long schoolId, Long documentId) {
         KnowledgeDocument document = documentMapper.findByIdAndSchoolId(documentId, schoolId);
@@ -89,7 +99,11 @@ public class KnowledgeDocumentServiceImpl
         if (!schoolId.equals(request.getSchoolId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "只能修订本校资料");
         }
+        if(request.getExpectedRevisionTag()!=null && documentMapper.findLockedByIdAndSchoolId(documentId,schoolId)==null)
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND,"资料不存在");
         KnowledgeDocument previous = findOne(schoolId, documentId);
+        if(request.getExpectedRevisionTag()!=null && !request.getExpectedRevisionTag().equals(previous.getRevisionTag()))
+            throw new ResponseStatusException(HttpStatus.CONFLICT,"资料已在预览后更新，请重新核对正文、日期与来源；未覆盖新版本");
         if (!"PUBLISHED".equals(previous.getStatus())
                 || versionMapper.countSuccessors(documentId) != 0) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "只能修订当前发布的最新版本");

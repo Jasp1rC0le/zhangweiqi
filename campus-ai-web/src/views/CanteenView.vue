@@ -1,7 +1,6 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
 import { ArrowLeft, ArrowRight, Search, StarFilled, Pointer, Food } from '@element-plus/icons-vue'
 import {
   canteenMerchantPhotoUrl,
@@ -15,6 +14,10 @@ import { useAuthStore } from '@/stores/auth'
 import CampMark from '@/components/CampMark.vue'
 import CanteenFoodArt from '@/components/CanteenFoodArt.vue'
 import { selectMerchants } from '@/utils/merchantList'
+import { createLatestRequest } from '@/utils/latestRequest'
+import { useUnsavedChanges } from '@/utils/useUnsavedChanges'
+import { userSessionGeneration } from '@/api/http'
+import { pendingCanteenDraftIds, reconcileCanteenDraft } from '@/utils/canteenDrafts'
 
 defineProps({ demo: Boolean })
 const router = useRouter()
@@ -32,6 +35,14 @@ const reviews = reactive({})
 const reviewErrors = reactive({})
 const reviewLoading = reactive({})
 const comments = reactive({})
+const savedScores = reactive({}), savedComments = reactive({})
+const actionErrors = reactive({}), actionStatus = reactive({})
+const writeBusy = computed(() => savingId.value !== null || likingId.value !== null)
+const pendingDraftIds = computed(() => pendingCanteenDraftIds(ratingDrafts, comments, savedScores, savedComments))
+useUnsavedChanges(() => pendingDraftIds.value.length > 0, () => writeBusy.value)
+const scope = computed(() => auth.user ? `${auth.user.id}:${auth.user.schoolId}:${auth.user.role}:${userSessionGeneration.value}` : '')
+let disposed = false, lifetime = new AbortController()
+const reviewRequests = new Map()
 const searchQuery = ref('')
 const sortBy = ref('default')
 const canRate = computed(() => auth.user?.role === 'STUDENT')
@@ -49,34 +60,42 @@ function resetFilters() {
   selectedCanteen.value = 'all'
 }
 
-async function load() {
-  loading.value = true
-  loadError.value = ''
-  try {
-    const [nextCanteens, nextMerchants] = await Promise.all([getCanteens(), getCanteenMerchants()])
-    canteens.value = nextCanteens
-    merchants.value = nextMerchants
-    for (const merchant of nextMerchants) ratingDrafts[merchant.id] = merchant.myScore || 0
-  } catch (error) {
-    loadError.value = error.response?.data?.message || '暂时无法读取食堂信息，请稍后重试'
-  } finally {
-    loading.value = false
+function applyMerchants(rows) {
+  merchants.value = rows
+  for (const merchant of rows) {
+    const score = merchant.myScore || 0
+    ratingDrafts[merchant.id] = reconcileCanteenDraft(ratingDrafts[merchant.id], savedScores[merchant.id], score)
+    savedScores[merchant.id] = score
   }
 }
-
-async function readReviews(merchant) {
-  if (reviewLoading[merchant.id]) return
-  reviewLoading[merchant.id] = true
-  reviewErrors[merchant.id] = ''
-  try {
-    reviews[merchant.id] = await getCanteenMerchantReviews(merchant.id)
-    if (comments[merchant.id] === undefined)
-      comments[merchant.id] = reviews[merchant.id].find((item) => item.mine)?.comment || ''
-  } catch (error) {
-    reviewErrors[merchant.id] = error.response?.data?.message || '短评未能读取，请重试'
-  } finally {
-    reviewLoading[merchant.id] = false
-  }
+const listRequest = createLatestRequest({
+  load: options => Promise.all([getCanteens(options), getCanteenMerchants(options)]),
+  onStart: () => { loading.value = true; loadError.value = '' },
+  onSuccess: ([places, rows]) => { canteens.value = places; applyMerchants(rows) },
+  onError: error => { loadError.value = error.response?.data?.message || '暂时无法读取食堂信息，请稍后重试' },
+  onFinish: () => { loading.value = false },
+})
+function load() {
+  if (!disposed && scope.value && !writeBusy.value) return listRequest.run()
+}
+function applyReviews(id, rows) {
+  reviews[id] = rows
+  const comment = rows.find(item => item.mine)?.comment || ''
+  comments[id] = reconcileCanteenDraft(comments[id], savedComments[id], comment)
+  savedComments[id] = comment
+}
+function reviewRequest(id) {
+  if (!reviewRequests.has(id)) reviewRequests.set(id, createLatestRequest({
+    load: options => getCanteenMerchantReviews(id, options),
+    onStart: () => { reviewLoading[id] = true; reviewErrors[id] = '' },
+    onSuccess: rows => applyReviews(id, rows),
+    onError: error => { reviewErrors[id] = error.response?.data?.message || '短评未能读取，请重试；未保存的填写仍在本页' },
+    onFinish: () => { reviewLoading[id] = false },
+  }))
+  return reviewRequests.get(id)
+}
+function readReviews(merchant) {
+  if (!disposed && scope.value && !writeBusy.value && !reviewLoading[merchant.id]) return reviewRequest(merchant.id).run()
 }
 
 function toggleReviews(merchant) {
@@ -89,43 +108,70 @@ function toggleReviews(merchant) {
 }
 
 async function submitRating(merchant, includeComment = false) {
-  if (!ratingDrafts[merchant.id] || savingId.value) return
+  if (!canRate.value || !ratingDrafts[merchant.id] || writeBusy.value || loading.value || disposed) return
+  const owner = scope.value, score = ratingDrafts[merchant.id]
+  const comment = includeComment ? (comments[merchant.id] || '').trim() : undefined
+  const current = () => !disposed && owner === scope.value
   savingId.value = merchant.id
+  actionErrors[merchant.id] = ''; actionStatus[merchant.id] = ''
+  reviewRequest(merchant.id).cancel()
   try {
     // Undefined means leave existing comment untouched, not delete it.
-    merchants.value = await rateCanteenMerchant(
-      merchant.id,
-      ratingDrafts[merchant.id],
-      includeComment ? comments[merchant.id] : undefined,
-    )
-    if (expandedId.value === merchant.id) await readReviews(merchant)
-    ElMessage.success(includeComment && comments[merchant.id]?.trim() ? '已保存，短评审核后公开' : '评分已保存')
+    const rows = await rateCanteenMerchant(merchant.id, score, comment, { signal: lifetime.signal })
+    if (!current()) return
+    applyMerchants(rows)
+    if (includeComment) { comments[merchant.id] = comment; savedComments[merchant.id] = comment }
+    actionStatus[merchant.id] = includeComment ? comment ? '已保存，短评审核后公开' : '评分已保存，短评已清空' : '评分已保存'
+    if (expandedId.value === merchant.id) await reviewRequest(merchant.id).run()
   } catch (error) {
-    ElMessage.error(error.response?.data?.message || '未能保存，请重试')
+    if (current()) actionErrors[merchant.id] = error.response?.data?.message || '未能确认保存成功，评分与短评仍保留在本页，请重试'
   } finally {
-    savingId.value = null
+    if (current()) savingId.value = null
   }
 }
 
 async function likeReview(merchant, review) {
-  if (likingId.value || review.mine || !canRate.value) return
+  if (writeBusy.value || loading.value || review.mine || !canRate.value || disposed) return
+  const owner = scope.value, current = () => !disposed && owner === scope.value
   likingId.value = review.id
+  actionErrors[merchant.id] = ''; actionStatus[merchant.id] = ''
+  reviewRequest(merchant.id).cancel()
   try {
-    reviews[merchant.id] = await likeCanteenReview(merchant.id, review.id, !review.liked)
+    const rows = await likeCanteenReview(merchant.id, review.id, !review.liked, { signal: lifetime.signal })
+    if (!current()) return
+    applyReviews(merchant.id, rows)
     const confirmed = reviews[merchant.id].find((item) => item.id === review.id)
     if (confirmed && merchant.featuredReview?.id === review.id)
       Object.assign(merchant.featuredReview, confirmed)
     try {
-      merchants.value = await getCanteenMerchants()
+      const next = await getCanteenMerchants({ signal: lifetime.signal })
+      if (current()) applyMerchants(next)
     } catch {
-      ElMessage.warning('点赞已保存，神评排序稍后刷新')
+      if (current()) actionStatus[merchant.id] = '点赞状态已保存，神评排序暂未刷新'
     }
   } catch (error) {
-    ElMessage.error(error.response?.data?.message || '操作未保存，请重试')
+    if (current()) actionErrors[merchant.id] = error.response?.data?.message || '未能确认点赞状态，请重试'
   } finally {
-    likingId.value = null
+    if (current()) likingId.value = null
   }
 }
+
+watch(scope, (next, previous) => {
+  if (!previous) return
+  lifetime.abort(); lifetime = new AbortController(); listRequest.cancel()
+  for (const request of reviewRequests.values()) request.dispose()
+  reviewRequests.clear()
+  for (const values of [ratingDrafts, comments, savedScores, savedComments, reviews, reviewLoading, reviewErrors, actionErrors, actionStatus]) {
+    for (const key of Object.keys(values)) delete values[key]
+  }
+  merchants.value = []; canteens.value = []; expandedId.value = null
+  savingId.value = null; likingId.value = null
+  if (next) load()
+}, { flush: 'sync' })
+onBeforeUnmount(() => {
+  disposed = true; lifetime.abort(); listRequest.dispose()
+  for (const request of reviewRequests.values()) request.dispose()
+})
 
 onMounted(async () => {
   if (!auth.user) {
@@ -135,7 +181,7 @@ onMounted(async () => {
       return
     }
   }
-  await load()
+  if (!disposed) await load()
 })
 </script>
 
@@ -154,7 +200,6 @@ onMounted(async () => {
       </aside>
       <section class="table-intro">
         <div>
-          <p class="table-eyebrow">CAMPUS TABLE / 校园餐桌</p>
           <h1>今天，吃哪家<span>？</span></h1>
           <p class="table-lead">好吃值得一颗星，有趣值得一个赞</p>
         </div>
@@ -171,6 +216,10 @@ onMounted(async () => {
         <button @click="load">重新加载</button>
       </div>
       <template v-else>
+        <p v-if="pendingDraftIds.length" class="table-draft-notice" role="status">
+          {{ pendingDraftIds.length }} 家商家有未保存的填写，切换筛选不会丢失；关闭页面前请先保存。
+          <button v-if="searchQuery || selectedCanteen !== 'all'" class="table-text-button" @click="resetFilters">显示全部商家</button>
+        </p>
         <div class="table-tools">
           <label class="table-search"
             ><el-icon><Search /></el-icon
@@ -267,7 +316,7 @@ onMounted(async () => {
               }}</span>
               <p>{{ merchant.featuredReview.comment }}</p>
               <button
-                :disabled="!canRate || merchant.featuredReview.mine || Boolean(likingId)"
+                :disabled="!canRate || merchant.featuredReview.mine || writeBusy"
                 :aria-pressed="merchant.featuredReview.liked"
                 :aria-label="
                   (merchant.featuredReview.liked ? '取消点赞' : '点赞') + merchant.name + '的神评'
@@ -292,8 +341,8 @@ onMounted(async () => {
                   :class="{ filled: score <= ratingDrafts[merchant.id] }"
                   :aria-label="score + '分'"
                   :aria-pressed="ratingDrafts[merchant.id] === score"
-                  :disabled="Boolean(savingId)"
-                  @click="ratingDrafts[merchant.id] = score"
+                  :disabled="writeBusy"
+                  @click="ratingDrafts[merchant.id] = score; actionStatus[merchant.id] = ''; actionErrors[merchant.id] = ''"
                 >
                   <el-icon><StarFilled /></el-icon>
                 </button>
@@ -314,7 +363,7 @@ onMounted(async () => {
                   ratingDrafts[merchant.id] !== merchant.myScore
                 "
                 class="table-save-score"
-                :disabled="Boolean(savingId)"
+                :disabled="writeBusy"
                 @click="submitRating(merchant)"
               >
                 {{
@@ -322,6 +371,8 @@ onMounted(async () => {
                 }}
               </button>
             </div>
+            <p v-if="actionErrors[merchant.id]" class="table-action-feedback is-error" role="alert">{{ actionErrors[merchant.id] }}</p>
+            <p v-else-if="actionStatus[merchant.id]" class="table-action-feedback" role="status">{{ actionStatus[merchant.id] }}</p>
             <Transition name="table-expand">
               <section
                 v-if="expandedId === merchant.id"
@@ -348,7 +399,7 @@ onMounted(async () => {
                     </div>
                     <button
                       v-if="review.status === 'PUBLISHED' && !review.mine && canRate"
-                      :disabled="Boolean(likingId)"
+                      :disabled="writeBusy"
                       :aria-pressed="review.liked"
                       :aria-label="(review.liked ? '取消点赞' : '点赞') + '短评：' + review.comment"
                       @click="likeReview(merchant, review)"
@@ -370,10 +421,11 @@ onMounted(async () => {
                     ><textarea
                       :id="'comment-' + merchant.id"
                       v-model="comments[merchant.id]"
+                      @input="actionStatus[merchant.id] = ''; actionErrors[merchant.id] = ''"
                       rows="3"
                       maxlength="500"
                       placeholder="比如：阿姨的手不抖，我的筷子停不了"
-                      :disabled="Boolean(savingId)"
+                      :disabled="writeBusy"
                     />
                     <div class="table-comment-meta">
                       <span
@@ -382,7 +434,7 @@ onMounted(async () => {
                     </div>
                     <div class="table-comment-footer">
                       <span>{{ scoreLabel[ratingDrafts[merchant.id] || 0] }}</span
-                      ><button :disabled="!ratingDrafts[merchant.id] || Boolean(savingId)">
+                      ><button :disabled="!ratingDrafts[merchant.id] || writeBusy">
                         {{ savingId === merchant.id ? '保存中…' : '保存评分与短评' }}
                       </button>
                     </div>
@@ -408,6 +460,15 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.table-draft-notice,
+.table-action-feedback {
+  color: var(--assistant-muted, #5d6876);
+  font-size: 14px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.table-action-feedback { margin: 12px 0 0; }
+.table-action-feedback.is-error { color: var(--assistant-danger, #bf303d); }
 .table-page {
   min-height: 100svh;
   background: #f6f6f2;
@@ -819,9 +880,9 @@ summary:focus-visible {
   font-size: 13px;
 }
 .table-reviews {
-  border-top: 1px solid #e6e8df;
+  border-top: 1px solid var(--assistant-line, #e2e7ec);
   padding: 10px 0 24px;
-  color: #697762;
+  color: var(--assistant-muted, #5d6876);
   font-size: 14px;
 }
 .table-review {
@@ -829,26 +890,27 @@ summary:focus-visible {
   align-items: center;
   gap: 16px;
   padding: 16px 0;
-  border-bottom: 1px solid #edf0e6;
+  border-bottom: 1px solid var(--assistant-line, #e2e7ec);
 }
 .table-review > div {
   flex: 1;
   min-width: 0;
 }
 .table-review strong {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
-  color: #6d7a62;
+  color: var(--assistant-ink, #29323c);
 }
 .table-review strong span {
   margin-left: 12px;
   font-weight: 400;
-  color: #8a926e;
+  color: var(--assistant-muted, #5d6876);
 }
 .table-review p {
   margin: 7px 0 0;
-  line-height: 1.65;
-  color: #40513b;
+  font-size: 16px;
+  line-height: 1.7;
+  color: var(--assistant-ink, #29323c);
   overflow-wrap: anywhere;
 }
 .table-review small {
@@ -859,9 +921,9 @@ summary:focus-visible {
 }
 .table-review-limit {
   display: block;
-  font-size: 12px;
+  font-size: 14px;
   margin-top: 12px;
-  color: #7f8875;
+  color: var(--assistant-muted, #5d6876);
 }
 .table-comment-form {
   margin-top: 22px;
@@ -869,12 +931,12 @@ summary:focus-visible {
 .table-comment-form label {
   display: block;
   font-size: 14px;
-  color: #3e5236;
+  color: var(--assistant-ink, #29323c);
   margin-bottom: 10px;
 }
 .table-comment-form label span {
-  font-size: 12px;
-  color: #859078;
+  font-size: 14px;
+  color: var(--assistant-muted, #5d6876);
   margin-left: 8px;
 }
 .table-comment-form textarea {
@@ -893,10 +955,10 @@ summary:focus-visible {
   display: flex;
   justify-content: space-between;
   gap: 20px;
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.7;
   margin-top: 8px;
-  color: #858c7b;
+  color: var(--assistant-muted, #5d6876);
 }
 .table-comment-meta > span:last-child {
   white-space: nowrap;
@@ -907,7 +969,7 @@ summary:focus-visible {
   justify-content: space-between;
   gap: 12px;
   margin-top: 14px;
-  font-size: 13px;
+  font-size: 14px;
 }
 .table-text-button {
   background: none;
@@ -952,7 +1014,8 @@ summary:focus-visible {
   .table-card-actions {
     padding-left: 122px;
   }
-  .table-reviews {
+  .table-reviews,
+  .table-action-feedback {
     margin-left: 122px;
   }
 }

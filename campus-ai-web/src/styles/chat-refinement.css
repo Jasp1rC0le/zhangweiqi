@@ -1,0 +1,63 @@
+/* One bottom dock in every chat state. This surface does not own auth or run state. */
+html:root body .workspace.chat-focused .message-scroller { flex: 1 1 0; min-height: 0; }
+html:root body .workspace.chat-focused .workspace-scene:has(> .welcome) { display: flex; flex-direction: column; justify-content: flex-start; padding-block: 0; }
+html:root body .workspace.chat-focused .welcome.welcome--mode { max-width: 760px; padding: 16px 0 24px; }
+html:root body .workspace.chat-focused .welcome--mode .welcome-heading { gap: 0; }
+html:root body .workspace.chat-focused .welcome--mode h1 { font-size: 22px; font-weight: 500; line-height: 1.35; letter-spacing: -.02em; }
+html:root body .workspace.chat-focused .welcome--mode .welcome-subtitle { margin-top: 8px; font-size: 15px; line-height: 1.7; }
+html:root body .workspace.chat-focused .welcome--mode .suggestion-grid { margin-top: 16px; gap: 8px; }
+html:root body .workspace.chat-focused .welcome--mode .suggestion-card { flex-direction: row; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid var(--assistant-line); border-radius: 12px; background: var(--assistant-surface); box-shadow: none; min-height: 44px; color: var(--assistant-muted); }
+html:root body .workspace.chat-focused .welcome--mode .suggestion-card:hover:not(:disabled) { background: var(--assistant-soft); color: var(--assistant-accent-hover); }
+html:root body .workspace.chat-focused .welcome--mode .quick-tool-icon { width: 18px; height: 18px; padding: 0; margin: 0; flex: none; background: transparent; border-radius: 0; }
+html:root body .workspace.chat-focused .welcome--mode .suggestion-copy strong { font-size: 13px; font-weight: 400; }
+html:root body .workspace.chat-focused .welcome--mode .suggestion-copy small { display: block; position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+html:root body .workspace.chat-focused .composer-wrap { margin-top: auto; padding-top: 12px; }
+html:root body .workspace.chat-focused .message-row.user .message-content > p { background: #f2f4f7; border-radius: 16px; padding: 12px 16px; }
+html:root body .workspace.chat-focused .composer {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid var(--assistant-line);
+  border-radius: var(--assistant-radius-md);
+  box-shadow: none;
+  transition: border-color var(--assistant-press-duration) ease;
+}
+html:root body .workspace.chat-focused .composer:focus-within { border-color: var(--assistant-accent); box-shadow: none; }
+html:root body .workspace.chat-focused .composer textarea { min-height: 44px; padding: 8px 10px; grid-area: auto; transition: none; }
+html:root body .workspace.chat-focused .composer-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+html:root body .workspace.chat-focused .composer-controls > .hold-talk { order: 2; }
+html:root body .workspace.chat-focused .composer-controls > .hold-talk.compact-entry { width: auto; margin: 0 0 0 auto; }
+html:root body .workspace.chat-focused .composer-controls > .hold-talk:not(.compact-entry) { order: 4; flex-basis: 100%; min-width: 0; margin: 0; max-height: min(300px, calc(var(--chat-viewport-height, 100dvh) - 210px)); overflow: auto; overscroll-behavior: contain; }
+html:root body .workspace.chat-focused .composer-controls .voice-entry { min-height: 44px; padding: 10px 12px; border: 0; border-radius: 12px; background: transparent; color: var(--assistant-muted); font-size: 14px; }
+html:root body .workspace.chat-focused .composer-controls .voice-entry:hover:not(:disabled) { background: var(--assistant-soft); color: var(--assistant-accent-hover); }
+html:root body .workspace.chat-focused .chat-tools-menu { grid-area: auto; }
+html:root body .workspace.chat-focused .chat-tools-menu > summary { background: transparent; border-radius: 12px; }
+html:root body .workspace.chat-focused .chat-tools-menu > summary:hover { background: var(--assistant-soft); }
+html:root body .workspace.chat-focused .chat-tools-panel { border-radius: var(--assistant-radius-md); max-height: min(460px, calc(var(--chat-viewport-height, 100dvh) - 220px)); }
+html:root body .workspace.chat-focused .chat-tools-panel .composer-upload { display: flex; justify-content: flex-start; width: 100%; margin-top: 4px; padding: 10px; background: transparent; color: var(--assistant-ink); font-size: 14px; font-weight: 500; text-align: left; }
+html:root body .workspace.chat-focused .chat-tools-panel .composer-upload:hover:not(:disabled) { background: var(--assistant-soft); }
+html:root body .workspace.chat-focused .composer-upload small { display: block; color: var(--assistant-muted); font-size: 12px; font-weight: 400; line-height: 1.6; }
+html:root body .workspace.chat-focused .send-button { order: 3; grid-area: auto; margin-left: auto; }
+html:root body .workspace.chat-focused .hold-talk.compact-entry + .send-button { margin-left: 0; }
+html:root body .workspace.chat-focused .chat-attachment { max-height: clamp(64px, calc(var(--chat-viewport-height, 100dvh) - 320px), 360px); overscroll-behavior: contain; }
+html:root body .workspace.chat-focused .composer-upload-hint { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+@media (max-width: 760px), (max-height: 500px) and (pointer: coarse) {
+  html:root body .workspace.chat-focused .welcome h1 { font-size: 1.25rem; font-weight: 500; line-height: 1.35; letter-spacing: -0.02em; }
+}
+@media (max-width: 760px) {
+  html:root body .workspace.chat-focused .composer-wrap { padding-inline: 16px; padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+  html:root body .workspace.chat-focused .composer { padding: 8px; }
+  html:root body .workspace.chat-focused .welcome.welcome--mode { padding-top: 16px; }
+}
+@media (max-height: 500px) {
+  html:root body .workspace.chat-focused .composer-wrap { padding-top: 8px; padding-bottom: max(8px, env(safe-area-inset-bottom)); }
+  html:root body .workspace.chat-focused .workspace-scene:has(> .welcome) { padding-block: 0; }
+  html:root body .workspace.chat-focused .welcome.welcome--mode { padding-top: 8px; padding-bottom: 8px; }
+  html:root body .workspace.chat-focused .welcome--mode .welcome-subtitle { margin-top: 6px; font-size: 14px; line-height: 1.6; }
+  html:root body .workspace.chat-focused .welcome--mode .suggestion-grid { margin-top: 8px; }
+}
+@media (max-height: 500px) and (pointer: coarse) {
+  html:root body .workspace.chat-focused { height: var(--chat-viewport-height, 100dvh); }
+}

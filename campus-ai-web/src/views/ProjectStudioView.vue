@@ -13,6 +13,7 @@ import { useFormDraftRecovery } from '@/utils/useFormDraftRecovery.js'
 import { projectRecoveryConflict } from '@/utils/formDraftSchemas.js'
 import { projectTemplates } from '@/utils/projectTemplates'
 import { useAuthStore } from '@/stores/auth'
+import { createLatestRequest } from '@/utils/latestRequest'
 import { isAdministrator } from '@/utils/adminAccess'
 import { projectChanges, defensePrompts, defenseMarkdown } from '@/utils/projectProgress'
 import { reviewInput, reviewFingerprint, recordReviewFeedback } from '@/utils/projectReview'
@@ -26,12 +27,14 @@ const route = useRoute(), router = useRouter()
 const auth = useAuthStore()
 const isAdmin = computed(() => isAdministrator(auth.user))
 const projects = ref([]), loading = ref(true), busy = ref(false), error = ref(''), status = ref('')
+const listError = ref('')
 const current = ref(null), draft = ref(emptyProject()), archived = ref(false), saved = ref('')
 const editing = ref(false), section = ref('requirements'), versions = ref([]), versionsLoading = ref(false)
 const reviewed = ref(null), reviewedContent = ref(''), showArchived = ref(false)
 const reviewDigest = ref(''), reviewing = ref(false), feedbackIssue = ref(null), feedbackReason = ref(''), previousIssueCount = ref(null)
 const createId = ref(crypto.randomUUID()), nextTrack = ref('business')
 const importer = ref()
+const instrumentLibrary = ref(), instrumentEpoch = ref(0)
 const taskTemplate = computed(() => projectTemplates[draft.value.track] || projectTemplates.general)
 const selection = ref(null), evidenceTarget = ref('')
 const hints = computed(() => taskHints[draft.value.track] || taskHints.general)
@@ -40,7 +43,7 @@ const comparison = ref(null)
 const changes = computed(() => comparison.value ? projectChanges(comparison.value.content, draft.value) : [])
 const defense = computed(() => defensePrompts(draft.value))
 watch(draft, () => { selection.value = null; evidenceTarget.value = '' })
-let openSequence = 0, disposed = false, recoveryNavigation = false, listSequence = 0
+let openSequence = 0, disposed = false, recoveryNavigation = false, syncingSavedRoute = ''
 const stamp = () => JSON.stringify({ content: draft.value, archived: archived.value })
 const clone = (value) => JSON.parse(JSON.stringify(value))
 const dirty = computed(() => editing.value && saved.value !== stamp())
@@ -55,18 +58,20 @@ const currentTrack = computed(() => tracks.find(t => t.id === draft.value.track)
 const reviewStale = computed(() => reviewedContent.value !== reviewInput(draft.value))
 const tabs = [{ id: 'requirements', label: '任务要求' }, { id: 'materials', label: '材料与证据' }, { id: 'instruments', label: '仪器与调试' }, { id: 'data', label: '数据检查' }, { id: 'review', label: '提交前检查' }, { id: 'defense', label: '答辩准备' }, { id: 'collaboration', label: '协作审阅' }, { id: 'versions', label: '历史版本' }]
 function appendInstrument(note) {
+  if(busy.value||disposed)return
   if(draft.value.manuscript.length+note.text.length+2>50000){error.value='材料已接近5万字上限，请先精简后加入';return}
   draft.value.manuscript += `\n\n${note.text}`
+  instrumentLibrary.value?.markAccepted(note)
   status.value='仪器记录已加入本页材料草稿，请点击保存项目；尚未上传或发送给 AI'
 }
 const formatted = (value) => value ? new Date(value).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''
 const fail = (e) => { error.value = e.response?.data?.message || e.response?.data?.detail || '暂时无法连接项目服务。你的当前草稿仍在此页，请导出备份后重试'; status.value = '' }
-const mayLeave = () => !dirty.value || window.confirm(recoveryState.value.enabled ? '当前修改尚未保存到账号，仅有30分钟临时副本。确认离开？' : '当前修改还没有保存。离开会丢失本页草稿，是否离开？')
+const mayLeave = () => !(dirty.value||instrumentLibrary.value?.hasPending) || window.confirm(instrumentLibrary.value?.hasPending ? '还有仪器记录未加入项目材料，离开会清除这些记录及本页未保存修改。继续？' : recoveryState.value.enabled ? '当前修改尚未保存到账号，仅有30分钟临时副本。确认离开？' : '当前修改还没有保存。离开会丢失本页草稿，是否离开？')
 onBeforeRouteLeave(() => (!busy.value || recoveryNavigation) && mayLeave())
-onBeforeRouteUpdate(() => (!busy.value || recoveryNavigation) && mayLeave())
-function beforeUnload(event) { if (busy.value || (dirty.value && !recovery.hasCurrent())) { event.preventDefault(); event.returnValue = '' } }
+onBeforeRouteUpdate(to => (syncingSavedRoute && to.path === syncingSavedRoute) || ((!busy.value || recoveryNavigation) && mayLeave()))
+function beforeUnload(event) { if (busy.value || instrumentLibrary.value?.hasPending || (dirty.value && !recovery.hasCurrent())) { event.preventDefault(); event.returnValue = '' } }
 window.addEventListener('beforeunload', beforeUnload)
-onBeforeUnmount(() => { disposed = true; openSequence++; listSequence++; window.removeEventListener('beforeunload', beforeUnload) })
+onBeforeUnmount(() => { disposed = true; openSequence++; directoryRead.dispose(); window.removeEventListener('beforeunload', beforeUnload) })
 function accept(project) {
   comparison.value = null
   current.value = project
@@ -78,15 +83,16 @@ function accept(project) {
   saved.value = stamp()
   editing.value = true
 }
-async function refreshList() {
-  const sequence = ++listSequence
-  loading.value = true
-  error.value = ''
-  try { const list = await api.listProjects(); if (!disposed && sequence === listSequence) projects.value = list }
-  catch (e) { if (!disposed && sequence === listSequence) fail(e) }
-  finally { if (!disposed && sequence === listSequence) loading.value = false }
-}
+const directoryRead = createLatestRequest({
+  load: options => api.listProjects(options),
+  onStart: () => { loading.value = true; listError.value = '' },
+  onSuccess: list => { projects.value = list },
+  onError: () => { listError.value = '目录暂时无法读取，请重试刷新目录；当前编辑内容不受影响' },
+  onFinish: () => { loading.value = false },
+})
+function refreshList() { if (!disposed) return directoryRead.run() }
 async function openProject(id) {
+  instrumentEpoch.value++
   // A retained draft must be offered before a new editor can replace the single local slot.
   pendingDraft.value = projectFormRecovery.recovery.snapshot()?.entries[0] ?? null
   importer.value?.close()
@@ -136,21 +142,26 @@ async function persist() {
       ? await api.saveProject(current.value.id, current.value.revision, content, archived.value)
       : await api.createProject(createId.value, content)
     if (disposed || sequence !== openSequence) return
+    directoryRead.cancel()
     accept(project)
     // Only this editor's acknowledged draft may be cleared; leave an unrelated recovery offer alone.
     recovery.save()
     recoveryNotice.value = ''
     status.value = `已保存为 v${project.revision}`
     projects.value = [project, ...projects.value.filter(p => p.id !== project.id)].map(p => p.content ? { ...p, title: p.content.title, track: p.content.track } : p)
+    void refreshList()
     // Unlock navigation only after the server has acknowledged this snapshot.
     busy.value = false
-    if (route.params.id !== project.id) await router.replace(`/projects/${project.id}`)
+    if (route.params.id !== project.id) {
+      syncingSavedRoute = `/projects/${project.id}`
+      try { await router.replace(syncingSavedRoute) } finally { syncingSavedRoute = '' }
+    }
     if (section.value === 'versions') await loadVersions()
   } catch (e) { if (!disposed && sequence === openSequence) fail(e) }
   finally { if (!disposed && sequence === openSequence) busy.value = false }
 }
 async function restoreDraft(asCopy = false) {
-  if (busy.value || dirty.value) { recoveryNotice.value = '先保存或导出当前修改，再恢复暂存；不会覆盖你正在填写的内容'; return }
+  if (busy.value || dirty.value || instrumentLibrary.value?.hasPending) { recoveryNotice.value = '先保存或保留当前修改及仪器记录，再恢复暂存；不会覆盖你正在填写的内容'; return }
   const entry = recovery.peek()
   if (!entry) return
   const sequence = ++openSequence
@@ -311,7 +322,9 @@ async function deleteCurrent() {
   try {
     await api.removeProject(id, current.value.revision)
     if (disposed || current.value?.id !== id) return
+    directoryRead.cancel()
     projects.value = projects.value.filter(p => p.id !== id)
+    void refreshList()
     if (projectFormRecovery.recovery.snapshot()?.entries[0]?.projectId === id) {
       projectFormRecovery.recovery.save([],null); pendingDraft.value = null
     }
@@ -334,6 +347,7 @@ async function deleteCurrent() {
         <label class="archive-filter"><input v-model="showArchived" type="checkbox" />显示已归档</label>
         <button class="directory-refresh" :disabled="loading || busy" @click="refreshList">刷新目录</button>
         <div v-if="loading" class="studio-skeleton" role="status" aria-label="正在加载项目"></div>
+        <p v-else-if="listError" class="directory-error" role="alert">{{ listError }}</p>
         <p v-else-if="!visibleProjects.length" class="directory-empty">{{ projects.length ? '没有进行中的项目' : '创建一个项目，把任务书和材料留在一起' }}</p>
         <div class="project-list">
           <RouterLink v-for="project in visibleProjects" :key="project.id" :to="`/projects/${project.id}`" :class="{selected: route.params.id === project.id}" :aria-current="route.params.id === project.id ? 'page' : undefined">
@@ -400,7 +414,7 @@ async function deleteCurrent() {
               <div class="section-next"><button class="primary" @click="runCheck"><DocumentChecked />检查提交缺项</button></div>
             </section>
             <ProjectDataPanel v-else-if="section === 'data'" v-model="draft.dataSheet" @import="requestImport('dataSheet')" />
-            <InstrumentLibrary v-else-if="section === 'instruments'" embedded @append="appendInstrument" />
+            <template v-else-if="section === 'instruments'"></template>
             <section v-else-if="section === 'collaboration'"><ProjectReviewPanel v-if="current" :key="current.id" :project="current" :dirty="dirty" /><p v-else class="inline-empty">先保存项目，再选择已保存版本和分享范围，邀请同校伙伴审阅</p></section>
             <section v-else-if="section === 'review'">
               <div class="section-heading"><div><h2>提交前，再对一遍</h2><p>找清单缺项、确认遗漏、失效证据；不作专业评分或通过保证</p></div><button class="primary" :disabled="reviewing" @click="runCheck">{{ reviewing ? '正在检查' : reviewed ? '重新检查' : '开始检查' }}</button></div>
@@ -440,6 +454,7 @@ async function deleteCurrent() {
               <label v-if="current" class="archive-filter"><input v-model="archived" type="checkbox" />归档此项目（保存后生效，可随时取消）</label>
               <div v-if="current" class="project-danger"><p>删除会永久移除项目及历史版本，请先导出备份</p><button @click="deleteCurrent">删除项目</button></div>
             </section>
+            <InstrumentLibrary v-show="section === 'instruments'" :key="instrumentEpoch" ref="instrumentLibrary" embedded :saving="busy" @append="appendInstrument" />
           </fieldset>
         </template>
       </main>

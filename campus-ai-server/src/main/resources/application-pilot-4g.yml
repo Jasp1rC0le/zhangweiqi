@@ -1,0 +1,44 @@
+# Opt-in starting envelope, not a capacity certificate. Combine with prod after review.
+server:
+  address: 127.0.0.1
+  tomcat:
+    threads:
+      max: 64
+      min-spare: 8
+      max-queue-capacity: 64
+    max-connections: 256
+    accept-count: 32
+    connection-timeout: 5s
+    keep-alive-timeout: 30s
+spring:
+  sql:
+    init:
+      mode: never
+  threads:
+    virtual:
+      enabled: false
+  datasource:
+    hikari:
+      maximum-pool-size: 8
+      minimum-idle: 2
+      connection-timeout: 2000
+      validation-timeout: 1000
+      max-lifetime: 1500000
+  jdbc:
+    template:
+      query-timeout: 3s
+  task:
+    execution:
+      pool:
+        core-size: 4
+        max-size: 8
+        queue-capacity: 32
+app:
+  ai:
+    max-concurrent: 4
+    budget:
+      enabled: true
+      daily-cny: ${AI_PLATFORM_DAILY_CNY:30}
+      monthly-cny: ${AI_PLATFORM_MONTHLY_CNY:1000}
+  web-search:
+    enabled: false

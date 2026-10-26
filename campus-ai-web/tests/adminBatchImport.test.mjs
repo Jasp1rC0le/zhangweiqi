@@ -43,7 +43,7 @@ test('batch editing stays mounted during module switches and participates in lea
   assert.match(parent, /ref="batchImport"/)
   assert.match(parent, /useUnsavedChanges\(\(\) => importCheckpoint\.isDirty\(\) \|\| Boolean\(batchImport\.value\?\.dirty\)/)
   assert.match(parent, /Boolean\(batchImport\.value\?\.busy\)/)
-  assert.match(panel, /defineExpose\(\{ busy, dirty \}\)/)
+  assert.match(panel, /defineExpose\(\{ busy, dirty, draftKey \}\)/)
 })
 test('both import modes and revision choices lock during parsing publishing and confirmation', { timeout: 1000 }, () => {
   for (const mode of ['page', 'site']) {

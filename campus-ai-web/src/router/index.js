@@ -3,6 +3,8 @@ import { getUserAccessToken, refreshUserAccess, isSessionExpired } from '@/api/h
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 import { adminDestination } from '@/utils/adminAccess'
+import PageRecovery from '@/components/PageRecovery.vue'
+import { recordRouteFailure, clearRouteFailure } from '@/utils/routeRecovery'
 
 const LoginView = () => import('@/views/LoginView.vue')
 const ChatView = () => import('@/views/ChatView.vue')
@@ -52,6 +54,7 @@ const router = createRouter({
         { path: '/instruments', name: 'instruments', component: () => import('@/views/InstrumentView.vue') },
         { path: '/study', name: 'study', component: () => import('@/views/StudyView.vue') },
         { path: '/timetable', name: 'timetable', component: () => import('@/views/TimetableView.vue') },
+        { path: '/teaching', name: 'teaching', component: () => import('@/views/TeachingView.vue') },
         { path: '/feedback', name: 'feedback', component: () => import('@/views/FeedbackView.vue') },
         { path: '/pro', name: 'pro', redirect: { path: '/chat', query: { pro: '1' } } },
         { path: '/admin', name: 'admin', component: AdminView, meta: { requiresAdmin: true } },
@@ -61,6 +64,7 @@ const router = createRouter({
     { path: '/reset-password', name: 'reset-password', component: AccountActionView },
     { path: '/verify-email', name: 'verify-email', component: AccountActionView },
     { path: '/privacy', name: 'privacy', component: PrivacyView },
+    { path: '/:pathMatch(.*)*', name: 'not-found', component: PageRecovery },
     {
       path: '/admin/login',
       name: 'admin-login',
@@ -68,6 +72,10 @@ const router = createRouter({
     },
   ],
 })
+
+const removeFailureHandler = router.onError((error, to, from) => recordRouteFailure(error, to, from, path => router.resolve(path)))
+const removeRecoveryHandler = router.afterEach((_to, _from, failure) => { if (!failure) clearRouteFailure() })
+if (import.meta.hot) import.meta.hot.dispose(() => { removeFailureHandler(); removeRecoveryHandler() })
 
 router.beforeEach(async (to, from) => {
   const hasToken = Boolean(getUserAccessToken())

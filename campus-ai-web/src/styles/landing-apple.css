@@ -1,0 +1,308 @@
+/* Public introduction only. Dialogs and the workspace keep their own owners. */
+html:root body .landing.apple-home {
+  --home-paper: #fbfbfd;
+  --home-surface: #ffffff;
+  --home-ink: #29323c;
+  --home-muted: #5d6876;
+  --home-accent: #536f90;
+  --home-accent-hover: #405b7b;
+  --home-soft: #eaf0f6;
+  --home-line: #e2e7ec;
+  --home-measure: 1240px;
+  --home-gutter: clamp(24px, 5vw, 80px);
+  --home-nav-height: 76px;
+  --home-ease: cubic-bezier(.16, 1, .3, 1);
+  background: var(--home-paper);
+  color: var(--home-ink);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', 'PingFang SC', sans-serif;
+}
+html:root body .landing.apple-home :is(.hero-wrap, .experience, .closing, .site-footer) {
+  background: var(--home-paper);
+  color: var(--home-ink);
+  border-radius: 0;
+  box-shadow: none;
+}
+html:root body .landing.apple-home .hero-wrap { min-height: 0; }
+html:root body .landing.apple-home .site-nav {
+  width: min(var(--home-measure), calc(100% - var(--home-gutter) * 2));
+  height: 76px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+html:root body .landing.apple-home .brand { color: var(--home-ink); font-size: 23px; letter-spacing: -.035em; }
+html:root body .landing.apple-home .brand-period { color: var(--home-accent); }
+html:root body .landing.apple-home .nav-links { color: var(--home-muted); gap: 28px; font-size: 14px; }
+html:root body .landing.apple-home .nav-links :is(a, button) { min-height: 44px; display: inline-flex; align-items: center; }
+html:root body .landing.apple-home .nav-links :is(a, button):hover { color: var(--home-ink); }
+html:root body .landing.apple-home .nav-action {
+  min-height: 44px;
+  padding: 10px 18px;
+  font-size: 14px;
+  color: var(--home-ink);
+  border: 1px solid var(--home-line);
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  transform: none;
+}
+html:root body .landing.apple-home .nav-action:hover { background: var(--home-soft); color: var(--home-ink); transform: none; }
+html:root body .landing.apple-home .hero {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  align-items: center;
+  gap: 24px;
+  width: min(760px, calc(100% - var(--home-gutter) * 2));
+  min-height: 0;
+  padding: 0 0 48px;
+}
+html:root body .landing.apple-home .hero-copy {
+  grid-column: 1 / -1;
+  min-width: 0;
+  width: 100%;
+  min-height: max(280px, calc(76.4svh - var(--home-nav-height) * 2));
+  display: grid;
+  grid-template-rows: minmax(24px, 1fr) auto minmax(min-content, 1fr);
+  text-align: center;
+}
+html:root body .landing.apple-home .hero-intro { grid-row: 2; min-width: 0; }
+html:root body .landing.apple-home .hero h1 {
+  margin: 0 auto;
+  max-width: 920px;
+  padding: 0;
+  font-size: clamp(32px, 3vw, 40px);
+  font-weight: 500;
+  line-height: 1.3;
+  letter-spacing: -.025em;
+  text-wrap: balance;
+  white-space: normal;
+}
+html:root body .landing.apple-home .hero h1 em {
+  margin-top: 4px;
+  padding: 0;
+  color: var(--home-ink);
+  background: none;
+  font-style: normal;
+}
+html:root body .landing.apple-home .hero-subtitle {
+  margin: 16px auto 0;
+  font-size: 16px;
+  line-height: 1.8;
+  color: var(--home-muted);
+  text-wrap: pretty;
+}
+html:root body .landing.apple-home .hero-actions { grid-row: 3; align-self: start; justify-self: center; flex-direction: column; align-items: center; gap: 6px; margin-top: 24px; }
+html:root body .landing.apple-home .hero-actions .hero-cta { min-height: 44px; padding: 10px 20px; border-radius: 14px; font-size: 15px; gap: 16px; }
+html:root body .landing.apple-home :is(.hero-cta, .closing button) {
+  min-height: 54px;
+  padding: 14px 22px;
+  border: 0;
+  border-radius: 28px;
+  gap: 22px;
+  background: var(--home-accent);
+  color: var(--home-surface);
+  font-size: 16px;
+  font-weight: 500;
+  box-shadow: none;
+  transform: none;
+  transition: background-color 180ms ease, scale 180ms var(--home-ease);
+}
+html:root body .landing.apple-home :is(.hero-cta, .closing button):hover { background: var(--home-accent-hover); box-shadow: none; transform: none; }
+html:root body .landing.apple-home :is(.hero-cta, .closing button):active { scale: .96; }
+html:root body .landing.apple-home .action-circle { width: 20px; height: 20px; color: inherit; border-radius: 0; background: transparent; box-shadow: none; }
+html:root body .landing.apple-home .explore-cue {
+  min-height: 44px;
+  padding: 0;
+  gap: 12px;
+  color: var(--home-muted);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+html:root body .landing.apple-home .hero-actions .explore-cue { min-height: 40px; }
+html:root body .landing.apple-home .explore-cue > span:first-child { font-size: 14px; font-weight: 400; }
+html:root body .landing.apple-home .explore-cue small { display: none; }
+html:root body .landing.apple-home .explore-cue-arrow { width: 22px; height: 28px; color: inherit; background: transparent; font-size: 22px; }
+html:root body .landing.apple-home :is(.explore-cue-arrow, .bridge-arrow) svg { width: 20px; height: 20px; rotate: 90deg; }
+html:root body .landing.apple-home .hero-visual {
+  display: grid;
+  place-items: center;
+  position: relative;
+  inset: auto;
+  justify-self: center;
+  width: 88px;
+  height: 88px;
+  min-height: 0;
+  aspect-ratio: auto;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  opacity: 1;
+  transform: none;
+  pointer-events: none;
+  overflow: visible;
+}
+html:root body .landing.apple-home .orb-ambient { display: none; }
+html:root body .landing.apple-home .hero-orb-stage { position: relative; inset: auto; width: 100%; height: 100%; min-height: 0; align-self: stretch; }
+html:root body .landing.apple-home .hero-orb-stage .intelligence-orb { width: 100%; box-shadow: inset 0 0 20px rgb(255 255 255 / 70%), 0 8px 24px rgb(65 72 138 / 10%); }
+html:root body .landing.apple-home .hero-visual .orb-orbit { display: none; }
+html:root body .landing.apple-home .orb-orbit {
+  width: min(110%, 580px);
+  height: 65%;
+  aspect-ratio: auto;
+  border-color: rgb(83 111 144 / 8%);
+  transform: rotate(-18deg);
+}
+html:root body .landing.apple-home .orb-orbit-inner { width: min(101%, 540px); height: 85%; transform: rotate(16deg); }
+html:root body .landing.apple-home .hero-demo {
+  position: relative;
+  inset: auto;
+  grid-column: 2;
+  justify-self: center;
+  width: 100%;
+  margin-top: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+  min-height: 112px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+html:root body .landing.apple-home .hero-demo-choice { display: grid; gap: 10px; min-width: 0; padding: 0; border-radius: 0; background: transparent; box-shadow: none; }
+html:root body .landing.apple-home .hero-demo-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px 8px; }
+html:root body .landing.apple-home .hero-demo-play { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 8px; border: 0; border-radius: 10px; background: transparent; color: var(--home-muted); font: inherit; font-size: 12px; cursor: pointer; }
+html:root body .landing.apple-home .hero-demo-play:hover { background: var(--home-soft); color: var(--home-ink); }
+html:root body .landing.apple-home .hero-demo-play svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+html:root body .landing.apple-home .hero-question-stage { display: grid; }
+html:root body .landing.apple-home .hero-example-modes { display: flex; flex-wrap: wrap; gap: 4px; }
+html:root body .landing.apple-home .hero-example-modes button { min-width: 64px; min-height: 44px; padding: 8px 14px; border: 0; border-radius: 12px; background: transparent; color: var(--home-muted); font: inherit; font-size: 14px; font-weight: 400; cursor: pointer; }
+html:root body .landing.apple-home .hero-example-modes button[aria-pressed='true'] { background: var(--home-soft); color: var(--home-ink); font-weight: 500; }
+html:root body .landing.apple-home .hero-example-modes button:hover { background: var(--home-soft); }
+html:root body .landing.apple-home .hero-example-question { grid-area: 1 / 1; display: flex; align-items: flex-start; gap: 10px; margin: 0; padding: 12px 14px; border-radius: 14px; background: #eef1f6; color: var(--home-ink); font-size: 15px; line-height: 1.65; overflow-wrap: anywhere; }
+html:root body .landing.apple-home .hero-example-question .workspace-icon { flex: none; width: 18px; height: 18px; margin-top: 3px; color: var(--home-accent); }
+html:root body .landing.apple-home .hero-demo-note { color: var(--home-muted); font-size: 12px; }
+html:root body .landing.apple-home .hero-demo-answer { min-width: 0; padding: 12px 0 0; border-top: 1px solid var(--home-line); border-radius: 0; background: transparent; box-shadow: none; }
+html:root body .landing.apple-home .hero-demo-content { display: block; min-height: 64px; }
+html:root body .landing.apple-home .hero-demo-result { font-size: 15px; font-weight: 500; color: var(--home-ink); line-height: 1.6; }
+html:root body .landing.apple-home .hero-demo-details { display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 0; margin: 10px 0 0; list-style: none; color: var(--home-muted); font-size: 12px; }
+html:root body .landing.apple-home .hero-demo-details li { display: inline-flex; align-items: center; gap: 5px; }
+html:root body .landing.apple-home .hero-demo-details svg { width: 14px; height: 14px; fill: none; stroke: var(--home-accent); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+html:root body .landing.apple-home .hero-question-enter-active, html:root body .landing.apple-home .hero-question-leave-active { transition: opacity 180ms ease, transform 220ms var(--home-ease); }
+html:root body .landing.apple-home .hero-question-enter-from { opacity: 0; transform: translateY(4px); }
+html:root body .landing.apple-home .hero-question-leave-to { opacity: 0; transform: translateY(-3px); }
+html:root body .landing.apple-home .hero-demo-progress { height: 2px; overflow: hidden; background: var(--home-line); border-radius: 1px; }
+html:root body .landing.apple-home .hero-demo-progress span { display: block; height: 100%; background: var(--home-accent); transform-origin: left; animation: home-demo-step 4500ms linear both; }
+@keyframes home-demo-step { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+html:root body .landing.apple-home .hero-demo-hint { margin: 8px 0 0; font-size: 13px; color: var(--home-muted); line-height: 1.65; }
+html:root body .landing.apple-home .chapter-bridge { min-height: 0; padding: 0 0 36px; border: 0; width: min(var(--home-measure), calc(100% - var(--home-gutter) * 2)); justify-content: flex-end; }
+html:root body .landing.apple-home .bridge-caption, html:root body .landing.apple-home .bridge-next { display: none; }
+html:root body .landing.apple-home .bridge-arrow { width: 44px; height: 44px; margin: 0 auto; border: 0; background: transparent; color: var(--home-muted); box-shadow: none; }
+html:root body .landing.apple-home .experience { justify-content: flex-start; padding: 40px max(var(--home-gutter), calc((100vw - var(--home-measure)) / 2)) 64px; }
+html:root body .landing.apple-home .section-intro { display: block; text-align: center; }
+html:root body .landing.apple-home :is(.section-intro h2, .life-content h2, .closing h2) { color: var(--home-ink); font-size: clamp(26px, 2.5vw, 32px); font-weight: 500; line-height: 1.35; letter-spacing: -.025em; text-wrap: balance; }
+html:root body .landing.apple-home .section-intro > p:last-child { margin: 22px auto 0; color: var(--home-muted); font-size: 17px; line-height: 1.8; }
+html:root body .landing.apple-home .capability-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 40px; margin-top: 28px; border: 0; }
+html:root body .landing.apple-home .capability-card { display: grid; grid-template-columns: 30px minmax(0, 1fr); align-items: start; gap: 12px 16px; min-height: 0; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+html:root body .landing.apple-home .capability-card .capability-icon { width: 30px; height: 30px; color: var(--home-accent); background: transparent; border-radius: 0; padding: 0; }
+html:root body .landing.apple-home .capability-card .capability-icon { position: static; margin: 0; transform: none; }
+html:root body .landing.apple-home .capability-card h3 { margin: 0; font-size: 20px; font-weight: 500; line-height: 1.35; letter-spacing: -.02em; }
+html:root body .landing.apple-home .capability-card p { grid-column: 2; max-width: 30ch; min-height: 0; margin: 0; color: var(--home-muted); font-size: 16px; line-height: 1.8; }
+html:root body .landing.apple-home .capability-card button { grid-column: 2; min-height: 44px; margin-top: 0; padding: 0; border: 0; border-radius: 0; color: var(--home-accent-hover); background: transparent; font-size: 14px; font-weight: 400; width: fit-content; gap: 20px; }
+html:root body .landing.apple-home .campus-tools { margin-top: 50px; padding-top: 28px; border-color: var(--home-line); }
+html:root body .landing.apple-home .campus-tools > p { color: var(--home-muted); }
+html:root body .landing.apple-home .campus-tool-links button { padding: 14px 0; border: 0; border-radius: 0; color: var(--home-ink); background: transparent; }
+html:root body .landing.apple-home .campus-tool-links button:hover { border: 0; background: transparent; color: var(--home-accent-hover); }
+html:root body .landing.apple-home .campus-tool-links small { color: var(--home-muted); }
+html:root body .landing.apple-home .life-section { color: var(--home-ink); background: var(--home-surface); border-radius: 0; box-shadow: none; }
+html:root body .landing.apple-home .life-content { padding: 80px var(--home-gutter); }
+html:root body .landing.apple-home .life-content :is(p, .life-status) { color: var(--home-muted); font-size: 16px; }
+html:root body .landing.apple-home .life-content h2 i { color: var(--home-accent-hover); }
+html:root body .landing.apple-home .life-content button { color: var(--home-accent-hover); border: 1px solid var(--home-line); background: transparent; box-shadow: none; backdrop-filter: none; }
+html:root body .landing.apple-home .closing { padding: 120px var(--home-gutter); }
+html:root body .landing.apple-home .closing h2 { font-size: clamp(28px, 3vw, 36px); }
+html:root body .landing.apple-home .closing h2 i { color: var(--home-accent-hover); }
+html:root body .landing.apple-home .closing::before { display: none; }
+html:root body .landing.apple-home .site-footer { padding: 28px var(--home-gutter); border-color: var(--home-line); color: var(--home-muted); }
+html:root body .landing.apple-home .site-footer :is(a, button) { min-height: 44px; display: inline-flex; align-items: center; }
+html:root body .landing.apple-home .page-index { background: transparent; border: 0; box-shadow: none; backdrop-filter: none; }
+html:root body .landing.apple-home .page-index button:is(.active, :hover) { background: transparent; border: 0; box-shadow: none; transform: none; }
+html:root body .landing.apple-home .story-page { border-radius: 0; box-shadow: none; }
+html:root body .landing.apple-home .story-page:not(.is-current) :is(.section-intro, .capability-grid, .life-content),
+html:root body .landing.apple-home .story-page.closing:not(.is-current) > * { opacity: 1; }
+html:root body .landing.apple-home :is(button, a, summary, select):focus-visible { outline: 2px solid var(--home-accent); outline-offset: 4px; }
+html:root body .landing.apple-home ::selection { color: var(--home-surface); background: var(--home-accent); }
+@media (min-width: 901px) {
+  html:root body .landing.apple-home .page-index { top: 50%; right: 14px; bottom: auto; transform: translateY(-50%); flex-direction: column; gap: 0; padding: 0; }
+  html:root body .landing.apple-home .page-index button { min-width: 44px; min-height: 44px; padding: 10px; justify-content: center; transform: none; }
+  html:root body .landing.apple-home .page-index button::after { display: none; }
+  html:root body .landing.apple-home .page-index button :is(b), html:root body .landing.apple-home .page-index small { display: none; }
+  html:root body .landing.apple-home .page-index button span { font-size: 11px; color: var(--home-muted); }
+  html:root body .landing.apple-home .page-index button.active span { color: var(--home-accent); font-weight: 600; }
+}
+@media (max-width: 1100px) {
+  html:root body .landing.apple-home .nav-links { gap: 18px; font-size: 13px; }
+  html:root body .landing.apple-home .hero h1 { font-size: clamp(30px, 3.5vw, 36px); }
+  html:root body .landing.apple-home .hero { gap: 16px; }
+  html:root body .landing.apple-home .capability-grid { gap: 28px; }
+  html:root body .landing.apple-home .experience { padding-top: 80px; padding-bottom: 80px; }
+}
+@media (max-width: 900px) { html:root body .landing.apple-home .page-index { display: none; } }
+@media (max-width: 760px) {
+  html:root body .landing.apple-home { --home-gutter: 24px; --home-nav-height: 68px; }
+  html:root body .landing.apple-home .site-nav { height: 68px; display: flex; }
+  html:root body .landing.apple-home .brand { font-size: 20px; }
+  html:root body .landing.apple-home .nav-action { min-height: 44px; padding: 9px 13px; font-size: 13px; }
+  html:root body .landing.apple-home .hero { grid-template-columns: 64px minmax(0, 1fr); gap: 16px; padding: 0 0 40px; }
+  html:root body .landing.apple-home .hero h1 { font-size: 1.625rem; line-height: 1.35; }
+  html:root body .landing.apple-home .hero h1 em { margin-top: 3px; }
+  html:root body .landing.apple-home .hero-subtitle { font-size: 15px; line-height: 1.8; margin-top: 16px; }
+  html:root body .landing.apple-home .hero-actions { margin-top: 24px; flex-direction: column; align-items: center; gap: 8px; }
+  html:root body .landing.apple-home .hero-cta { min-height: 48px; padding: 12px 18px; font-size: 14px; gap: 16px; }
+  html:root body .landing.apple-home .hero-actions .hero-cta { min-height: 44px; padding: 10px 18px; font-size: 14px; }
+  html:root body .landing.apple-home .explore-cue > span:first-child { font-size: 13px; }
+  html:root body .landing.apple-home .hero-visual { width: 64px; height: 64px; }
+  html:root body .landing.apple-home .hero-orb-stage .intelligence-orb { width: 100%; }
+  html:root body .landing.apple-home .orb-orbit { width: 100%; height: 62%; }
+  html:root body .landing.apple-home .orb-orbit-inner { width: 96%; height: 90%; }
+  html:root body .landing.apple-home .hero-demo { grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 0; margin-top: 0; width: 100%; }
+  html:root body .landing.apple-home .hero-demo-choice { gap: 10px; }
+  html:root body .landing.apple-home .hero-example-modes button { min-width: 44px; padding-inline: 10px; }
+  html:root body .landing.apple-home .hero-demo-content { padding: 0; min-height: 40px; }
+  html:root body .landing.apple-home .hero-demo-note { font-size: 11px; }
+  html:root body .landing.apple-home .hero-demo-result { font-size: 14px; }
+  html:root body .landing.apple-home .chapter-bridge { padding-bottom: 16px; }
+  html:root body .landing.apple-home .experience { padding-top: 68px; padding-bottom: 68px; }
+  html:root body .landing.apple-home .section-intro { text-align: left; }
+  html:root body .landing.apple-home :is(.section-intro h2, .life-content h2, .closing h2) { font-size: 1.5rem; font-weight: 500; }
+  html:root body .landing.apple-home .section-intro > p:last-child { font-size: 16px; }
+  html:root body .landing.apple-home .capability-grid { grid-template-columns: minmax(0, 1fr); margin-top: 38px; gap: 28px; }
+  html:root body .landing.apple-home .capability-card { min-height: 0; padding-bottom: 28px; border-bottom: 1px solid var(--home-line); }
+  html:root body .landing.apple-home .capability-card h3 { margin-top: 0; }
+  html:root body .landing.apple-home .capability-card p { max-width: none; margin-bottom: 10px; }
+  html:root body .landing.apple-home .campus-tools { margin-top: 20px; }
+  html:root body .landing.apple-home .life-section { grid-template-columns: minmax(0, 1fr); }
+  html:root body .landing.apple-home .life-content { padding: 56px var(--home-gutter); }
+  html:root body .landing.apple-home .closing { min-height: 60svh; padding: 80px var(--home-gutter); }
+  html:root body .landing.apple-home .site-footer { gap: 10px; }
+}
+@media (max-width: 360px) {
+  html:root body .landing.apple-home .hero { grid-template-columns: minmax(0, 1fr); }
+  html:root body .landing.apple-home .hero-visual { width: 48px; height: 48px; grid-column: 1; }
+  html:root body .landing.apple-home .hero-demo { grid-column: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html:root body .landing.apple-home :is(.hero-cta, .closing button):active { scale: 1; }
+  html:root body .landing.apple-home :is(button, a) { transition: none; }
+  html:root body .landing.apple-home :is(.hero-question-enter-active, .hero-question-leave-active) { transition: opacity 100ms ease; transform: none; }
+  html:root body .landing.apple-home .hero-demo-progress span { animation: none; }
+}

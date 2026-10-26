@@ -98,8 +98,11 @@ onBeforeUnmount(()=>{disposed=true;sequence++;window.removeEventListener('before
 <template>
   <div class="work-page wall-page">
     <header class="work-heading"><div><h1>校园里的事，一起聊</h1><p>遇到不会的实验、想找的队友，或值得分享的小事</p></div><button class="work-button primary" :disabled="busy" :aria-expanded="composing" @click="composing=!composing"><NavigationIcon name="wall" />发布主题</button></header>
-    <p class="wall-notice">仅登录后的同校用户可见 · 默认显示“同校同学” · 内容审核后公开，不自动进入 AI 知识库</p>
-    <FormDraftRecovery :state="recoveryState" :pending="Boolean(pendingDraft)" :busy="busy" enabled-allowed scope="校园墙" :notice="recoveryNotice" @toggle="recovery.toggle" @restore="restoreDraft" @discard="recovery.discard" />
+    <details class="wall-guidance" :open="composing">
+      <summary>使用说明</summary>
+      <p class="wall-notice">仅登录后的同校用户可见 · 默认显示“同校同学” · 内容审核后公开，不自动进入 AI 知识库</p>
+    </details>
+    <FormDraftRecovery v-if="composing || dirty || detail || pendingDraft || recoveryNotice || recoveryState.enabled || recoveryState.error" :state="recoveryState" :pending="Boolean(pendingDraft)" :busy="busy" enabled-allowed scope="校园墙" :notice="recoveryNotice" @toggle="recovery.toggle" @restore="restoreDraft" @discard="recovery.discard" />
     <div v-if="error" class="work-error" role="alert">{{ error }} <button class="work-button" :disabled="loading || busy" @click="route.query.post ? open(String(route.query.post)) : load()">重试</button></div>
     <p v-if="status" class="work-status" role="status">{{ status }}</p>
     <form v-if="composing" class="work-form" :aria-busy="busy" @submit.prevent="publish" @input="status=''">

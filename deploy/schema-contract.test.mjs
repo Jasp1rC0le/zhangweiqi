@@ -28,22 +28,24 @@ test('receipt migration matches fresh schema and is packaged explicitly',{timeou
   const restore=await source('deploy/restore-drill.sh')
   assert.ok(restore.includes("table_name='contact_submission_keys'"))
 })
-test('private timetable upgrade covers the current schema and release checks',{timeout:1500},async()=>{
-  const schema=await source('campus-ai-server/src/main/resources/schema.sql')
-  const migration=await source('deploy/migrations/2026-10-11-private-timetables.sql')
-  const names=['student_timetable_versions','student_timetables','student_course_schedule_versions','student_course_schedules']
-  const definition=(text,name)=>text.match(new RegExp(`CREATE TABLE IF NOT EXISTS ${name} \\([\\s\\S]*?\\);`))?.[0].replace(/\s+/g,' ').trim()
-  for (const name of names) {
-    assert.ok(definition(migration,name),name)
-    assert.equal(definition(migration,name),definition(schema,name),name)
-  }
-  const statements=migration.replace(/^--.*$/gm,'').split(';').filter(value=>value.trim())
-  assert.equal(statements.length,4)
-  for (const statement of statements) assert.match(statement,/^\s*CREATE TABLE IF NOT EXISTS student_/)
+
+test('release verifies mjs tests and uses bounded non-mutating static checks',{timeout:1500},async()=>{
   const build=await source('deploy/build-release.sh')
-  assert.ok(build.includes('2026-10-11-private-timetables.sql'))
-  assert.match(build,/node --test[^\n]+tests\/\*\.test\.js[^\n]+tests\/\*\.test\.mjs/)
-  const restore=await source('deploy/restore-drill.sh')
-  for (const name of names) assert.ok(restore.includes(`'${name}'`))
-  assert.ok(restore.includes('"$table_count" -ge 49'))
+  assert.match(build,/bounded 90 node --test --test-timeout=15000 tests\s/)
+  assert.doesNotMatch(build,/tests\/\*\.test\.js/)
+  assert.match(build,/bounded 60 npx eslint \. --no-cache/)
+  assert.match(build,/bounded 60 npx oxlint \. --deny-warnings/)
+  assert.doesNotMatch(build,/npx (?:eslint|oxlint).*--fix/)
+  assert.match(build,/bounded 180 mvn -q verify/)
+  assert.ok(build.includes('mkdir -p "$repo_root/.local/runtime"'))
+})
+
+test('release explicitly inventories every current migration and forbids blind migration claims',{timeout:1500},async()=>{
+  const {readdir}=await import('node:fs/promises')
+  const names=(await readdir(new URL('deploy/migrations/',root))).filter(name=>name.endsWith('.sql'))
+  const build=await source('deploy/build-release.sh')
+  for(const name of names)assert.ok(build.includes(name),`missing migration: ${name}`)
+  assert.match(build,/real schema diff remains mandatory/)
+  assert.match(build,/isolated source copy/)
+  assert.ok(build.includes('schema-new-database-only.sql'))
 })

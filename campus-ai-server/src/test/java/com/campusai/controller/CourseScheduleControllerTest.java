@@ -44,4 +44,15 @@ class CourseScheduleControllerTest {
         mvc.perform(post("/api/timetable/courses/checked?revision=3&userId=2").header("Authorization","Bearer test-token")).andExpect(status().isOk()).andExpect(header().string("Cache-Control","no-store"));
         mvc.perform(delete("/api/timetable/courses?revision=3&userId=2").header("Authorization","Bearer test-token")).andExpect(status().isNoContent()); verify(service).checked(1L,3); verify(service).delete(1L,3);
     }
+    @Test void periodPayloadPreservesIntegersAndRejectsSilentRoundingOrExtraIdentity() throws Exception {
+        var body = "{\"revision\":0,\"semester\":\"示例\",\"firstMonday\":\"2026-09-07\",\"remindDays\":7,\"courses\":[{\"name\":\"节次示例\",\"weekday\":1,\"startPeriod\":1,\"endPeriod\":2,\"weeks\":[6],\"room\":\"A\"}]}";
+        when(service.save(eq(1L),any())).thenReturn(new CourseScheduleService.State(null));
+        mvc.perform(put("/api/timetable/courses").contentType("application/json").content(body).header("Authorization","Bearer test-token")).andExpect(status().isOk());
+        verify(service).save(eq(1L),argThat(input -> input.courses().get(0).startPeriod() == 1 && input.courses().get(0).startTime() == null));
+        clearInvocations(service);
+        for (String bad : List.of(body.replace("\"startPeriod\":1", "\"startPeriod\":1.5"),body.replace("\"weekday\":1", "\"weekday\":1.2"),body.replace("\"name\":", "\"studentId\":\"private\",\"name\":"))) {
+            mvc.perform(put("/api/timetable/courses").contentType("application/json").content(bad).header("Authorization","Bearer test-token")).andExpect(status().isBadRequest());
+        }
+        verifyNoInteractions(service);
+    }
 }

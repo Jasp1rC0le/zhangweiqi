@@ -404,7 +404,7 @@ test(
   options,
   () => {
     const api = readFileSync(new URL('../src/api/admin.js', import.meta.url), 'utf8')
-    assert.equal((view.match(/capture\(\{ abortable: true \}\)/g) || []).length, 6)
+    assert.equal((view.match(/capture\(\{ abortable: true \}\)/g) || []).length, 7)
     assert.match(
       view,
       /reviseKnowledgeDocument\(editingId, payload, \{ signal: ticket\.signal \}\)/,

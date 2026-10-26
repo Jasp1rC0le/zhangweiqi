@@ -5,6 +5,7 @@ import com.campusai.knowledge.semantic.KnowledgeSemanticService;
 import com.campusai.mapper.KnowledgeChunkMapper;
 import com.campusai.service.impl.KnowledgeSearchServiceImpl;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -19,7 +20,56 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import org.mockito.ArgumentCaptor;
 
+@Timeout(10)
 class KnowledgeSearchServiceImplTest {
+
+    @Test
+    void shouldPrioritizeTopicsAfterAnIntroductoryYearInLongQuestions() {
+        List<String> terms = capturedTerms("我是2023级学生，也要参加实验室安全线上学习和准入考核吗？"
+                + "9月21日是不是所有学生考试截止日？实验指导书应有哪些安全内容？");
+        assertTrue(terms.containsAll(List.of("实验室", "安全", "准入", "考核", "指导书")));
+        assertTrue(terms.size() <= 16);
+        assertEquals(terms.size(), terms.stream().distinct().count());
+    }
+
+    @Test
+    void shouldKeepBothVenuesInAMixedQuestion() {
+        List<String> terms = capturedTerms("图书馆座位什么时候能预约？暂离35分钟回来怎么办？"
+                + "这套时间能用于体育馆抢场吗？");
+        assertTrue(terms.containsAll(List.of("图书馆", "体育馆", "借阅")));
+        assertTrue(terms.size() <= 16);
+    }
+
+    @Test
+    void shouldKeepLaterClausesForTopicsOutsideTheLexicon() {
+        List<String> terms = capturedTerms("最近事情很多忙着整理笔记还有很多事情想了解一下，请问拐杖可以借用吗？");
+        assertTrue(terms.contains("拐杖"));
+        assertTrue(terms.size() <= 16);
+    }
+
+    @Test
+    void shouldRankSafetyTopicAboveAMatchingYearInUnrelatedCourseRules() {
+        KnowledgeChunkMapper mapper = mock(KnowledgeChunkMapper.class);
+        KnowledgeSearchServiceImpl service = new KnowledgeSearchServiceImpl(mapper);
+        String query = "我是2023级学生 实验室安全线上学习和准入考核怎么安排 指导书要有哪些安全内容";
+        KnowledgeSearchResult unrelated = result(1L, 132L, "2023课程考试规范",
+                "2023级学生考试截止日与成绩复核", 20.0);
+        KnowledgeSearchResult safety = result(2L, 142L, "实验室安全线上学习 准入考核与指导书",
+                "2023至2026级学生应按学院安排完成实验室安全学习和准入考核", 1.0);
+        when(mapper.searchPublished(eq(1L), eq(query), eq(24))).thenReturn(List.of(unrelated));
+        when(mapper.searchPublishedByTerms(eq(1L), eq(query), anyList(), eq(24)))
+                .thenReturn(List.of(unrelated, safety));
+        assertEquals(142L, service.search(1L, query).get(0).getDocumentId());
+    }
+
+    private List<String> capturedTerms(String query) {
+        KnowledgeChunkMapper mapper = mock(KnowledgeChunkMapper.class);
+        var service = new KnowledgeSearchServiceImpl(mapper);
+        service.search(7L, query);
+        ArgumentCaptor<List<String>> terms = ArgumentCaptor.forClass(List.class);
+        verify(mapper).searchPublishedByTerms(eq(7L), org.mockito.ArgumentMatchers.anyString(), terms.capture(), eq(24));
+        return terms.getValue();
+    }
 
     @Test
     void combinesSemanticOnlyCandidateWithKeywordCandidates() {

@@ -344,8 +344,18 @@ public class KnowledgeImportPreviewService {
         Metadata metadata = new Metadata();
         metadata.set("resourceName", filename);
         try {
-            String content = tika.parseToString(new ByteArrayInputStream(data), metadata,
-                    MAX_CHARS + 1).replace("\r\n", "\n").replace('\r', '\n').trim();
+            List<String> warnings = List.of();
+            String content;
+            String detectedType = tika.detect(data);
+            if ("text/html".equals(detectedType) || "application/xhtml+xml".equals(detectedType)) {
+                var body = OfficialHtmlContent.extract(data, sourceUrl);
+                content = body.content();
+                metadata.set(org.apache.tika.metadata.TikaCoreProperties.TITLE, body.title());
+                warnings = body.warnings();
+            } else {
+                content = tika.parseToString(new ByteArrayInputStream(data), metadata, MAX_CHARS + 1);
+            }
+            content = content.replace("\r\n", "\n").replace('\r', '\n').trim();
             if (content.isBlank()) throw badRequest("未解析出文字；扫描版PDF请先做OCR");
             if (content.length() > MAX_CHARS) throw badRequest("正文超过10万字，请拆分后导入");
             String title = metadata.get(org.apache.tika.metadata.TikaCoreProperties.TITLE);
@@ -362,7 +372,7 @@ public class KnowledgeImportPreviewService {
                     conflicts == null ? List.of() : conflicts.stream()
                             .map(KnowledgeDocument::getId)
                             .filter(id -> duplicate == null || !id.equals(duplicate.getId()))
-                            .toList());
+                            .toList(), warnings);
         } catch (ResponseStatusException exception) {
             throw exception;
         } catch (Exception exception) {

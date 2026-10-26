@@ -8,7 +8,8 @@ campthink.cn {
     header Referrer-Policy strict-origin-when-cross-origin
     header Strict-Transport-Security "max-age=31536000"
     header X-Frame-Options DENY
-    header Permissions-Policy "camera=(), microphone=(), geolocation=()"
+    # Voice remains opt-in in the app and still requires browser permission.
+    header Permissions-Policy "camera=(), microphone=(self), geolocation=()"
     # Same-origin production build. Re-evaluate explicit origins before adding external assets or APIs.
     header Content-Security-Policy "default-src 'self'; script-src 'self'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'; upgrade-insecure-requests"
 

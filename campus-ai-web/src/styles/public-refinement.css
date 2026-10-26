@@ -1,0 +1,201 @@
+/* Public support pages reuse the approved Apple palette without styling login or Pro. */
+html:root body :is(.action-page, .connection-page, .privacy-page) {
+  --support-bg: #eef2f8;
+  --support-surface: #ffffff;
+  --support-panel: #f2f5fa;
+  --support-ink: #29323c;
+  --support-muted: #5d6876;
+  --support-accent: #0b62db;
+  --support-accent-hover: #084db0;
+  --support-soft: #eaf2ff;
+  --support-line: #e2e7ec;
+  background: var(--support-bg);
+  background-image: none;
+  color: var(--support-ink);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC', sans-serif;
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+}
+html:root body :is(.action-page, .connection-page, .privacy-page) ::selection {
+  color: var(--support-ink);
+  background: var(--support-soft);
+}
+html:root body :is(.action-page, .connection-page, .privacy-page) :is(a, button, input):focus-visible {
+  outline: 2px solid var(--support-accent);
+  outline-offset: 4px;
+  box-shadow: none;
+}
+html:root body :is(.action-page, .connection-page, .privacy-page) .camp-mark {
+  --mark-color: var(--support-accent);
+}
+html:root body :is(.action-page, .connection-page) {
+  padding: 28px max(20px, calc((100vw - 1180px) / 2));
+}
+html:root body .action-page .brand {
+  width: fit-content;
+  min-height: 44px;
+  color: var(--support-ink);
+  letter-spacing: -0.03em;
+}
+html:root body .action-page .action-card,
+html:root body .connection-page > section {
+  width: min(100%, 520px);
+  max-width: 520px;
+  padding: 40px;
+  border: 1px solid var(--support-line);
+  border-radius: 16px;
+  background: var(--support-surface);
+  box-shadow: none;
+}
+html:root body .action-page .action-card { margin: 7vh auto 40px; }
+html:root body .action-page .action-symbol {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  margin: 0 0 24px;
+  border-radius: 12px;
+  color: var(--support-accent);
+  background: var(--support-soft);
+}
+html:root body .action-page .action-symbol svg { width: 26px; height: 26px; }
+html:root body .action-page .action-symbol.is-done { color: #187248; background: #e8f7ef; }
+html:root body .action-page h1,
+html:root body .connection-page h1 {
+  font-size: clamp(30px, 3.2vw, 40px);
+  line-height: 1.25;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: var(--support-ink);
+  margin: 0 0 16px;
+  text-wrap: balance;
+}
+html:root body .connection-page > section > .camp-mark { margin-bottom: 28px; }
+html:root body .action-page .description,
+html:root body .connection-page p {
+  color: var(--support-muted);
+  font-size: 16px;
+  line-height: 1.75;
+  margin: 0 0 20px;
+}
+html:root body .action-page label {
+  color: var(--support-ink);
+  font-size: 14px;
+  font-weight: 500;
+}
+html:root body .action-page input {
+  min-width: 0;
+  min-height: 50px;
+  border: 1px solid var(--support-line);
+  border-radius: 12px;
+  background: var(--support-panel);
+  color: var(--support-ink);
+  font: inherit;
+  caret-color: var(--support-accent);
+}
+html:root body .action-page button,
+html:root body .connection-page button {
+  min-height: 50px;
+  padding: 12px 20px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--support-accent);
+  color: var(--support-surface);
+  font: inherit;
+  font-weight: 500;
+  transition: background-color 160ms ease;
+}
+html:root body .action-page button:hover:not(:disabled),
+html:root body .connection-page button:hover:not(:disabled) {
+  background: var(--support-accent-hover);
+}
+html:root body .action-page .return-link,
+html:root body .connection-page a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-top: 16px;
+  color: var(--support-accent-hover);
+  font-size: 15px;
+  text-underline-offset: 4px;
+}
+html:root body .connection-page button { margin: 28px 0 0; }
+html:root body .action-page .error { color: #bf303d; }
+
+/* Readable policy, with the existing unapproved-policy warning fully retained. */
+html:root body .privacy-page { background: var(--support-surface); }
+html:root body .privacy-page header {
+  border-color: var(--support-line);
+  background: var(--support-surface);
+  color: var(--support-muted);
+}
+html:root body .privacy-page header a { color: var(--support-ink); min-height: 44px; }
+html:root body .privacy-page article { max-width: 850px; padding-top: 56px; }
+html:root body .privacy-page h1 {
+  font-size: clamp(40px, 5vw, 60px);
+  line-height: 1.18;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: var(--support-ink);
+  text-wrap: balance;
+}
+html:root body .privacy-page h1 em { color: var(--support-accent); }
+html:root body .privacy-page .lead {
+  padding: 0;
+  background: transparent;
+  margin: 24px 0 32px;
+  color: var(--support-muted);
+  font-size: 16px;
+  line-height: 1.75;
+}
+html:root body .privacy-page .policy-status {
+  border: 0;
+  border-radius: 16px;
+  background: #fff3d9;
+  color: #9a5400;
+  font-size: 15px;
+}
+html:root body .privacy-page .policy-nav { gap: 8px; }
+html:root body .privacy-page .policy-nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: var(--support-panel);
+  text-decoration: none;
+}
+html:root body .privacy-page section {
+  padding: 32px 0;
+  border-color: var(--support-line);
+  scroll-margin-top: 24px;
+}
+html:root body .privacy-page h2 {
+  color: var(--support-ink);
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin-bottom: 16px;
+}
+html:root body .privacy-page :is(section p, li, dd) {
+  color: var(--support-muted);
+  font-size: 16px;
+  line-height: 1.85;
+  max-width: 72ch;
+}
+html:root body .privacy-page a { color: var(--support-accent-hover); }
+html:root body .privacy-page .back { min-height: 44px; align-content: center; }
+@media (max-width: 600px) {
+  html:root body .action-page .action-card,
+  html:root body .connection-page > section { padding: 26px 24px; }
+  html:root body .action-page .action-card { margin-top: 32px; }
+  html:root body .privacy-page article { padding: 32px 20px 64px; }
+  html:root body .privacy-page header { height: auto; padding: 12px 20px; }
+  html:root body .privacy-page h2 { font-size: 22px; }
+  html:root body .privacy-page .policy-nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  html:root body .privacy-page .policy-nav a { justify-content: center; padding-inline: 8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html:root body .action-page button,
+  html:root body .connection-page button { transition: none; }
+}
