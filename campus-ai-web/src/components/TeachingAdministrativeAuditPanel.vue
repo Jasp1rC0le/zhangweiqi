@@ -1,4 +1,5 @@
 <script setup>
+import DateField from '@/components/DateField.vue'
 import {computed,nextTick,onBeforeUnmount,reactive,ref,watch} from 'vue'
 import {chinaDate,addDays} from '@/utils/timetable'
 import {auditDate} from '@/utils/teachingAudit'
@@ -32,8 +33,8 @@ onBeforeUnmount(()=>{disposed=true;cancelExportFocus();resource.dispose()})
       <template v-else>
         <form v-if="state.access" class="management-filters" @submit.prevent="load()">
           <label>操作类型<select v-model="kind" :disabled="state.busy"><option value="ALL">全部已启用类型</option><option v-for="category in state.access.categories" :key="category.key" :value="category.key" :disabled="!category.enabled">{{ category.label }}{{ category.enabled?'':'（尚未启用）' }}</option></select></label>
-          <label>开始日期<input v-model="from" type="date" required :disabled="state.busy" /></label>
-          <label>结束日期<input v-model="to" type="date" :min="from" :max="addDays(from||chinaDate(),30)" required :disabled="state.busy" /></label>
+          <label>开始日期<DateField v-model="from" required :disabled="state.busy"  /></label>
+          <label>结束日期<DateField v-model="to" :min="from" :max="addDays(from||chinaDate(),30)" required :disabled="state.busy"  /></label>
           <label class="management-search">查人、课程或依据<input v-model="search" maxlength="80" placeholder="姓名、学号、课程或记录编号" :disabled="state.busy" /></label>
           <div class="management-actions"><button :class="{primary:!state.preview}" :disabled="state.busy">查询管理历史</button><button v-if="state.access.exportEnabled&&!state.preview" type="button" :disabled="state.busy||!state.data?.total||state.data.total>2000" :title="state.data?.total>2000?'超过2000条，请缩小日期、类型或搜索':'准备全部当前条件，不只这一页'" @click="exportStep('prepare')">准备完整导出<span v-if="state.data"> · {{ state.data.total }}条</span></button><button v-if="search" type="button" :disabled="state.busy" @click="clearSearch">清除搜索并读取</button></div>
         </form>

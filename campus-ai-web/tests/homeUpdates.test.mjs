@@ -27,9 +27,9 @@ test('checked date uses the school timezone and includes the year; invalid time 
   assert.equal(courseCheckedDate('not-a-date'), '')
 })
 test('the dated update log is factual, immutable and links only to existing product destinations', () => {
-  assert.deepEqual(productUpdates.map(group => group.date), ['2026-10-25', '2026-10-24'])
+  assert.deepEqual(productUpdates.map(group => group.date), ['2026-10-26', '2026-10-25', '2026-10-24'])
   assert.ok(Object.isFrozen(productUpdates))
-  const allowed = new Set(['/chat', '/timetable', '/canteens', '/projects'])
+  const allowed = new Set(['/chat', '/timetable', '/canteens', '/projects', '/wall'])
   for (const group of productUpdates) for (const item of group.items) {
     assert.ok(Object.isFrozen(item) && item.title && item.text && item.action)
     assert.ok(allowed.has(item.route.split('?')[0]))

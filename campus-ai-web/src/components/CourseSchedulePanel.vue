@@ -1,4 +1,6 @@
 <script setup>
+import DateField from '@/components/DateField.vue'
+import NavigationIcon from './NavigationIcon.vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useCourseScheduleStore } from '@/stores/courseSchedule'
 import {
@@ -39,6 +41,7 @@ const props = defineProps({ manageOnly: { type: Boolean, default: false }, layou
 const store = useCourseScheduleStore(),
   clock = useTimetableClock()
 const editing = ref(false),
+  importMode = ref('image'),
   operationsBusy = ref(false), operationsDirty = ref(false),
   operationsPanel = ref(),
   raw = ref(''),
@@ -69,7 +72,7 @@ const dirty = computed(
 async function openOperations(){if(unavailable.value||editing.value)return;await operationsPanel.value?.openPanel()}
 async function openTeacherEditing(){if(unavailable.value||editing.value||operationsDirty.value)return;await operationsPanel.value?.openPanel({operation:'BATCH',missingTeachersOnly:true,firstMonday:store.schedule?.firstMonday})}
 const filledTeachers=computed(()=>store.schedule?.courses.filter(course=>course.teacher?.trim()).length||0)
-defineExpose({ dirty:computed(()=>dirty.value||operationsDirty.value), unavailable, openImport, openExport, openManagement, openOperations })
+defineExpose({ dirty:computed(()=>dirty.value||operationsDirty.value), importing:editing, unavailable, openImport, openExport, openManagement, openOperations })
 useUnsavedChanges(
   () => dirty.value || operationsDirty.value,
   () => unavailable.value,
@@ -271,7 +274,7 @@ async function cancel() {
   if (unavailable.value) return
   if (
     dirty.value &&
-    !(await confirm('未保存的表格、学期、日期和提醒设置会被放弃，已保存的课表不会改变', {
+    !(await confirm('本次选图及未保存的表格、学期、日期和提醒设置会被放弃，已保存的课表不会改变', {
       title: '放弃这次导入？',
       confirmText: '放弃未保存内容',
       cancelText: '继续编辑',
@@ -524,7 +527,7 @@ onBeforeUnmount(() => {
       </button>
     </div>
     <p v-if="notice" ref="exportNotice" class="course-notice" role="status" tabindex="-1" :data-workflow-ready="layoutReady">{{ notice }}</p>
-    <section v-if="store.schedule" class="course-saved" aria-label="已保存课程表格">
+    <section v-if="store.schedule && !editing" class="course-saved" aria-label="已保存课程表格">
       <header class="course-head">
         <div>
           <h2 ref="heading" tabindex="-1" :data-workflow-ready="layoutReady">{{ store.schedule.semester }}</h2>
@@ -545,7 +548,7 @@ onBeforeUnmount(() => {
       <p class="course-teacher-summary">任课教师已填{{ filledTeachers }}/{{ store.schedule.courses.length }}项
         <button class="work-button" type="button" :disabled="unavailable||editing||operationsDirty" @click="openTeacherEditing">补充任课教师</button>
       </p>
-      <p class="course-teacher-note">个人记录的教师姓名不会建立教师端权限；正式课程由教学配置绑定教师账号，各日期和节次共用同一课程记录。</p>
+      <details class="course-teacher-note"><summary>教师账号如何关联？</summary><p>填教师姓名不会建立账号权限；正式课程需明确绑定教师账号，各日期与节次共用同一课程记录。</p></details>
       <template v-if="!manageOnly">
         <p v-if="nextCourse && !nextCourse.timeUnknown" class="course-next">
           <strong>{{
@@ -672,41 +675,42 @@ onBeforeUnmount(() => {
       </button>
     </div>
     <div v-if="!store.schedule && !editing && store.loaded && !store.error">
-      <h2 ref="emptyHeading" tabindex="-1" :data-workflow-ready="layoutReady">还没有导入课程表格</h2>
-      <button class="work-button primary" @click="startImport">上传课表文件</button>
+      <h2 ref="emptyHeading" tabindex="-1" :data-workflow-ready="layoutReady">添加你的课表</h2>
+      <button class="work-button primary" @click="startImport"><NavigationIcon name="timetable" />导入课表</button>
     </div>
     <form v-if="editing" class="course-import" @submit.prevent="inspect">
       <h2 ref="importHeading" tabindex="-1" :data-workflow-ready="layoutReady">
-        {{ store.schedule ? '上传新课表，看看哪里变了' : '上传课表，自动生成课程安排' }}
+        {{ store.schedule ? '更新课表' : '导入课表' }}
       </h2>
-      <p>
-        首选本站工具导出的整学期 JSON；也支持带课程、星期、周次、节次或钟点列的 XLSX /
-        CSV，不需要按本站模板重排列。课表图片可在下方单独使用模型识别并核对；扫描PDF暂不支持，未知周次不能自动补猜。
-      </p>
-      <CourseImageImport :scope="store.principal" :disabled="baseUnavailable" @busy="imageBusy=$event" @pending="imagePending=$event" @adopt="adoptCourseImage" />
-      <SchoolTimetableGuide />
+      <p class="course-import-intro">上传 → 核对课程 → 确认保存</p>
+      <div class="course-import-methods" role="group" aria-label="选择课表导入方式">
+        <button class="work-button" type="button" :aria-pressed="importMode === 'image'" :disabled="unavailable" @click="importMode = 'image'"><NavigationIcon name="timetable" />课表截图</button>
+        <button class="work-button" type="button" :aria-pressed="importMode === 'file'" :disabled="unavailable" @click="importMode = 'file'"><NavigationIcon name="sources" />表格文件</button>
+      </div>
+      <CourseImageImport v-show="importMode === 'image'" :scope="store.principal" :disabled="baseUnavailable" @busy="imageBusy=$event" @pending="imagePending=$event" @adopt="adoptCourseImage" />
+      <SchoolTimetableGuide v-show="importMode === 'file'" />
       <fieldset :disabled="unavailable">
-        <div class="course-actions">
+        <div v-show="importMode === 'file'" class="course-actions">
           <label class="course-file"
-            >选择课表文件，自动解析<input
+            >选择表格文件<input
               type="file"
               accept=".json,.xlsx,.csv,.tsv,.txt"
               aria-describedby="course-file-help"
               @change="chooseFile"
           /></label>
         </div>
-        <p id="course-file-help">
-          此处表格文件只在本机解析，确认后仅保存课程数据。失败不覆盖原课表；XLSX限10MB，文本限100KB。图片识别需在上方单独同意发送。
+        <p v-show="importMode === 'file'" id="course-file-help">
+          XLSX / CSV / JSON · 本机解析 · XLSX最大10MB，文本最大100KB
         </p>
         <p v-if="fileLabel || fileNotice" class="course-file-status" role="status">
           <strong v-if="fileLabel">{{ fileLabel }}</strong>
           <span>{{ fileNotice || '课程数据待重新检查' }}</span>
         </p>
-        <div class="course-fields">
+        <div v-if="raw.trim()" class="course-fields">
           <label>学期<input v-model="form.semester" maxlength="100" required /></label
           ><label
-            >第1周周一日期<input v-model="form.firstMonday" type="date" required /><small
-              >按校历确认，不能把今天默认当成第1周</small
+            >开学第一周周一<DateField v-model="form.firstMonday" aria-label="开学第一周周一" required monday-only :disabled="unavailable" /><small
+              >按学校校历确认</small
             ></label
           ><label
             >核对提醒<select v-model="form.remindDays">
@@ -717,8 +721,8 @@ onBeforeUnmount(() => {
             </select></label
           >
         </div>
-        <details class="course-advanced">
-          <summary>粘贴表格或调整识别数据（可选）</summary>
+        <details v-show="importMode === 'file' || raw.trim()" class="course-advanced">
+          <summary>手动粘贴或调整数据</summary>
           <div class="course-actions">
             <button
               type="button"
@@ -752,8 +756,8 @@ onBeforeUnmount(() => {
             type="submit"
             :disabled="!raw.trim() || !store.loaded || !!store.error"
           >
-            检查并预览差异</button
-          ><button class="work-button" type="button" @click="cancel">取消，保留已保存内容</button>
+            预览课程变化</button
+          ><button class="work-button" type="button" @click="cancel">取消导入</button>
         </div>
         <section v-if="preview" ref="previewTarget" class="course-preview" aria-label="待保存课程及差异" tabindex="-1">
           <h3>待保存{{ preview.courses.length }}条课程安排</h3>
@@ -851,12 +855,13 @@ onBeforeUnmount(() => {
         </section>
       </fieldset>
     </form>
-    <p class="course-boundary">
+    <details class="course-boundary"><summary>数据与同步说明</summary><p>
       课表保存在统一数据库，按当前账号权限读取。聊天由模型理解问题，并根据查到的课程、教师、时间和地点回答；不发送学号、名单、成绩或考勤。图片识别仅在你主动同意时发送本次选图。未导入周次不补猜，不自动同步教务。正式教学另有站内提醒，尚无微信/离线推送；不索取教务密码。
-    </p>
+    </p></details>
   </section>
 </template>
 <style scoped>
+.course-import-methods{display:flex;gap:8px;margin:18px 0 8px;flex-wrap:wrap}.course-import-methods .work-button{gap:8px;min-height:44px;font-size:16px}.course-import-methods .work-button[aria-pressed=true]{background:var(--assistant-soft,#eaf2ff);color:var(--assistant-accent,#0b62db);border-color:transparent}.course-import-methods svg,.course-panel>.work-button svg{width:19px;height:19px}.course-import-intro{color:var(--assistant-muted,#5d6876);font-size:14px;margin:0 0 8px}.course-teacher-note p{margin-top:0}
 .course-teacher-summary { display:flex;flex-wrap:wrap;align-items:center;gap:12px;font-size:14px;line-height:1.7; }
 .course-teacher-note { max-width:70ch;font-size:14px;line-height:1.7;color:var(--assistant-muted,#5d6876); }
 .course-export { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--assistant-line, #e2e7ec); }

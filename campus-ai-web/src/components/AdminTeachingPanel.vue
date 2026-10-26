@@ -1,4 +1,5 @@
 <script setup>
+import DateField from '@/components/DateField.vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { userSessionGeneration } from '@/api/http'
@@ -199,7 +200,7 @@ onBeforeUnmount(() => { disposed = true; generation++; controller?.abort(); prev
           <template v-if="rosterMode==='SELECTED'"><label>教学组名称<input v-model="groupName" maxlength="100" required :disabled="busy || confirming" placeholder="例如：物联网选修教学组" /></label><TeachingRosterPicker v-model="rosterStudents" :owner="principal" :disabled="busy || confirming" :refresh="refresh" /></template>
           <TeachingScopePicker v-model="course.teacherId" :owner="principal" label="任课教师账号" kind="TEACHER" :disabled="busy || confirming" :refresh="refresh" @selected="selectedCourseTeacher=$event" />
           <label>课程名称<input v-model="course.name" maxlength="100" required :disabled="busy" /></label><label>学期<input v-model="course.semester" maxlength="100" required :disabled="busy" /></label>
-          <label>第1周周一<input v-model="course.firstMonday" type="date" required :disabled="busy" /></label>
+          <label>第1周周一<DateField v-model="course.firstMonday" required :disabled="busy"  monday-only /></label>
           <label>星期<select v-model="course.weekday" :disabled="busy" required><option v-if="courseOnly" value="" disabled>选择星期</option><option v-for="(day, i) in ['一','二','三','四','五','六','日']" :key="day" :value="i + 1">周{{ day }}</option></select></label>
           <label>开始钟点<input v-model="course.startTime" type="time" required :disabled="busy" /></label><label>结束钟点<input v-model="course.endTime" type="time" required :disabled="busy" /></label>
           <label>上课周次<input v-model="course.weeks" placeholder="例如1-16单，或1;3;5" required :disabled="busy" /></label><label>教室<input v-model="course.room" maxlength="100" required :disabled="busy" /></label>

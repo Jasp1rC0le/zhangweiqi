@@ -22,9 +22,12 @@ test('valid leap dates work and malformed partial or impossible dates never norm
 test('date helper returns a frozen minimal date intention with no role class or owner authority',()=>{
   const target=calendarDateTarget('2026-10-13');assert.ok(Object.isFrozen(target));assert.deepEqual(Object.keys(target),['date','monday']);assert.equal(target.classId,undefined);assert.equal(target.view,undefined)
 })
-test('calendar date form compiles as a labelled16px native input with explicit submit and error status',()=>{
+test('calendar date form compiles with a labelled date picker and explicit submit and error status',()=>{
   const filename='src/components/UnifiedWeekCalendar.vue',source=readFileSync(new URL('../'+filename,import.meta.url),'utf8'),{descriptor,errors}=parse(source);assert.deepEqual(errors,[]);compileScript(descriptor,{id:filename});assert.deepEqual(compileTemplate({source:descriptor.template.content,filename,id:filename}).errors,[]);assert.deepEqual(compileStyle({source:descriptor.styles[0].content,filename,id:filename,scoped:true}).errors,[])
-  assert.match(source,/v-model="dateDraft" type="date"/);assert.match(source,/@submit.prevent="jumpDate"/);assert.match(source,/:aria-describedby="dateHintId"/);assert.match(source,/:role="dateError \? 'alert' : 'status'"/);assert.match(source,/\.calendar-date-jump input[^}]*font-size: 16px/)
+  assert.match(source,/<DateField v-model="dateDraft"/);assert.match(source,/@submit.prevent="jumpDate"/);assert.match(source,/:aria-describedby="dateHintId"/);assert.match(source,/:role="dateError \? 'alert' : 'status'"/)
+  const picker=readFileSync(new URL('../src/components/DateField.vue',import.meta.url),'utf8')
+  assert.match(picker,/type="text" :value="draft" :required="required" :disabled="disabled"/)
+  assert.match(picker,/font-size:16px/);assert.match(picker,/setCustomValidity/)
 })
 test('jump changes only intended day/week and resets page, preserving view and class through protected load',()=>{
   const source=readFileSync(new URL('../src/components/UnifiedWeekCalendar.vue',import.meta.url),'utf8'),handler=source.slice(source.indexOf('async function jumpDate'),source.indexOf("const days ="))

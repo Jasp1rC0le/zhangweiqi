@@ -1,4 +1,5 @@
 <script setup>
+import DateField from '@/components/DateField.vue'
 import {computed,nextTick,onBeforeUnmount,onMounted,reactive,ref,watch} from 'vue'
 import {readTeachingCapabilities,readTeachingConfigPage,previewTeachingCourse,readTeachingCourseDefinition,createTeachingCourse,createTeachingRosterCourse} from '@/api/teaching'
 import {createFormalCourseResource,resolveFormalTarget,formalCoursePayload,formalMissingFields,formalWeeksLabel} from '@/utils/formalCourseDraft'
@@ -70,7 +71,7 @@ onBeforeUnmount(()=>{disposed=true;generation++;controller?.abort();resource.dis
       <TeachingScopePicker v-model="form.course.classId" :owner="scope" label="课程班级或主办班" :disabled="locked" />
       <TeachingScopePicker v-model="form.course.teacherId" :owner="scope" label="任课教师账号" kind="TEACHER" :disabled="locked" />
       <label class="wide">课程名称<input v-model="form.course.name" required maxlength="100" :disabled="locked" /></label>
-      <label>学期<input v-model="form.course.semester" required maxlength="100" :disabled="locked" /></label><label>第1周周一<input v-model="form.course.firstMonday" type="date" required :disabled="locked" /></label>
+      <label>学期<input v-model="form.course.semester" required maxlength="100" :disabled="locked" /></label><label>第1周周一<DateField v-model="form.course.firstMonday" required :disabled="locked"  monday-only /></label>
       <label>星期<select v-model="form.course.weekday" aria-label="教学课程星期" required :disabled="locked"><option value="" disabled>选择星期</option><option v-for="(d,i) in ['一','二','三','四','五','六','日']" :key="d" :value="i+1">周{{d}}</option></select></label><label>上课周次<input v-model="form.course.weeks" required maxlength="160" placeholder="例如1-16单，或1;3;5" :disabled="locked" /></label>
       <label>开始钟点<input v-model="form.course.startTime" type="time" required :disabled="locked" /></label><label>结束钟点<input v-model="form.course.endTime" type="time" required :disabled="locked" /></label>
       <label class="wide">教室<input v-model="form.course.room" required maxlength="100" :disabled="locked" /></label>

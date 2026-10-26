@@ -195,13 +195,13 @@ onMounted(focusAccountWorkflow)
     </header>
     <div class="account-content">
       <div class="account-intro">
-      <h1>关于你，由你决定</h1>
-      <p class="lede">你的偏好、账户与数据。<br />只保留你愿意分享的部分。</p>
+      <h1>账户与设置</h1>
+      <p class="lede">管理偏好、安全和个人数据。</p>
       <nav class="account-nav" aria-label="账户设置目录"><a href="#product-updates">产品更新</a><a href="#teaching-identity">教学身份</a><a href="#personal">个人信息</a><a href="#security">找回邮箱</a><a href="#token-activity">额度记录</a><a href="#my-data">我的数据</a><a href="#sessions">登录会话</a><a href="#close-account">注销账户</a></nav></div>
 
       <div class="account-sections"><ProductUpdates id="product-updates" ref="updatesPanel" :disabled="accountBusy" @activate="openProductFeature" /><AccountIdentityPanel /><TeachingIdentityPanel ref="identityPanel" tabindex="-1" /><section id="personal" class="account-card">
-        <h2>让建议更适合你</h2>
-        <p>这些信息完全自愿填写，只用于调整解释深度、例子和求职建议，不会被当作校园事实来源。</p>
+        <h2>个人信息</h2>
+        <p>选填，用于个性化建议，不作为校园事实来源。</p>
         <p v-if="profileLoading" role="status">正在读取个人信息…</p>
         <p v-if="profileError" class="form-error" role="alert">{{ profileError }}</p>
         <button v-if="!profileLoaded && !profileLoading" class="secondary" type="button" @click="loadProfile">重新读取</button>

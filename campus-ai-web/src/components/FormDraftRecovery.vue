@@ -8,10 +8,10 @@ const helpId = useId()
 </script>
 
 <template>
-  <section class="form-recovery" :aria-label="`${scope}草稿保护`">
+  <section v-if="pending || enabledAllowed || state.enabled || state.error || notice" class="form-recovery" :aria-label="`${scope}草稿保护`">
     <div v-if="pending" class="form-recovery-pending">
-      <p>发现本账号的{{scope}}草稿，恢复后不会自动提交</p>
-      <p>请先选择恢复或清除；在此之前，新输入不会更新临时副本</p>
+      <p>发现{{scope}}草稿，恢复后不会自动提交。</p>
+      <p>先恢复或清除，处理前不会暂存新输入。</p>
       <div class="form-recovery-actions">
         <button type="button" :disabled="busy" @click="$emit('restore')">恢复草稿</button>
         <slot />
@@ -21,12 +21,12 @@ const helpId = useId()
     </div>
     <div class="form-recovery-settings">
       <label><input type="checkbox" :checked="state.enabled" :disabled="busy || pending || (!state.enabled && !enabledAllowed)"
-        :aria-describedby="helpId" @change="$emit('toggle',$event.target.checked)" />暂存{{scope}}草稿 30 分钟</label>
-      <details><summary>保存范围</summary>
+        :aria-describedby="helpId" @change="$emit('toggle',$event.target.checked)" />本机暂存 30 分钟</label>
+      <details><summary>暂存说明</summary>
         <p>默认关闭；开启后仅在本标签页的浏览器会话存储中{{storageDescription}}。不保存原附件或登录凭据，不上传服务器、不发送给 AI；不是长期备份</p>
         <p>这是非加密副本，不能防止他人使用已登录设备。仅服务器确认的同一账号、同一学校可恢复；主动退出、跨标签换号、关闭开关会清除副本。最后暂存满 30 分钟后不再恢复，下次检查时清理。浏览器可能恢复关闭的标签页，公共设备请勿开启</p>
       </details>
-      <span :id="helpId">仅本标签页 · 非加密 · 未保存到账号</span>
+      <span :id="helpId">仅本标签页 · 未加密</span>
     </div>
     <p v-if="state.error" class="form-recovery-error" role="alert">{{state.error}}</p>
     <p v-else-if="notice" role="status">{{notice}}</p>

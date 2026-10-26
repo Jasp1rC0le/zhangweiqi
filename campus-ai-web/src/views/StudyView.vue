@@ -53,7 +53,7 @@ onMounted(()=>window.addEventListener('beforeunload',unload));onBeforeUnmount(()
 </script>
 <template>
   <div class="work-page study-page">
-    <header class="work-heading"><div><h1>从卡住的这一步开始</h1><p>带上题目和你已经做的部分，先弄懂，再动手<br>实验、专业课作业，都不用从一段空白聊天开始</p></div><RouterLink class="work-button" to="/instruments">查仪器说明 ↗</RouterLink></header>
+    <header class="work-heading"><div><h1>学习助手</h1><p>带上题目，理清下一步。</p></div><RouterLink class="work-button" to="/instruments">仪器说明</RouterLink></header>
     <form class="work-form" @submit.prevent="help">
       <fieldset :disabled="busy || saving">
         <div class="work-tabs" aria-label="学习任务类型"><button type="button" :aria-pressed="form.kind==='experiment'" @click="form.kind='experiment'">实验不会做</button><button type="button" :aria-pressed="form.kind==='homework'" @click="form.kind='homework'">作业卡住了</button></div>
@@ -61,8 +61,8 @@ onMounted(()=>window.addEventListener('beforeunload',unload));onBeforeUnmount(()
           <div class="study-brief">
             <label>哪门课<input v-model="form.course" required maxlength="100" placeholder="例如：大学物理、电路基础、统计学" /></label>
             <label>题目或实验要求<textarea v-model="form.task" required maxlength="20000" rows="5" placeholder="粘贴老师的题目、实验目的和已知条件，不用先整理成报告"></textarea></label>
-            <button class="work-button" type="button" @click="importer?.open('brief')">从 PDF / Word / 表格提取文字</button>
-            <p class="work-help">附件在本机解析，扫描图片暂不支持识字；确认前不会发送给 AI</p>
+            <button class="work-button" type="button" @click="importer?.open('brief')">导入题目文件</button>
+            <p class="work-help">PDF / Word / 表格 · 本机提取，确认后才发送</p>
             <AttachmentImportPanel ref="importer" @apply="imported" />
           </div>
           <div class="study-reflection">

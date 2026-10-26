@@ -1,4 +1,5 @@
 <script setup>
+import DateField from '@/components/DateField.vue'
 import { computed,nextTick,onBeforeUnmount,onMounted,reactive,ref,watch } from 'vue'
 import { readCourseSchedule,saveCourseSchedule } from '@/api/courseSchedule'
 import { readTeachingAccess,readTeachingLessonsPage,readTeachingLessonPage,saveRollCallPage } from '@/api/teaching'
@@ -138,7 +139,7 @@ onBeforeUnmount(()=>{disposed=true;generation++;controller?.abort();resource.res
     <template v-else-if="loaded && state.phase!=='uncertain'">
       <form v-if="kind==='PERSONAL_COURSE' && state.phase!=='preview'" class="action-form" @submit.prevent="preview">
         <p v-if="snapshot" class="wide">保存到 {{ snapshot.semester }}；已有 {{ snapshot.courses.length }} 项安排，均会保留。</p>
-        <template v-else><label>学期<input v-model="form.semester" maxlength="100" required :disabled="locked" placeholder="按校历填写" /></label><label>第1周周一<input v-model="form.firstMonday" type="date" required :disabled="locked" /></label></template>
+        <template v-else><label>学期<input v-model="form.semester" maxlength="100" required :disabled="locked" placeholder="按校历填写" /></label><label>第1周周一<DateField v-model="form.firstMonday" required :disabled="locked"  monday-only /></label></template>
         <label class="wide">课程名称<input v-model="form.course.name" maxlength="100" required :disabled="locked" /></label>
         <label>星期<select v-model="form.course.weekday" required :disabled="locked"><option value="" disabled>选择星期</option><option v-for="(day,i) in ['一','二','三','四','五','六','日']" :key="day" :value="i+1">周{{ day }}</option></select></label>
         <label>上课周次<input v-model="form.course.weeks" required :disabled="locked" placeholder="例如1-16，或1;3;5" maxlength="160" /></label>
@@ -150,7 +151,7 @@ onBeforeUnmount(()=>{disposed=true;generation++;controller?.abort();resource.res
       <template v-else-if="['ATTENDANCE','ATTENDANCE_QUERY'].includes(kind) && state.phase!=='preview'">
         <form class="action-form" @submit.prevent="loadCourses(0)">
           <label v-if="kind==='ATTENDANCE_QUERY'" class="wide">查询身份<select v-model="role" :disabled="locked"><option v-for="r in roles" :key="r" :value="r">{{ TEACHING_VIEWS[r] }} · 仅授权范围</option></select></label>
-          <label>开始日期<input v-model="date" type="date" required :disabled="locked" /></label><label>结束日期<input v-model="until" type="date" :min="date" :max="addDays(date,30)" required :disabled="locked" /></label>
+          <label>开始日期<DateField v-model="date" required :disabled="locked"  /></label><label>结束日期<DateField v-model="until" :min="date" :max="addDays(date,30)" required :disabled="locked"  /></label>
           <label class="wide">查找课程<input v-model="courseSearch" type="search" maxlength="100" :disabled="locked" placeholder="课程、班级或任课教师" /></label><button class="wide" :disabled="locked">查找授权课程</button>
         </form>
         <template v-if="courses">

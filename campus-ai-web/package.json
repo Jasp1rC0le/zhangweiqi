@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "test": "node --test --test-timeout=15000",
+    "check": "eslint . --no-cache && oxlint . --deny-warnings",
     "build": "vite build",
     "preview": "vite preview",
     "lint": "run-s \"lint:*\"",

@@ -15,6 +15,14 @@ Campthink 是面向校园学习与日常事务的全栈应用：把带来源的�
 
 正式教学、真实身份和名单管理需要独立的学校授权与受控启用；开发演示中的合成角色不代表已接入学校系统。
 
+## 界面预览
+
+以下为本地合成场景，非真实学生课程或发言。日期、截图导入与校园墙的改动见[易用性更新](docs/usability-2026-10-26.md)。
+
+![专注课表截图导入 合成场景](docs/images/usability-20261026/import.png)
+
+<p><img src="docs/images/usability-20261026/calendar-mobile.png" width="280" alt="手机日期选择 合成场景" /> <img src="docs/images/usability-20261026/wall-mobile.png" width="280" alt="校园墙 合成场景" /></p>
+
 ## 已实现的能力
 
 | 模块 | 当前源码能力 |
@@ -30,7 +38,7 @@ Campthink 是面向校园学习与日常事务的全栈应用：把带来源的�
 
 校园事实回答依赖已核实的资料。模型输出、描述统计和规则检查都不能代替事实核验、学校正式通知或专业判断。文件提取不包含通用 OCR 或原版式保真；支付、会员权益和实时共同编辑尚未实现。
 
-课表只保存学生主动提供并确认的内容，不收集教务密码，不自动登录学校或实时同步调课。截图与结构化课程分别保存；单周图片不能自动补全整学期。课程表格支持明确列名的 UTF-8 CSV/TSV/TXT 或粘贴文本，学校原生文件格式仍需单独适配。详见[私有课表说明](docs/private-timetable.md)。
+个人导入课表只保存用户主动提供并确认的内容，不收集教务密码，不自动登录学校或实时同步调课。截图与结构化课程分别保存；单周图片不能自动补全整学期。课程表格支持明确列名的 UTF-8 CSV/TSV/TXT 或粘贴文本，学校原生文件格式仍需单独适配。详见[私有课表说明](docs/private-timetable.md)。
 
 ## 技术栈
 
@@ -107,7 +115,7 @@ cd campus-ai-server
 mvn spring-boot:run
 ```
 
-后端默认地址为 `http://localhost:8080`。`/api/health` 表示进程存活；`/api/health/ready` 会连接当前数据库并检查 49 张必要表，缺表或连接失败返回 503。已有数据库升级需审查[私有课表增量迁移](deploy/migrations/2026-10-11-private-timetables.sql)，它新增四张表，不应以完整建表脚本覆盖旧库。
+后端默认地址为 `http://localhost:8080`。`/api/health` 表示进程存活；`/api/health/ready` 会连接当前数据库并检查必要业务表，缺表或连接失败返回 503。已有数据库升级需审查[私有课表增量迁移](deploy/migrations/2026-10-11-private-timetables.sql)，它新增四张表，不应以完整建表脚本覆盖旧库。
 
 ### 4. 启动前端
 
@@ -160,7 +168,7 @@ cd ..
 # 前端：安装锁定依赖、单元回归、只读 lint、生产构建
 cd campus-ai-web
 npm ci
-node --test --test-timeout=15000 tests/*.test.js tests/*.test.mjs
+npm test
 npx eslint src
 npm run build
 ```

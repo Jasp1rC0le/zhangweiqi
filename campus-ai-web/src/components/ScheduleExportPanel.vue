@@ -1,4 +1,5 @@
 <script setup>
+import DateField from '@/components/DateField.vue'
 import {computed,nextTick,onBeforeUnmount,onMounted,reactive,ref,watch} from 'vue'
 import {readScheduleExportAccess,readScheduleExportClasses,prepareScheduleExport,downloadScheduleExport} from '@/api/teaching'
 import {readCourseSchedule} from '@/api/courseSchedule'
@@ -121,7 +122,7 @@ defineExpose({open})
         <form v-if="!state.preview&&initialized" @submit.prevent="step('prepare')">
           <label>课表来源<select v-model="form.source" aria-label="导出课表来源" :disabled="busy"><option v-for="s in state.access.sources" :key="s" :value="s">{{SCHEDULE_SOURCES[s]}}</option></select></label>
           <label>核对身份<select v-model="form.view" aria-label="导出核对身份" required :disabled="busy"><option v-if="!form.view" value="" disabled>请选择当前有权身份</option><option v-for="v in views" :key="v" :value="v">{{EXPORT_VIEWS[v]}}</option></select></label>
-          <div class="date-pair wide"><label>开始日期<input v-model="form.from" type="date" required :disabled="busy" /></label><label>结束日期<input v-model="form.to" type="date" required :min="form.from" :max="addDays(form.from||chinaDate(),209)" :disabled="busy" /></label></div>
+          <div class="date-pair wide"><label>开始日期<DateField v-model="form.from" required :disabled="busy"  /></label><label>结束日期<DateField v-model="form.to" required :min="form.from" :max="addDays(form.from||chinaDate(),209)" :disabled="busy"  /></label></div>
           <label>文件格式<select v-model="form.format" aria-label="导出文件格式" :disabled="busy"><option v-for="f in state.access.formats" :key="f" :value="f">{{SCHEDULE_FORMATS[f]}}</option></select></label>
           <details class="wide" :open="requirement==='CLASS'||form.period!=='ALL'"><summary>班级、课程与时段筛选</summary><TeachingScopePicker v-if="form.source==='TEACHING'" :model-value="form.classId" @update:model-value="manualClassChange" :owner="`${owner}:${form.view}`" label="导出班级" :read-page="readClasses" :refresh="classPickerRefresh" optional :disabled="busy" /><label>上课时段<select v-model="form.period" aria-label="导出上课时段" :disabled="busy"><option value="ALL">全天</option><option value="MORNING">上午（12点前）</option><option value="AFTERNOON">下午（12至18点）</option><option value="EVENING">晚上（18点后）</option></select></label><label>查找课程<input v-model="form.search" maxlength="100" placeholder="课程、地点、教师或教学组，按字面筛选" :disabled="busy" /></label><label class="check"><input v-model="form.includeCancelled" type="checkbox" :disabled="busy" /> 同时导出已取消的课程</label></details>
           <p v-if="form.classId" class="hint wide">班级文件只包含该班级的授权教学安排，不含本人个人导入；准备与下载时会再次核对权限。</p>

@@ -1,4 +1,5 @@
 <script setup>
+import DateField from '@/components/DateField.vue'
 import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import {
   readPersonalTerms,
@@ -441,8 +442,8 @@ onBeforeUnmount(() => {
                 </select></label
               >
               <div v-if="form.operation === 'DATE'" class="fields">
-                <label>原上课日期<input v-model="form.fromDate" required type="date" /></label
-                ><label>新上课日期<input v-model="form.toDate" required type="date" /></label>
+                <label>原上课日期<DateField v-model="form.fromDate" required  :disabled="locked" /></label
+                ><label>新上课日期<DateField v-model="form.toDate" required  :disabled="locked" /></label>
               </div>
               <div v-if="['DATE', 'BATCH'].includes(form.operation)" class="fields">
                 <label>新任课教师，留空不改<input v-model="form.teacher" maxlength="100" placeholder="只记录姓名，不建立授课账号绑定" /></label>
@@ -479,10 +480,9 @@ onBeforeUnmount(() => {
                   ><label
                     >新学期名称<input v-model="form.semester" required maxlength="100" /></label
                   ><label
-                    >新学期第1周周一<input
+                    >新学期第1周周一<DateField
                       v-model="form.firstMonday"
-                      required
-                      type="date" /></label></template
+                      required  monday-only :disabled="locked" /></label></template
                 ><label
                   >目标学期上课周次<input
                     v-model="form.targetWeeks"

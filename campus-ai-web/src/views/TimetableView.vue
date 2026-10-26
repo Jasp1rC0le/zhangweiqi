@@ -12,6 +12,8 @@ const legacy = useTimetableStore()
 const personal = useCourseScheduleStore()
 const importDetails = ref(), importPanel = ref(),scheduleExportPanel=ref()
 const importOpen = ref(false)
+const importAction = ref(false)
+watch(() => importPanel.value?.importing, active => { if (!active) importAction.value = false })
 const route = useRoute()
 const calendarLayout = ref({ owner: '', status: 'waiting' })
 const calendarOwner = computed(() => personal.principal ? `${personal.principal}:${userSessionGeneration.value}` : '')
@@ -39,10 +41,12 @@ watch([() => route.query.tool, () => personal.principal], async ([tool]) => {
 }, { immediate: true, flush: 'post' })
 onBeforeUnmount(() => { disposed = true; routeGeneration++ })
 async function openImport() {
+  importAction.value = true
   importOpen.value = true
   if (importDetails.value) importDetails.value.open = true
   await nextTick()
   await importPanel.value?.openImport()
+  if (!importPanel.value?.importing) importAction.value = false
 }
 async function openOperations(){importOpen.value=true;if(importDetails.value)importDetails.value.open=true;await nextTick();await importPanel.value?.openOperations()}
 onMounted(() => personal.load())
@@ -69,22 +73,21 @@ function loadLegacy(event) {
   <main class="work-page timetable-page">
     <header class="timetable-heading">
       <h1>{{ title }}</h1>
-      <p>{{ hint }}</p>
-      <div class="timetable-actions" aria-label="课表操作">
+      <p v-if="!importAction">{{ hint }}</p>
+      <div class="timetable-actions" v-if="!importAction" aria-label="课表操作">
       <button v-if="!['COUNSELOR','SECRETARY'].includes(scope)" class="timetable-import-action" type="button" :disabled="importPanel?.dirty||importPanel?.unavailable" @click="openImport">{{ personal.schedule ? '更新课表' : '导入课表' }}</button>
       <button class="timetable-import-action timetable-export-action" type="button" :disabled="!calendarExportContext" @click="openCalendarExport">导出课表</button>
       <button v-if="!['COUNSELOR','SECRETARY'].includes(scope)" class="timetable-import-action timetable-export-action" type="button" @click="openOperations">修改个人安排</button>
       </div>
-      <p v-if="personal.loaded && !personal.schedule && !['COUNSELOR','SECRETARY'].includes(scope)" class="import-first-use">上传课表文件，自动解析后确认。保存后每天直接看课程、教师和教室。</p>
     </header>
-    <UnifiedWeekCalendar @available="unifiedAvailable = $event" @scope="scope = $event" @layout="calendarLayoutChanged" @export-context="calendarExportChanged" />
-    <ScheduleExportPanel ref="scheduleExportPanel" :owner="calendarOwner" :preferred-view="scope" :preset="fileExportPreset" :calendar-context="calendarExportContext" />
-    <details ref="importDetails" class="import-management" :open="importOpen || !unifiedAvailable" @toggle="importOpen = $event.target.open">
-      <summary>导入、更新或导出个人课表</summary>
+    <UnifiedWeekCalendar v-show="!importAction" @available="unifiedAvailable = $event" @scope="scope = $event" @layout="calendarLayoutChanged" @export-context="calendarExportChanged" />
+    <ScheduleExportPanel v-show="!importAction" ref="scheduleExportPanel" :owner="calendarOwner" :preferred-view="scope" :preset="fileExportPreset" :calendar-context="calendarExportContext" />
+    <details ref="importDetails" class="import-management" :class="{'import-focused':importAction}" :open="importOpen || !unifiedAvailable" @toggle="importOpen = $event.target.open">
+      <summary>管理个人课表</summary>
       <CourseSchedulePanel ref="importPanel" :layout-ready="layoutReadiness" :export-requested="route.query.tool === 'personal-export'" :manage-requested="route.query.tool === 'personal-manage'" :manage-only="unifiedAvailable" />
     </details>
-    <details class="legacy-source" @toggle="loadLegacy">
-      <summary>取回以前保存的原件</summary>
+    <details v-show="!importAction" class="legacy-source" @toggle="loadLegacy">
+      <summary>旧版原件</summary>
       <p>新版统一显示解析后的课程，旧图片不再作为课表展示，已经保存的原件没有删除。</p>
       <p v-if="legacy.loading" role="status">正在读取本人原件…</p>
       <p v-else-if="legacy.error" role="alert">
@@ -102,6 +105,7 @@ function loadLegacy(event) {
   </main>
 </template>
 <style scoped>
+.import-focused>summary{display:none}.import-focused{border-top:0!important;padding-top:0!important;margin-top:0!important}
 .timetable-page {
   max-width: 1160px;
 }

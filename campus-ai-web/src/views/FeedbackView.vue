@@ -66,7 +66,7 @@ async function submit() {
 
 <template>
   <div class="work-page feedback-page">
-    <header class="work-heading"><div><h1>让它更好</h1><p>哪里不顺手，或哪一步还缺工具，直接告诉我们</p></div></header>
+    <header class="work-heading"><div><h1>意见反馈</h1><p>哪里不好用，告诉我们。</p></div></header>
     <FormDraftRecovery :state="draftState" :pending="Boolean(draftPending)" :busy="busy" :enabled-allowed="Boolean(auth.user?.id)"
       scope="反馈" :notice="draftNotice" storage-description="保留最近一份反馈的主题、正文和提交编号，不保留称呼、联系方式字段；正文中自行填写的个人信息仍会暂存"
       @toggle="drafts.toggle" @restore="restoreDraft" @discard="drafts.discard" />

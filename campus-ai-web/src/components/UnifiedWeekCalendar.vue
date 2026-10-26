@@ -1,4 +1,5 @@
 <script setup>
+import DateField from '@/components/DateField.vue'
 import { computed, onBeforeUnmount, onMounted, reactive, ref, useId, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useCourseScheduleStore } from '@/stores/courseSchedule'
@@ -332,7 +333,7 @@ onBeforeUnmount(() => {
         </nav>
       </header>
       <form class="calendar-date-jump" novalidate @submit.prevent="jumpDate">
-        <label>查看日期<input v-model="dateDraft" type="date" aria-label="查看课表日期" :aria-describedby="dateHintId" :aria-invalid="!!dateError" :min="CALENDAR_DATE_MIN" :max="CALENDAR_DATE_MAX" required :disabled="state.loading || scopeState.loading || noticeBusy" @input="dateError = ''" /></label>
+        <label>查看日期<DateField v-model="dateDraft" aria-label="查看课表日期" :aria-describedby="dateHintId" :aria-invalid="!!dateError" :min="CALENDAR_DATE_MIN" :max="CALENDAR_DATE_MAX" required :disabled="state.loading || scopeState.loading || noticeBusy" @input="dateError = ''"  /></label>
         <button type="submit" :disabled="state.loading || scopeState.loading || noticeBusy">查看</button>
       </form>
       <p :id="dateHintId" class="calendar-date-hint" :class="{ 'calendar-error': dateError }" :role="dateError ? 'alert' : 'status'">{{ dateError || dateHint }}</p>

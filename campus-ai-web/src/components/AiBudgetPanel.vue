@@ -1,4 +1,5 @@
 <script setup>
+import DateField from '@/components/DateField.vue'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { getAiBudget, getAiDailyCosts } from '@/api/admin'
 import { userSessionGeneration } from '@/api/http'
@@ -102,8 +103,8 @@ onMounted(refresh)
         </article>
       </div>
       <form class="cost-export" @submit.prevent="exportCosts">
-        <label>开始日期<input v-model="exportFrom" type="date" required :disabled="pending || exportPending" :max="budget.date" /></label>
-        <label>结束日期（含当天）<input v-model="exportThrough" type="date" required :disabled="pending || exportPending" :min="exportFrom" :max="budget.date" /></label>
+        <label>开始日期<DateField v-model="exportFrom" required :disabled="pending || exportPending" :max="budget.date"  /></label>
+        <label>结束日期（含当天）<DateField v-model="exportThrough" required :disabled="pending || exportPending" :min="exportFrom" :max="budget.date"  /></label>
         <button type="submit" :disabled="pending || exportPending">{{ exportPending ? '正在导出…' : '导出对账明细' }}</button>
       </form>
       <p v-if="exportNotice" class="budget-context" role="status">{{ exportNotice }}</p>

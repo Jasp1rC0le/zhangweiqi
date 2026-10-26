@@ -69,7 +69,7 @@ class TeachingDispatchCapacityTest {
         long begun=System.nanoTime();int added=tx.execute(s->service.dispatchDueNotices());long millis=(System.nanoTime()-begun)/1000000;
         boolean before="before".equals(System.getProperty("capacity.phase"));
         var metrics=Map.of("engine","isolated H2","registeredStudents",10000,"lessons",250,"added",added,"readStatements",reads.get(),"writeStatements",writes.get(),"elapsedMillis",millis);
-        Path output=Path.of("../.local/runtime/dispatch-capacity-"+(before?"before":"after")+"-2026-10-15.json");Files.createDirectories(output.getParent());Files.writeString(output,new ObjectMapper().writeValueAsString(metrics));
+        Path output=Path.of("target/test-evidence/dispatch-capacity-"+(before?"before":"after")+".json");Files.createDirectories(output.getParent());Files.writeString(output,new ObjectMapper().writeValueAsString(metrics));
         System.out.println("DISPATCH_CAPACITY "+new ObjectMapper().writeValueAsString(metrics));
         assertEquals(before?10250:1000,added);
         if(!before) {assertTrue(reads.get()<=3);assertTrue(writes.get()<=10);}
@@ -80,7 +80,7 @@ class TeachingDispatchCapacityTest {
         assertEquals(10250,total);assertEquals(10250,db.queryForObject("SELECT COUNT(*) FROM teaching_notices",Integer.class));
         assertEquals(10000,db.queryForObject("SELECT COUNT(*) FROM teaching_notices WHERE kind='STUDENT_CLASS'",Integer.class));
         var metrics=Map.of("engine","isolated H2","total",total,"passes",passes,"readStatements",reads.get(),"writeStatements",writes.get(),"elapsedMillis",(System.nanoTime()-begun)/1000000);
-        Files.writeString(Path.of("../.local/runtime/dispatch-capacity-drain-2026-10-15.json"),new ObjectMapper().writeValueAsString(metrics));
+        Path output=Path.of("target/test-evidence/dispatch-capacity-drain.json");Files.createDirectories(output.getParent());Files.writeString(output,new ObjectMapper().writeValueAsString(metrics));
         assertTrue(writes.get()<=103);assertTrue(reads.get()<=36);
     }
     @Test void preparationNeverMakesAnInboxVisibleBeforeItsDueTimeAndExpiredLessonsAreNotSent() {

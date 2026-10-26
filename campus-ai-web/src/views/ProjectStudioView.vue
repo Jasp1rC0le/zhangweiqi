@@ -1,4 +1,5 @@
 <script setup>
+import DateField from '@/components/DateField.vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter } from 'vue-router'
 import { ArrowRight, Plus, Download, FolderOpened, DocumentChecked, Clock, Delete, Check } from '@element-plus/icons-vue'
@@ -343,7 +344,7 @@ async function deleteCurrent() {
     <div class="studio-layout">
       <aside class="studio-directory" aria-label="项目目录">
         <div class="directory-heading"><h1>我的项目</h1><button class="icon-button" :disabled="busy" aria-label="创建新项目" @click="beginProject()"><Plus /></button></div>
-        <p class="directory-intro">让每次修改，都接着上次继续</p>
+        <p class="directory-intro">任务、材料和版本，一起保存。</p>
         <label class="archive-filter"><input v-model="showArchived" type="checkbox" />显示已归档</label>
         <button class="directory-refresh" :disabled="loading || busy" @click="refreshList">刷新目录</button>
         <div v-if="loading" class="studio-skeleton" role="status" aria-label="正在加载项目"></div>
@@ -366,12 +367,12 @@ async function deleteCurrent() {
         <div v-if="error" class="studio-error" role="alert"><p>{{ error }}</p><button v-if="!editing" :disabled="busy" @click="route.params.id ? openProject(route.params.id) : refreshList()">重试加载</button><template v-else><button @click="download">导出当前草稿</button><button v-if="current" :disabled="busy" @click="mayLeave() && openProject(current.id)">重新加载已保存版本</button></template></div>
         <p class="studio-status" role="status" aria-live="polite">{{ status }}</p>
         <section v-if="!editing && !busy" class="studio-start">
-          <h2>把一个任务，做完整</h2>
-          <p>准备两样东西：课程、研究或项目的任务要求，以及你已经写好的报告或作品说明。师生都可使用，粘贴进来就能逐项看还缺什么。</p>
+          <h2>开始一个项目</h2>
+          <p>选一个方向，放入任务要求和已有材料。</p>
           <div class="starter-flow"><span><DocumentChecked />确认要求</span><ArrowRight /><span><FolderOpened />关联材料</span><ArrowRight /><span><Check />检查缺项</span></div>
           <h3>从你的任务开始</h3>
           <button v-for="track in tracks" :key="track.id" class="project-template" @click="beginProject(track.id)"><span><strong>{{ track.name }}</strong><small>{{ track.description }}</small></span><ArrowRight /></button>
-          <p class="studio-boundary">没有数据表也能用。有表格时再做数据检查；不会替你写作业、编造实验结果或保证通过。</p>
+          <p class="studio-boundary">按需检查缺项或数据，不代写、不编造结果。</p>
         </section>
         <div v-else-if="busy && !editing" class="studio-skeleton editor-skeleton" role="status" aria-label="正在打开项目"></div>
         <template v-else-if="editing">
@@ -379,15 +380,15 @@ async function deleteCurrent() {
           <fieldset class="project-meta" :disabled="busy">
             <label class="title-field">项目名称<input id="project-title" v-model="draft.title" maxlength="100" :placeholder="hints.title" aria-label="项目名称" /></label>
             <label>任务方向<select v-model="draft.track"><option v-for="track in tracks" :key="track.id" :value="track.id">{{ track.name }}</option></select></label>
-            <label>截止日期（选填）<input v-model="draft.deadline" type="date" /></label>
+            <label>截止日期（选填）<DateField v-model="draft.deadline"  :disabled="busy" /></label>
           </fieldset>
           <div class="studio-next-action"><div><strong>下一步：{{ nextAction.label }}</strong><p>{{ nextAction.detail }}</p></div><button :disabled="busy" @click="followNextAction">{{ nextAction.label }}<ArrowRight /></button></div>
           <nav class="studio-tabs" aria-label="项目步骤"><button v-for="tab in tabs" :key="tab.id" :aria-current="section === tab.id ? 'step' : undefined" :class="{active: section === tab.id}" :disabled="busy" @click="selectSection(tab.id)">{{ tab.label }}</button></nav>
           <AttachmentImportPanel ref="importer" @apply="applyAttachment" />
           <fieldset class="studio-editor" :disabled="busy">
             <section v-if="section === 'requirements'" class="requirements-section">
-              <div class="section-heading"><div><h2>先说清楚，要完成什么</h2><p>粘贴获授权的任务要求，按行整理后逐条确认；不自动推测评分标准</p></div></div>
-              <label class="text-label" for="project-brief">任务要求是什么？直接粘贴原话</label><p id="brief-help" class="studio-field-help">从课程通知、研究任务书或项目要求中复制。尽量一行一项；示例只是格式，不是学校标准。</p><textarea id="project-brief" v-model="draft.brief" rows="6" maxlength="20000" :placeholder="hints.brief" aria-describedby="brief-help"></textarea>
+              <div class="section-heading"><div><h2>任务要求</h2></div></div>
+              <label class="text-label" for="project-brief">粘贴任务原文</label><p id="brief-help" class="studio-field-help">一行一项，再点“按行整理要求”核对。示例不是学校标准。</p><textarea id="project-brief" v-model="draft.brief" rows="6" maxlength="20000" :placeholder="hints.brief" aria-describedby="brief-help"></textarea>
               <div class="field-actions"><span>{{ draft.brief.length }} / 20,000 字</span><button @click="requestImport('brief')">导入任务附件</button><button :disabled="!draft.brief.trim()" @click="organize">按行整理要求</button></div>
               <details class="template-suggestions"><summary>还没有任务书？从通用练习开始</summary><p>原创练习模板，不是本校课程要求或评分标准；使用后需要逐项修改和确认</p><p v-if="taskTemplate.url">公开教学参考：<a :href="taskTemplate.url" target="_blank" rel="noopener noreferrer">{{ taskTemplate.source }}</a></p><pre class="template-preview">{{ taskTemplate.brief }}</pre><button @click="useTaskTemplate">使用这份通用练习</button></details>
               <div class="requirements-heading"><h3 id="project-requirements" tabindex="-1">要求清单 <span>{{ draft.requirements.length }} / 80</span></h3><button @click="addRequirement()"><Plus />补充要求</button></div>

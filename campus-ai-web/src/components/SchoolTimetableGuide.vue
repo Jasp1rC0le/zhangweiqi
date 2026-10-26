@@ -13,10 +13,9 @@ async function copy() {
 </script>
 <template>
   <details class="school-guide">
-    <summary>怎么获得整学期课表？</summary>
+    <summary>获取整学期数据文件</summary>
     <p>
-      <strong>首选数据文件，不建议截图。</strong
-      >文件能保留全部周次和教室；单周截图不包含其他周，也容易漏掉单双周。
+      数据文件可保留整学期周次；单周截图只能识别图中明确的安排。
     </p>
     <ol>
       <li>电脑上把下面的“导出中德课表”拖入浏览器书签栏。</li>

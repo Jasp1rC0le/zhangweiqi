@@ -204,9 +204,8 @@ onMounted(async () => {
           <p class="table-lead">好吃值得一颗星，有趣值得一个赞</p>
         </div>
         <div class="table-intro-note">
-          <span>同学的口味，你的参考</span>
-          <p>看评分 · 留短评 · 选神评</p>
-          <small>满分 5 分，不把一条好评当成全部</small>
+          <span>5 分制 · 同学的真实体验</span>
+          <p>点评一家你吃过的店。</p>
         </div>
       </section>
       <div v-if="loading" class="table-empty" aria-busy="true">正在摆好校园餐桌…</div>

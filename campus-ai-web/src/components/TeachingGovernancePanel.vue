@@ -1,4 +1,5 @@
 <script setup>
+import DateField from '@/components/DateField.vue'
 import {computed,nextTick,onBeforeUnmount,reactive,ref,watch} from 'vue'
 import {chinaDate,addDays} from '@/utils/timetable'
 import {ATTENDANCE_STATUSES,TEACHING_VIEWS,teachingDate,teachingClock} from '@/utils/teaching'
@@ -63,8 +64,8 @@ onBeforeUnmount(()=>{disposed=true;resource.dispose();classResource.dispose()})
       <p v-else-if="state.access && !ready" role="status">当前账号还没有这个教学视图的记录权限。</p>
       <form v-if="ready" class="governance-filters" @submit.prevent="load()">
         <label>查看内容<select v-model="kind" :disabled="operationBusy"><option value="ATTENDANCE">考勤结果</option><option value="AUDIT">更正与点名变更</option></select></label>
-        <label>开始日期<input v-model="from" type="date" required :disabled="operationBusy" /></label>
-        <label>结束日期<input v-model="to" type="date" :min="from" :max="addDays(from||chinaDate(),30)" required :disabled="operationBusy" /></label>
+        <label>开始日期<DateField v-model="from" required :disabled="operationBusy"  /></label>
+        <label>结束日期<DateField v-model="to" :min="from" :max="addDays(from||chinaDate(),30)" required :disabled="operationBusy"  /></label>
         <label class="governance-check"><input v-model="expiredOnly" type="checkbox" :disabled="operationBusy" /><span>只看到期候选</span></label>
         <button class="primary" :disabled="operationBusy">读取并核对</button>
       </form>

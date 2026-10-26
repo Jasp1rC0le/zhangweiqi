@@ -15,9 +15,8 @@
 ```bash
 cd campus-ai-web
 npm ci
-node --test --test-timeout=15000 tests
-npx eslint . --no-cache
-npx oxlint . --deny-warnings
+npm test
+npm run check
 npm run build
 ```
 

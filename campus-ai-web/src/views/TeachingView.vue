@@ -1,4 +1,5 @@
 <script setup>
+import DateField from '@/components/DateField.vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useScopedConfirmation } from '@/utils/useScopedConfirmation'
@@ -450,16 +451,15 @@ onBeforeUnmount(() => {
         <span v-if="state.lessonQuery?.search">课程筛选：{{ state.lessonQuery.search }}</span>
       </div>
       <form v-if="!focused" v-show="!leadership || filtersExpanded" id="teaching-query-filters" class="teaching-filters" @submit.prevent="reload">
-        <label>开始日期<input v-model="from" type="date" :disabled="busy" required /></label>
+        <label>开始日期<DateField v-model="from" :disabled="busy" required  /></label>
         <label
-          >结束日期<input
+          >结束日期<DateField
             v-model="to"
-            type="date"
             :min="from"
             :max="addDays(from || chinaDate(), 30)"
             :disabled="busy"
             required
-        /></label>
+         /></label>
         <button class="teaching-button" :disabled="busy">
           {{ state.loading ? '正在读取' : '查看记录' }}
         </button>

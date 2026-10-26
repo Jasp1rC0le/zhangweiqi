@@ -24,7 +24,7 @@ watch(()=>[auth.user?.id,auth.user?.schoolId,userSessionGeneration.value],reset,
 function append(){if(!current.value||!draft.value||!confirmed.value||props.saving||alreadyAccepted.value)return;emit('append',{instrumentId:current.value.id,...instrumentRequest(draft.value),title:`${current.value.name} · 实验学习`,text:instrumentNote(current.value,draft.value.model,draft.value.symptom,draft.value.tried)})}
 </script>
 <template><section class="instrument-library" :class="{'is-embedded':embedded}">
-  <header class="instrument-heading"><div><h2>{{embedded?'仪器与调试记录':'先认识设备，再开始实验'}}</h2><p>{{instruments.length}} 类常见仪器 · 原厂资料索引与学习提示 · 不是本校设备清单</p></div></header>
+  <header class="instrument-heading"><div><h2>{{embedded?'仪器与调试记录':'仪器资料'}}</h2><p>{{instruments.length}} 类常见仪器 · 原厂资料索引，非本校设备清单</p></div></header>
   <p v-if="pendingCount" class="work-help instrument-draft-status" role="status">{{pendingCount}} 份仪器记录{{embedded?'尚未加入项目材料':'尚未保存'}} · 筛选或切换仪器不会清除，离开页面前请处理</p>
   <div class="instrument-search"><label><span>找仪器</span><input v-model="query" :disabled="saving" type="search" placeholder="示波器、万用表、卡尺…" /></label><label><span>学科类别</span><select v-model="group" :disabled="saving"><option value="">全部类别</option><option v-for="g in instrumentGroups" :key="g">{{g}}</option></select></label></div>
   <div class="instrument-layout">

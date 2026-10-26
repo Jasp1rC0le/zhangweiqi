@@ -1,4 +1,5 @@
 <script setup>
+import DateField from '@/components/DateField.vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import {
   readLessonChangeAccess,
@@ -430,11 +431,10 @@ defineExpose({
             </fieldset>
             <template v-if="form.action === 'RESCHEDULE'"
               ><label class="wide"
-                >调整后日期<input
+                >调整后日期<DateField
                   v-model="form.date"
-                  type="date"
                   required
-                  :disabled="busy" /></label
+                  :disabled="busy"  /></label
               ><label
                 >开始钟点<input
                   v-model="form.startTime"
@@ -501,15 +501,14 @@ defineExpose({
           </p>
           <form @submit.prevent="list(0)">
             <label
-              >开始日期<input v-model="query.from" type="date" required :disabled="busy" /></label
+              >开始日期<DateField v-model="query.from" required :disabled="busy"  /></label
             ><label
-              >结束日期<input
+              >结束日期<DateField
                 v-model="query.to"
-                type="date"
                 required
                 :min="query.from"
                 :max="addDays(query.from || chinaDate(), 30)"
-                :disabled="busy" /></label
+                :disabled="busy"  /></label
             ><label class="wide"
               >查找课程<input
                 v-model="query.search"

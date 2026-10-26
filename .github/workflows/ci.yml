@@ -27,9 +27,8 @@ jobs:
           cache: npm
           cache-dependency-path: campus-ai-web/package-lock.json
       - run: npm ci --no-audit --no-fund
-      - run: node --test --test-timeout=15000 tests
-      - run: npx eslint . --no-cache
-      - run: npx oxlint . --deny-warnings
+      - run: npm test
+      - run: npm run check
       - run: npm run build
   backend:
     runs-on: ubuntu-latest

@@ -1,6 +1,14 @@
 // User-visible shipped capabilities only. Keep dates factual; never substitute the current clock.
 export const productUpdates = Object.freeze([
   Object.freeze({
+    date: '2026-10-26', label: '2026年10月26日',
+    items: Object.freeze([
+      Object.freeze({ title: '日期选择更清楚', text: '统一月历、快捷选月和键盘操作；选择日期仍需按原流程查看或保存。', route: '/timetable', action: '打开课表' }),
+      Object.freeze({ title: '截图导入分步核对', text: '先选截图或表格，识别后再核对课程。发送给 Kimi 仍需主动同意，不自动保存。', route: '/timetable?tool=personal-manage', action: '导入课表' }),
+      Object.freeze({ title: '校园墙轻松开聊', text: '日常吐槽、交友搭子、学习交流；长说明收起，审核后同校可见。', route: '/wall', action: '去校园墙' }),
+    ]),
+  }),
+  Object.freeze({
     date: '2026-10-25', label: '2026年10月25日',
     items: Object.freeze([
       Object.freeze({ title: '看完记录返回原课表范围', text: '从课表打开单节记录或名单后，“返回课表”带回原日期、身份、班级和课程页，并重新核对权限；失效不悄悄改查本周或全部班级。未保存记录仍先确认离开。', route: '/timetable', action: '打开课表与记录' }),

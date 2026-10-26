@@ -13,7 +13,7 @@ bounded 180 mvn -q verify
 cd "$repo_root/campus-ai-web"
 # Run this script in an isolated source copy when the working checkout has a live Vite process.
 bounded 120 npm ci --no-audit --no-fund
-bounded 90 node --test --test-timeout=15000 tests
+bounded 90 npm test
 bounded 60 npx eslint . --no-cache
 bounded 60 npx oxlint . --deny-warnings
 bounded 60 npm run build
