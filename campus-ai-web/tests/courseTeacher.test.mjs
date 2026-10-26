@@ -21,7 +21,7 @@ test('seven-column CSV JSON and mapped school details retain teacher, old six-co
   assert.throws(()=>parseCourseJson(JSON.stringify({...snapshot(),courses:[{...course,teacherId:77}]})),/课程字段异常/)
 })
 test('image teacher is reviewed and corrected like a course field, never guessed from missing data',()=>{
-  const payload={version:1,provider:'kimi',model:'synthetic-vision',semester:'合成学期',firstMonday:'2026-10-12',warnings:[],rows:[{...course,startTime:null,endTime:null}]}
+  const payload={version:2,provider:'local-ocr',engine:'synthetic-local',external:false,semester:'合成学期',firstMonday:'2026-10-12',warnings:[],rows:[{...course,startTime:null,endTime:null}]}
   const rows=prepareCourseImageResult(payload).rows;assert.equal(rows[0].teacher,course.teacher);rows[0].teacher='合成教师乙';assert.equal(reviewCourseImageRows(rows).courses[0].teacher,'合成教师乙');assert.equal(payload.rows[0].teacher,'合成教师甲')
   delete payload.rows[0].teacher;assert.equal(prepareCourseImageResult(payload).rows[0].teacher,'')
 })

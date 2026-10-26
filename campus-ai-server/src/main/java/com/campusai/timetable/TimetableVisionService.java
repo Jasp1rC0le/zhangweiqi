@@ -5,7 +5,6 @@ import com.campusai.ai.usage.*;
 import com.campusai.mapper.UserMapper;
 import com.campusai.user.entity.User;
 import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.ObjectMapper;
 import java.time.LocalDate;
@@ -13,7 +12,7 @@ import java.util.*;
 import java.util.concurrent.*;
 
 /** Explicit consent grants this single uploaded image only. This service cannot read or save schedules. */
-@Service
+// Legacy provider adapter retained for isolated compatibility tests, not registered in the application.
 public class TimetableVisionService {
     private final TimetableVisionModel model;private final AiCallAdmission admission;private final AiSpendGuard budget;private final AiUsageRecorder usage;private final UserMapper users;private final ObjectMapper json;
     private final Semaphore slots=new Semaphore(2);private final Set<Long> active=ConcurrentHashMap.newKeySet();

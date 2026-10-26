@@ -19,6 +19,10 @@ Campthink 是面向校园学习与日常事务的全栈应用：把带来源的�
 
 以下为本地合成场景，非真实学生课程或发言。日期、截图导入与校园墙的改动见[易用性更新](docs/usability-2026-10-26.md)。
 
+最新版本：截图上传后由后台本地 OCR 识别，校园墙只需一个正文框。见[运行和验证说明](docs/local-timetable-ocr.md)。
+
+![单框校园墙，合成内容](docs/images/local-ocr-20261026/wall-desktop.png)
+
 ![专注课表截图导入 合成场景](docs/images/usability-20261026/import.png)
 
 <p><img src="docs/images/usability-20261026/calendar-mobile.png" width="280" alt="手机日期选择 合成场景" /> <img src="docs/images/usability-20261026/wall-mobile.png" width="280" alt="校园墙 合成场景" /></p>
@@ -38,7 +42,7 @@ Campthink 是面向校园学习与日常事务的全栈应用：把带来源的�
 
 校园事实回答依赖已核实的资料。模型输出、描述统计和规则检查都不能代替事实核验、学校正式通知或专业判断。文件提取不包含通用 OCR 或原版式保真；支付、会员权益和实时共同编辑尚未实现。
 
-个人导入课表只保存用户主动提供并确认的内容，不收集教务密码，不自动登录学校或实时同步调课。截图与结构化课程分别保存；单周图片不能自动补全整学期。课程表格支持明确列名的 UTF-8 CSV/TSV/TXT 或粘贴文本，学校原生文件格式仍需单独适配。详见[私有课表说明](docs/private-timetable.md)。
+个人导入课表只保存用户主动提供并确认的内容，不收集教务密码，不自动登录学校或实时同步调课。课表截图由后台本地 OCR 识别，不发送给大模型；单周图片只更新明确周次，不自动补全整学期。课程表格支持明确列名的 UTF-8 CSV/TSV/TXT 或粘贴文本。详见[本地截图识别](docs/local-timetable-ocr.md)与[私有课表说明](docs/private-timetable.md)。
 
 ## 技术栈
 

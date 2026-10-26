@@ -82,12 +82,12 @@ const overview = { pendingSubmissions: 0, unresolvedFeedback: 0, openContactMess
 const feedbackReceipts=new Map()
 let failFeedback=new URLSearchParams(window.location.search).has('failFeedback')
 const adapter = async (config) => {
-  // Explicitly synthetic image review: this DEV entry never calls an external vision service.
-  if(config.url==='/api/timetable/courses/image-capabilities')return{data:{version:1,provider:'kimi',model:'synthetic-vision-only',destination:'example.invalid',maxBytes:2097152,available:true},status:200,statusText:'OK',headers:{},config}
+  // Explicitly synthetic local OCR review; never calls a provider.
+  if(config.url==='/api/timetable/courses/image-capabilities')return{data:{version:2,provider:'local-ocr',engine:'synthetic-local',external:false,maxBytes:2097152,available:true},status:200,statusText:'OK',headers:{},config}
   if(config.url==='/api/timetable/courses/recognize-image'){
     document.documentElement.dataset.visionRequests=String(Number(document.documentElement.dataset.visionRequests||0)+1)
     if(new URLSearchParams(window.location.search).has('visionFailure'))throw{response:{status:503,data:{message:'模拟识别失败，请保留图片后重试'}},config}
-    return{data:{version:1,provider:'kimi',model:'synthetic-vision-only',semester:'2026秋（合成课表）',firstMonday:'2026-09-07',warnings:[],rows:[{name:'合成课程A',teacher:'合成教师A',weekday:1,startPeriod:1,endPeriod:2,weeks:[1,2,3,4],room:'合成教室A'},{name:'合成课程B',teacher:'',weekday:3,startTime:'14:00',endTime:'15:35',weeks:[1,3],room:''}]},status:200,statusText:'OK',headers:{},config}
+    return{data:{version:2,provider:'local-ocr',engine:'synthetic-local',external:false,semester:'2026秋（合成课表）',firstMonday:'2026-09-07',week:9,warnings:[],rows:[{name:'合成课程A',teacher:'',weekday:1,startPeriod:1,endPeriod:2,weeks:[9],room:'合成教室A'},{name:'合成课程B川',teacher:'',weekday:3,startTime:'14:00',endTime:'15:35',weeks:[9],room:'',reviewNote:'名称中的符号需对照原图核对'}]},status:200,statusText:'OK',headers:{},config}
   }
   if(privateMaterialFixture){const response=await privateMaterialFixture(config);if(response)return response}
   if (materialFixture) { const response = await materialFixture.adapter(config); if (response) return response }

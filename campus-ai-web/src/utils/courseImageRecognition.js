@@ -6,14 +6,17 @@ export function courseImageFileIssue(file){
 const single=(value,max)=>value==null?'':typeof value==='string'&&value.length<=max&&!/[\r\n\0]/.test(value)?value:(()=>{throw new Error('图片识别响应异常，未覆盖已有内容')})()
 const integer=(value,max)=>value==null?'':Number.isInteger(value)&&value>=1&&value<=max?String(value):(()=>{throw new Error('图片识别数值异常，未覆盖已有内容')})()
 export function prepareCourseImageResult(data){
-  if(data?.version!==1||data.provider!=='kimi'||!single(data.model,100)||!Array.isArray(data.rows)||!data.rows.length||data.rows.length>120||!Array.isArray(data.warnings)||data.warnings.length>20)throw new Error('图片识别响应不完整，未覆盖已有内容')
+  if(data?.version!==2||data.provider!=='local-ocr'||data.external!==false||!single(data.engine,100)||!Array.isArray(data.rows)||!data.rows.length||data.rows.length>120||!Array.isArray(data.warnings)||data.warnings.length>20)throw new Error('本地识别响应不完整，未覆盖已有内容')
   const firstMonday=single(data.firstMonday,10),semester=single(data.semester,100)
   if(firstMonday&&(mondayOf(firstMonday)!==firstMonday||firstMonday<'2000-01-01'||firstMonday>'2100-12-31'))throw new Error('图片中的开学日期不可信，请手工核对')
-  return{metadata:{semester,firstMonday},warnings:data.warnings.map(w=>single(w,300)),rows:data.rows.map((row,index)=>{
+  const week=data.week==null?null:Number(data.week)
+  if(week!==null&&(!Number.isInteger(week)||week<1||week>30))throw new Error('截图周次响应异常')
+  return{metadata:{semester,firstMonday,week},warnings:data.warnings.map(w=>single(w,300)),rows:data.rows.map((row,index)=>{
     if(!row||typeof row!=='object'||Array.isArray(row)||!Array.isArray(row.weeks)||row.weeks.length>30||row.weeks.some(w=>!Number.isInteger(w)||w<1||w>30))throw new Error('识别周次响应异常，未补猜周次')
     const startPeriod=integer(row.startPeriod,16),endPeriod=integer(row.endPeriod,16),startTime=single(row.startTime,5),endTime=single(row.endTime,5)
     if((startPeriod||endPeriod)&&(startTime||endTime))throw new Error('识别的节次和钟点混淆，请重新裁剪核对')
-    return{id:index+1,include:true,name:single(row.name,100),weekday:integer(row.weekday,7),mode:startTime||endTime?'clock':'period',start:startTime||startPeriod,end:endTime||endPeriod,weeks:row.weeks.join(';'),room:single(row.room,100),teacher:single(row.teacher,100)}
+    const reviewNote=single(row.reviewNote,180)
+    return{id:index+1,include:true,name:single(row.name,100),weekday:integer(row.weekday,7),mode:startTime||endTime?'clock':'period',start:startTime||startPeriod,end:endTime||endPeriod,weeks:row.weeks.join(';'),room:single(row.room,100),teacher:single(row.teacher,100),reviewNote,nameReviewed:!reviewNote}
   })}
 }
 export function reviewCourseImageRows(rows){
@@ -22,6 +25,7 @@ export function reviewCourseImageRows(rows){
   for(let i=0;i<rows.length;i++){
     const r=rows[i];if(!r.include)continue
     try{
+      if(r.reviewNote&&!r.nameReviewed)throw new Error(r.reviewNote+'，请核对后勾选确认')
       if(!['clock','period'].includes(r.mode)||!/^\d$/.test(r.weekday))throw new Error('请补充星期和时间类型')
       if(r.mode==='period'&&(!/^\d{1,2}$/.test(r.start)||!/^\d{1,2}$/.test(r.end)))throw new Error('请补充明确的开始和结束节次')
       selected.push(normalizeCourse({name:r.name,weekday:Number(r.weekday),...(r.mode==='period'?{startPeriod:Number(r.start),endPeriod:Number(r.end)}:{startTime:r.start,endTime:r.end}),weeks:parseCourseWeeks(r.weeks),room:r.room,teacher:r.teacher}))

@@ -4,7 +4,6 @@ import com.campusai.ai.model.AiModelResult;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.JsonNode;
@@ -12,7 +11,7 @@ import java.net.URI;
 import java.util.*;
 
 /** One explicit image, no Files upload, tools, history, retries or provider fallback. */
-@Service
+// Historical external adapter; public screenshot routes now use LocalTimetableOcrService exclusively.
 public class KimiTimetableVisionModel implements TimetableVisionModel {
     private static final Set<String> VISION = Set.of("kimi-k3","kimi-k3.1-pro","kimi-k3.1-pro-highspeed","kimi-k2.6","kimi-k2.7-code","kimi-k2.7-code-highspeed");
     private static final String SYSTEM = """

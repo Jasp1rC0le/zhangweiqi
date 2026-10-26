@@ -25,6 +25,7 @@ import CourseWeekGrid from './CourseWeekGrid.vue'
 import PersonalScheduleOperations from './PersonalScheduleOperations.vue'
 import SchoolTimetableGuide from './SchoolTimetableGuide.vue'
 import CourseImageImport from './CourseImageImport.vue'
+import { mergeWeeklyImage } from '@/utils/weeklyImageMerge'
 import { parseCourseText, coursesToCsv, describeCourseChanges } from '@/utils/courseImport'
 import { readCourseUpload } from '@/utils/courseUpload'
 import { useTimetableClock } from '@/utils/useTimetableClock'
@@ -355,14 +356,22 @@ async function chooseFile(event) {
 }
 async function adoptCourseImage(result) {
   if(disposed||unavailable.value||result.owner!==store.principal)return
-  const owner=store.principal,generation=++fileGeneration
+  const owner=store.principal,base=store.schedule,baseRevision=base?.revision||0
+  let merged
+  try{merged=mergeWeeklyImage(base,result.courses,result.metadata)}catch(failure){error.value=failure.message;return}
+  const nextRaw=coursesToCsv(merged.courses)
+  if(raw.value.trim()&&raw.value!==nextRaw&&!(await confirm('本次结果会替换未保存预览；已保存课表不变。',{title:'采用这次识别结果？',confirmText:'替换未保存预览',cancelText:'保留当前填写'})))return
+  if(disposed||owner!==store.principal)return
+  if((store.schedule?.revision||0)!==baseRevision){error.value='已保存课表发生变化，请重新读取后再采用识别结果';versionConflict.value=true;return}
+  const generation=++fileGeneration
   fileRead?.abort();fileRead=null;invalidatePreview();error.value=''
+  result={...result,courses:merged.courses,metadata:merged.metadata,conflicts:courseConflicts(merged.courses),warnings:[...result.warnings,...merged.warnings]}
   if(result.metadata.semester)form.semester=result.metadata.semester
   if(result.metadata.firstMonday)form.firstMonday=result.metadata.firstMonday
   raw.value=coursesToCsv(result.courses)||JSON.stringify({semester:form.semester,firstMonday:form.firstMonday,courses:result.courses})
   await nextTick()
   if(disposed||owner!==store.principal||generation!==fileGeneration)return
-  preview.value={courses:result.courses,metadata:result.metadata,warnings:result.warnings,conflicts:result.conflicts,duplicates:result.duplicates,source:result.source,revision:store.schedule?.revision||0}
+  preview.value={courses:result.courses,metadata:result.metadata,warnings:result.warnings,conflicts:result.conflicts,duplicates:result.duplicates,source:result.source,revision:baseRevision}
   fileLabel.value='本人核对后的图片识别结果';fileNotice.value=`待保存${result.courses.length}条课程；请核对学期、第1周日期和下方新增/移除差异，尚未保存`
   result.onApplied()
   await nextTick()
@@ -856,7 +865,7 @@ onBeforeUnmount(() => {
       </fieldset>
     </form>
     <details class="course-boundary"><summary>数据与同步说明</summary><p>
-      课表保存在统一数据库，按当前账号权限读取。聊天由模型理解问题，并根据查到的课程、教师、时间和地点回答；不发送学号、名单、成绩或考勤。图片识别仅在你主动同意时发送本次选图。未导入周次不补猜，不自动同步教务。正式教学另有站内提醒，尚无微信/离线推送；不索取教务密码。
+      课表保存在统一数据库，按账号权限读取。截图由本站后台本地OCR处理，不发送给大模型；只采用图中明确的周次。聊天查课仍根据授权数据回答，不发送学号、名单、成绩或考勤。不自动同步教务或索取教务密码。
     </p></details>
   </section>
 </template>

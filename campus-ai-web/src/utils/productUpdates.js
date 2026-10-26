@@ -4,8 +4,8 @@ export const productUpdates = Object.freeze([
     date: '2026-10-26', label: '2026年10月26日',
     items: Object.freeze([
       Object.freeze({ title: '日期选择更清楚', text: '统一月历、快捷选月和键盘操作；选择日期仍需按原流程查看或保存。', route: '/timetable', action: '打开课表' }),
-      Object.freeze({ title: '截图导入分步核对', text: '先选截图或表格，识别后再核对课程。发送给 Kimi 仍需主动同意，不自动保存。', route: '/timetable?tool=personal-manage', action: '导入课表' }),
-      Object.freeze({ title: '校园墙轻松开聊', text: '日常吐槽、交友搭子、学习交流；长说明收起，审核后同校可见。', route: '/wall', action: '去校园墙' }),
+      Object.freeze({ title: '截图改为后台本地识别', text: '上传后本地OCR读取课程、节次与截图周次，不调用大模型。核对后保存，只更新明确的那一周。', route: '/timetable?tool=personal-manage', action: '导入课表' }),
+      Object.freeze({ title: '校园墙，一个框就能发布', text: '只写正文，标题自动整理。审核与草稿设置收在更多菜单里，原有内容保留。', route: '/wall', action: '去校园墙' }),
     ]),
   }),
   Object.freeze({
