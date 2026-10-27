@@ -58,7 +58,7 @@ try {
   const password = randomBytes(18).toString('hex')
   const user = async name => {
     const username = `${name}_${app.suffix}`
-    assert.equal((await app.api('POST', '/api/users', {username, nickname: '邮件边界合成测试', password, schoolId: 1, privacyAccepted: true, policyVersion: '2026-10-04'})).status, 201)
+    assert.equal((await app.api('POST', '/api/users', {username, nickname: '邮件边界合成测试', password, schoolId: 1, privacyAccepted: true, policyVersion: '2026-10-27'})).status, 201)
     const result = await app.api('POST', '/api/auth/login', {username, password}); assert.equal(result.status, 200)
     return {username, access: result.value.token, id: result.value.user.id}
   }

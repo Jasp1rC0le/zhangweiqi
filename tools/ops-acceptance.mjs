@@ -18,7 +18,7 @@ try {
   active = await fixture(release)
   receipt.fixture = {folder: active.folder, sourceSchema: active.db, webOrigin: active.origin}
   const password = randomBytes(20).toString('hex'), ownerName = 'ops21_owner_' + active.suffix, otherName = 'ops21_other_' + active.suffix
-  for (const username of [ownerName, otherName]) assert.equal((await active.api('POST', '/api/users', {username, nickname: '隔离合成验收', password, schoolId: 1, privacyAccepted: true, policyVersion: '2026-10-04'})).status, 201)
+  for (const username of [ownerName, otherName]) assert.equal((await active.api('POST', '/api/users', {username, nickname: '隔离合成验收', password, schoolId: 1, privacyAccepted: true, policyVersion: '2026-10-27'})).status, 201)
   const login = async username => { const response = await active.api('POST', '/api/auth/login', {username, password}); assert.equal(response.status, 200); return response.value.token }
   const oldToken = await login(ownerName), otherToken = await login(otherName)
   checked('normal registration and password login against real MySQL/Java')

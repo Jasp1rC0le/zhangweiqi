@@ -38,7 +38,7 @@ try {
   active = await fixture(process.argv[2], {maxInFlight: 2})
   receipt.fixture = {folder: active.folder, schema: active.db}
   const password = randomBytes(20).toString('hex'), username = 'upload21_' + active.suffix
-  assert.equal((await active.api('POST', '/api/users', {username, nickname: '合成上传边界', password, schoolId: 1, privacyAccepted: true, policyVersion: '2026-10-04'})).status, 201)
+  assert.equal((await active.api('POST', '/api/users', {username, nickname: '合成上传边界', password, schoolId: 1, privacyAccepted: true, policyVersion: '2026-10-27'})).status, 201)
   const login = await active.api('POST', '/api/auth/login', {username, password}); assert.equal(login.status, 200)
   const token = login.value.token
   const anonymous = partial(); await pause(500)

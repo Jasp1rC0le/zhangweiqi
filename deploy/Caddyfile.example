@@ -1,6 +1,22 @@
 # Apply only after filing is approved and DNS points to the actual server.
 # Caddy obtains and renews the TLS certificate; ports 80 and 443 must be reachable.
 campthink.cn {
+    # Match the published six-month security-log policy. No headers or token-bearing URI.
+    log {
+        output file /var/log/caddy/campthink-access.json {
+            roll_size 25MiB
+            roll_keep -1
+            roll_keep_for 4320h
+        }
+        format filter {
+            wrap json
+            fields {
+                request>headers delete
+                request>uri delete
+                resp_headers delete
+            }
+        }
+    }
     root * /srv/campus-ai-web
     encode zstd gzip
 
@@ -42,4 +58,8 @@ campthink.cn {
         try_files {path} /index.html
         file_server
     }
+}
+
+www.campthink.cn {
+    redir https://campthink.cn{uri} permanent
 }

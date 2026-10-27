@@ -48,7 +48,7 @@ public class CommandLocalOcrEngine implements LocalOcrEngine,AutoCloseable {
         if(!Files.isExecutable(target))throw unavailable();binary=target;return binary;
     }
     public List<Line> read(BufferedImage image,long deadline){
-        return mac?nativeRead(image,List.of(),deadline).lines():tesseract(image,11,deadline);
+        return mac?nativeRead(image,List.of(),deadline).lines():tesseractAnchors(image,deadline);
     }
     public List<RegionText> regions(BufferedImage image,List<Region> regions,long deadline){
         if(regions.size()>120)throw unavailable();
@@ -56,7 +56,7 @@ public class CommandLocalOcrEngine implements LocalOcrEngine,AutoCloseable {
         var result=new ArrayList<RegionText>();
         for(int i=0;i<regions.size();i++){
             var r=regions.get(i);validateRegion(image,r);
-            var lines=tesseract(image.getSubimage(r.x(),r.y(),r.width(),r.height()),6,deadline);
+            var crop=image.getSubimage(r.x(),r.y(),r.width(),r.height());int scale=crop.getWidth()<80?3:2;var lines=rescale(tesseract(enhance(crop,r.enhance(),scale),6,deadline),scale,0,0);
             result.add(new RegionText(i,lines,lines.stream().sorted(Comparator.comparingDouble(Line::y).thenComparingDouble(Line::x)).map(Line::text).reduce((a,b)->a+" "+b).orElse("")));
         }
         return List.copyOf(result);
@@ -79,7 +79,8 @@ public class CommandLocalOcrEngine implements LocalOcrEngine,AutoCloseable {
             return parsed;
         }catch(ResponseStatusException e){throw e;}catch(Exception e){throw unavailable();}finally{delete(job);}
     }
-    private List<Line> tesseract(BufferedImage image,int psm,long deadline){
+    private List<Line> tesseract(BufferedImage image,int psm,long deadline){return tesseract(image,psm,deadline,psm==11);}
+    private List<Line> tesseract(BufferedImage image,int psm,long deadline,boolean anchors){
         Path job=null;
         try{
             job=Files.createTempDirectory(runtime(),"job-",PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------")));
@@ -98,10 +99,32 @@ public class CommandLocalOcrEngine implements LocalOcrEngine,AutoCloseable {
                 double right=words.stream().mapToDouble(v->v.x()+v.width()).max().orElse(x),bottom=words.stream().mapToDouble(v->v.y()+v.height()).max().orElse(y);
                 result.add(new Line(text,words.stream().mapToDouble(Line::confidence).average().orElse(0),x,y,right-x,bottom-y));
                 // TSV words are retained for weekday/date/period anchors.
-                if(psm==11&&words.size()>1)result.addAll(words);
+                if(anchors&&words.size()>1)result.addAll(words);
             }
             validLines(result);return List.copyOf(result);
         }catch(ResponseStatusException e){throw e;}catch(Exception e){throw unavailable();}finally{delete(job);}
+    }
+    private List<Line> tesseractAnchors(BufferedImage image,long deadline){
+        var result=new ArrayList<>(tesseract(image,11,deadline));
+        // The supplied school template has a full-width colored semester/week band.
+        int first=-1,last=-1;
+        for(int y=0;y<image.getHeight()*0.45;y++){
+            int colored=0;for(int x=0;x<image.getWidth();x+=3){int v=image.getRGB(x,y),r=(v>>16)&255,g=(v>>8)&255,b=v&255;if(b>r+25&&g>r+15)colored++;}
+            if(colored>image.getWidth()/3.0*0.72){if(first<0)first=y;last=y;}
+            else if(first>=0&&y-last>image.getHeight()*0.018)break;
+        }
+        if(first>=0&&last-first>25){var crop=image.getSubimage(0,first,image.getWidth(),last-first+1);result.addAll(rescale(tesseract(enhance(crop,true,2),6,deadline,true),2,0,first));}
+        var dates=result.stream().filter(l->l.text().matches("\\d{1,2}[-/]\\d{1,2}")).toList();
+        if(dates.size()>=5){int y=(int)dates.stream().mapToDouble(Line::y).min().orElse(0),height=(int)dates.stream().mapToDouble(Line::height).max().orElse(24);int top=Math.max(0,y-Math.max(55,image.getHeight()/25)),bottom=Math.min(image.getHeight(),y+height+12);
+            if(bottom>top){var crop=image.getSubimage(0,top,image.getWidth(),bottom-top);result.addAll(rescale(tesseract(enhance(crop,false,2),6,deadline,true),2,0,top));}}
+        return List.copyOf(result);
+    }
+    private static List<Line> rescale(List<Line> lines,int scale,int x,int y){return lines.stream().map(l->new Line(l.text(),l.confidence(),l.x()/scale+x,l.y()/scale+y,l.width()/scale,l.height()/scale)).toList();}
+    private static BufferedImage enhance(BufferedImage source,boolean contrast,int scale){
+        var base=new BufferedImage(source.getWidth(),source.getHeight(),BufferedImage.TYPE_INT_RGB);var copy=base.createGraphics();copy.drawImage(source,0,0,null);copy.dispose();
+        if(contrast){int light=0,dark=0;for(int y=3;y<base.getHeight()-3;y++)for(int x=3;x<base.getWidth()-3;x++){int v=base.getRGB(x,y),r=(v>>16)&255,g=(v>>8)&255,b=v&255;if(Math.min(r,Math.min(g,b))>210&&Math.max(r,Math.max(g,b))-Math.min(r,Math.min(g,b))<32)light++;if(Math.max(r,Math.max(g,b))<90)dark++;}
+            for(int y=0;y<base.getHeight();y++)for(int x=0;x<base.getWidth();x++){int v=base.getRGB(x,y),r=(v>>16)&255,g=(v>>8)&255,b=v&255;boolean inside=x>2&&x<base.getWidth()-3&&y>2&&y<base.getHeight()-3;boolean ink=inside&&(dark>light?Math.max(r,Math.max(g,b))<130:Math.min(r,Math.min(g,b))>205&&Math.max(r,Math.max(g,b))-Math.min(r,Math.min(g,b))<45);base.setRGB(x,y,ink?0:0xffffff);}}
+        var out=new BufferedImage(base.getWidth()*scale,base.getHeight()*scale,BufferedImage.TYPE_INT_RGB);var g=out.createGraphics();g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION,java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC);g.drawImage(base,0,0,out.getWidth(),out.getHeight(),null);g.dispose();return out;
     }
     private String run(List<String> args,Path job,long deadline)throws IOException,InterruptedException{
         long millis=Math.min(60000,TimeUnit.NANOSECONDS.toMillis(deadline-System.nanoTime()));if(millis<=0)throw timeout();

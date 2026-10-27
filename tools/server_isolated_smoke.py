@@ -68,7 +68,7 @@ def smoke():
     for name, role in roles.items():
         user = call(None, 'POST', '/api/users', {'username': 'accept17-' + RUN + '-' + name, 'password': password,
             'nickname': '合成验收-' + name, 'schoolId': 2 if name == 'external' else 1,
-            'teachingIdentity': role, 'privacyAccepted': True, 'policyVersion': '2026-10-04'}, expected=201)
+            'teachingIdentity': role, 'privacyAccepted': True, 'policyVersion': '2026-10-27'}, expected=201)
         accounts[name] = {'id': user['id'], 'username': user['username']}
         check('registration does not grant platform role', user['role'] == 'STUDENT')
     # This is the single test-fixture platform administrator, in this generated DB only.

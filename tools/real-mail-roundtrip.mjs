@@ -53,7 +53,7 @@ try {
   })
   app = await fixture(release, {smtpPort: relayPort, smtpFrom: recipient, webHost: '::1', webPort: port})
   const username = `mail_check_${app.suffix}`, password = randomBytes(18).toString('hex')
-  const registered = await app.api('POST', '/api/users', {username, nickname: '邮件验收临时账号', password, schoolId: 1, privacyAccepted: true, policyVersion: '2026-10-04'})
+  const registered = await app.api('POST', '/api/users', {username, nickname: '邮件验收临时账号', password, schoolId: 1, privacyAccepted: true, policyVersion: '2026-10-27'})
   assert.equal(registered.status, 201)
   const login = await app.api('POST', '/api/auth/login', {username, password}); assert.equal(login.status, 200)
   const access = login.value.token, userId = Number(login.value.user.id)

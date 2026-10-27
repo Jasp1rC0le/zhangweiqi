@@ -27,7 +27,7 @@ try {
   const require = createRequire('/Users/zhangweiqi/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/package.json')
   browser = await require('playwright').chromium.launch({channel: 'chrome', headless: true, timeout: 12000})
   const password = randomBytes(20).toString('hex'), username = 'recovery21_' + active.suffix
-  assert.equal((await active.api('POST', '/api/users', {username, nickname: '恢复合成验收', password, schoolId: 1, privacyAccepted: true, policyVersion: '2026-10-04'})).status, 201)
+  assert.equal((await active.api('POST', '/api/users', {username, nickname: '恢复合成验收', password, schoolId: 1, privacyAccepted: true, policyVersion: '2026-10-27'})).status, 201)
   for (const device of mediumOnly ? ['medium'] : ['desktop', 'mobile']) {
     const options = {viewport: {width: device === 'desktop' ? 1440 : device === 'medium' ? 870 : 390, height: device === 'mobile' ? 844 : 1050}, ...(device === 'mobile' ? {isMobile: true, hasTouch: true} : {})}
     const makePage = async () => {
