@@ -1,7 +1,6 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
-import { ArrowLeft, ArrowRight, Search, StarFilled, Pointer, Food } from '@element-plus/icons-vue'
+import { ArrowRight, Search, StarFilled, Pointer, Food } from '@element-plus/icons-vue'
 import {
   canteenMerchantPhotoUrl,
   getCanteens,
@@ -11,7 +10,6 @@ import {
   likeCanteenReview,
 } from '@/api/canteen'
 import { useAuthStore } from '@/stores/auth'
-import CampMark from '@/components/CampMark.vue'
 import CanteenFoodArt from '@/components/CanteenFoodArt.vue'
 import { selectMerchants } from '@/utils/merchantList'
 import { createLatestRequest } from '@/utils/latestRequest'
@@ -20,7 +18,6 @@ import { userSessionGeneration } from '@/api/http'
 import { pendingCanteenDraftIds, reconcileCanteenDraft } from '@/utils/canteenDrafts'
 
 defineProps({ demo: Boolean })
-const router = useRouter()
 const auth = useAuthStore()
 const canteens = ref([])
 const merchants = ref([])
@@ -187,12 +184,6 @@ onMounted(async () => {
 
 <template>
   <div class="table-page">
-    <header class="table-header">
-      <button class="table-back" @click="router.push('/chat')">
-        <el-icon><ArrowLeft /></el-icon><span>校园助手</span>
-      </button>
-      <div class="table-brand"><CampMark /><span>Campthink.</span></div>
-    </header>
     <main class="table-main">
       <aside v-if="demo" class="table-demo" role="note">
         <strong>交互样例</strong
@@ -200,15 +191,13 @@ onMounted(async () => {
       </aside>
       <section class="table-intro">
         <div>
-          <h1>今天，吃哪家<span>？</span></h1>
-          <p class="table-lead">好吃值得一颗星，有趣值得一个赞</p>
+          <h1>今天吃什么<span>？</span></h1>
         </div>
         <div class="table-intro-note">
-          <span>5 分制 · 同学的真实体验</span>
-          <p>点评一家你吃过的店。</p>
+          <span class="table-rating-key" aria-label="满分5分"><el-icon v-for="star in 5" :key="star" aria-hidden="true"><StarFilled /></el-icon><b>5分制</b></span>
         </div>
       </section>
-      <div v-if="loading" class="table-empty" aria-busy="true">正在摆好校园餐桌…</div>
+      <div v-if="loading" class="table-empty" aria-busy="true">正在加载商家…</div>
       <div v-else-if="loadError" class="table-empty" role="alert">
         <h2>暂时没能读到商家</h2>
         <p>{{ loadError }}</p>
@@ -219,13 +208,13 @@ onMounted(async () => {
           {{ pendingDraftIds.length }} 家商家有未保存的填写，切换筛选不会丢失；关闭页面前请先保存。
           <button v-if="searchQuery || selectedCanteen !== 'all'" class="table-text-button" @click="resetFilters">显示全部商家</button>
         </p>
-        <div class="table-tools">
+        <div v-if="merchants.length" class="table-tools">
           <label class="table-search"
             ><el-icon><Search /></el-icon
             ><input
               v-model="searchQuery"
               type="search"
-              placeholder="搜一家店，或一种味道"
+              placeholder="搜索店铺或口味"
               aria-label="搜索商家"
           /></label>
           <select v-model="sortBy" aria-label="商家排序">
@@ -234,7 +223,7 @@ onMounted(async () => {
             <option value="popular">评分人数最多</option>
           </select>
         </div>
-        <nav class="table-filters" aria-label="选择食堂">
+        <nav v-if="merchants.length" class="table-filters" aria-label="选择食堂">
           <button
             :class="{ active: selectedCanteen === 'all' }"
             :aria-pressed="selectedCanteen === 'all'"
@@ -252,16 +241,16 @@ onMounted(async () => {
             {{ canteen.name }}
           </button>
         </nav>
-        <div class="table-list-heading">
+        <div v-if="merchants.length" class="table-list-heading">
           <h2>
-            校园口碑榜 <span>{{ visibleMerchants.length }} 家</span>
+            店铺 <span>{{ visibleMerchants.length }} 家</span>
           </h2>
-          <span>真实体验，理性评价</span>
+          <span>同学评分</span>
         </div>
         <section v-if="!visibleMerchants.length" class="table-empty">
           <el-icon><Food /></el-icon>
-          <h2>{{ merchants.length ? '没找到这个味道' : '商家核实后，就在这里见' }}</h2>
-          <p>{{ merchants.length ? '换个关键词或食堂试试' : '这里不填充虚构的正式评分' }}</p>
+          <h2>{{ merchants.length ? '没有匹配的店铺' : '商家即将开放' }}</h2>
+          <p>{{ merchants.length ? '换个口味搜搜' : '核实后上架，欢迎来尝鲜' }}</p>
           <button
             v-if="merchants.length"
             @click="resetFilters"
@@ -285,8 +274,8 @@ onMounted(async () => {
                   :alt="merchant.name + '照片'"
                   loading="lazy"
                 />
-                <span v-else class="table-no-photo"
-                  ><el-icon><Food /></el-icon><small>照片待补充</small></span
+                <span v-else class="table-no-photo" aria-label="暂无店铺照片"
+                  ><el-icon><Food /></el-icon></span
                 >
               </div>
               <div class="table-shop-info">
@@ -444,7 +433,7 @@ onMounted(async () => {
           </article>
         </section>
         <details class="table-rules">
-          <summary>评分与神评怎么选？</summary>
+          <summary>评分规则</summary>
           <p>
             每个学生账号对一家商家只计一条评分，可以修改。综合推荐使用 5 票、3.5
             分的先验平滑，降低少量评分冲榜的影响；展示分数仍是真实评分均值。神评仅从审核通过的短评中按点赞数选出，同赞时展示较新的一条，无赞时显示“同学说”。点赞不影响商家星级。

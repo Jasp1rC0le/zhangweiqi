@@ -915,7 +915,7 @@ async function exitAdmin() {
         <span>
           {{
             activeTab === 'wall' ? '发布前审核、举报处理与隐藏记录，仅管理本校内容' : activeTab === 'overview'
-              ? '本校待处理事项、资料索引与最近24小时模型用量。'
+              ? '待办、资料与模型用量'
               : activeTab === 'knowledge'
               ? '用户在聊天中补充的校园信息，通过审核后才会进入正式知识库。'
               : activeTab === 'contact'

@@ -32,7 +32,7 @@ watch(() => props.counts, () => { selected.value = null })
         </button>
       </li>
     </ul>
-    <figcaption><span v-if="model.total >= 100000">共 {{ cockpitCount(model.total) }} 人次。</span>占全部考勤人次，非出勤率。点选一行可突出对应扇区。</figcaption>
+    <figcaption><span v-if="model.total >= 100000">共 {{ cockpitCount(model.total) }} 人次。</span>人次占比 · 非出勤率</figcaption>
   </figure>
 </template>
 
@@ -43,12 +43,12 @@ watch(() => props.counts, () => { selected.value = null })
 .attendance-donut circle { stroke: var(--slice-color, #8997a8); transition: opacity 140ms ease-out; }
 .attendance-donut circle.donut-empty { fill: none; stroke: var(--assistant-line, #e2e7ec); stroke-width: 2; stroke-dasharray: 3 5; }
 .attendance-donut .donut-dimmed { opacity: .22; }
-[data-key='onTime'] { --slice-color: #417ac1; }
-[data-key='absent'] { --slice-color: #bd5268; }
-[data-key='earlyLeave'] { --slice-color: #9b6c20; }
-[data-key='unknown'] { --slice-color: #77879d; }
-[data-key='late'] { --slice-color: #8d6d55; }
-[data-key='excused'] { --slice-color: #7d6cb3; }
+[data-key='onTime'] { --slice-color: #2c9972; }
+[data-key='absent'] { --slice-color: #d56676; }
+[data-key='earlyLeave'] { --slice-color: #d78634; }
+[data-key='unknown'] { --slice-color: #e2b85c; }
+[data-key='late'] { --slice-color: #477bbb; }
+[data-key='excused'] { --slice-color: #8d74bd; }
 .donut-label { position: absolute; inset: 30px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: var(--assistant-muted, #5d6876); font-size: 13px; text-align: center; pointer-events: none; }
 .donut-label strong { font-size: 26px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--assistant-ink, #29323c); letter-spacing: -.02em; }
 .attendance-legend { list-style: none; padding: 0; margin: 0; min-width: 0; }

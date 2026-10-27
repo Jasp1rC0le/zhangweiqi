@@ -80,6 +80,7 @@ import '@/styles/apple-workspace.css'
 import '@/styles/workspace-refinement.css'
 import '@/styles/chat-refinement.css'
 import '@/styles/workspace-composition.css'
+import '@/styles/workspace-color.css'
 
 const router = useRouter()
 const route = useRoute()
@@ -1555,7 +1556,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="workspace persistent-workspace" :class="{ 'workspace-expanded': !isChatRoute && expandedWorkspace, 'chat-focused': isChatRoute, 'calm-workspace': !isChatRoute && route.name !== 'pro', 'chat-sidebar-collapsed': isChatRoute && chatSidebarCollapsed && !mobileLayout }" :style="isChatRoute ? { '--chat-viewport-height': keyboardHeight, ...(mobileLayout ? { height: keyboardHeight } : {}) } : undefined" :inert="membershipVisible || membershipPresent">
+  <div :data-section="isChatRoute ? selectedModelKey : route.name" class="workspace persistent-workspace" :class="{ 'workspace-expanded': !isChatRoute && expandedWorkspace, 'chat-focused': isChatRoute, 'calm-workspace': !isChatRoute && route.name !== 'pro', 'chat-sidebar-collapsed': isChatRoute && chatSidebarCollapsed && !mobileLayout }" :style="isChatRoute ? { '--chat-viewport-height': keyboardHeight, ...(mobileLayout ? { height: keyboardHeight } : {}) } : undefined" :inert="membershipVisible || membershipPresent">
     <aside ref="sidebarElement" id="campus-sidebar" class="sidebar" :class="{ 'mobile-open': mobileSidebarOpen }" :inert="logoutConfirmVisible || (mobileLayout && !mobileSidebarOpen) || (!mobileLayout && (isChatRoute ? chatSidebarCollapsed : expandedWorkspace))" aria-label="校园导航">
       <div class="sidebar-top">
         <div class="brand">

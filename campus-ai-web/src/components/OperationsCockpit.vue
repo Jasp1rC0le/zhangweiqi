@@ -19,12 +19,12 @@ const providerName = provider => ({ deepseek: 'DeepSeek', kimi: 'Kimi', glm: 'GL
     <div class="operations-columns">
       <section class="operations-queue" aria-label="运营待处理事项">
         <header><h2>待处理事项</h2><span v-if="pendingCategories">{{ pendingCategories }} 类待办</span></header>
-        <p class="operations-caption" :class="{ 'operation-warning': missingTasks }">{{ missingTasks ? '部分数量未返回，请刷新核对。' : pendingCategories ? '按数量排列，点击一行进入处理。' : '当前没有待处理事项，仍可进入各模块查看。' }}</p>
-        <button v-for="item in tasks" :key="item.tab" type="button" class="operation-task" @click="$emit('navigate', item.tab)">
-          <span class="task-label"><b>{{ item.label }}</b><small>{{ item.hint }}</small></span>
+        <p class="operations-caption" :class="{ 'operation-warning': missingTasks }">{{ missingTasks ? '部分数量未返回，请刷新核对。' : pendingCategories ? '点击处理' : '暂无待办' }}</p>
+        <button v-for="item in tasks" :key="item.tab" type="button" class="operation-task" :data-tab="item.tab" @click="$emit('navigate', item.tab)">
+          <span class="task-label"><b>{{ item.label }}</b><small class="operation-detail">{{ item.hint }}</small></span>
           <strong :class="{ 'has-pending': item.count > 0 }">{{ cockpitCount(item.count) }} <small v-if="item.barPercent !== null">项</small></strong>
           <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m8 5 5 5-5 5" /></svg>
-          <span v-if="item.barPercent !== null" class="task-track" aria-hidden="true"><i :style="{ width: `${item.barPercent}%` }"></i></span>
+          <span v-if="item.barPercent !== null && item.count > 0" class="task-track" aria-hidden="true"><i :style="{ width: `${item.barPercent}%` }"></i></span>
         </button>
       </section>
       <div class="operations-context">
@@ -41,16 +41,16 @@ const providerName = provider => ({ deepseek: 'DeepSeek', kimi: 'Kimi', glm: 'GL
           <div><dt>已保存回答</dt><dd>{{ cockpitCount(overview.recentModelCalls) }} <small>次</small></dd></div>
           <div><dt>服务商返回 Token</dt><dd>{{ cockpitCount(overview.recentModelTokens) }}</dd></div>
         </dl>
-        <p class="operations-caption">最近24小时 · 不含失败与重试；未返回的用量不估算为零。</p>
+        <details class="operations-caption"><summary>最近24小时 · 已保存回答</summary><p>不含失败与重试；未返回的用量不估算为零。</p></details>
         <p v-if="usageUnavailable" class="operations-empty" role="status">模型明细读取失败，可刷新重试；上方统计来自独立汇总。</p>
         <p v-else-if="!usage.length" class="operations-empty">本次读取暂无模型明细。</p>
         <ul v-else class="provider-list">
-          <li v-for="item in providers" :key="`${item.provider}-${item.model}`">
+          <li v-for="item in providers" :key="`${item.provider}-${item.model}`" :data-provider="item.provider">
             <div><span>{{ providerName(item.provider) }} · {{ item.model || '模型未知' }}</span><strong>{{ cockpitCount(item.requestCount) }} 次</strong></div>
             <span v-if="item.barPercent !== null" class="provider-track" aria-hidden="true"><i :style="{ width: `${item.barPercent}%` }"></i></span>
           </li>
         </ul>
-        <p v-if="!usageUnavailable && providers.length" class="comparison-note">条形按已保存回答次数比较，不代表费用占比。</p>
+        <p v-if="!usageUnavailable && providers.length" class="comparison-note">按回答次数比较，非费用</p>
         </section>
       </div>
     </div>

@@ -25,6 +25,10 @@ Campthink 是面向校园学习与日常事务的全栈应用：把带来源的�
 
 右上角发布入口、课表紧凑工具栏和模式切换排版见[2026-10-27 更新](docs/visual-rework-2026-10-27.md)。
 
+食堂评分与领导端统计增加舒适的任务配色、状态图形并精简说明，见[配色与统计更新](docs/color-and-statistics-2026-10-27.md)。下图为合成验收数据。
+
+![领导端考勤统计，合成数据](docs/images/color-pass-20261027/leadership-desktop.png)
+
 ![专注课表截图导入 合成场景](docs/images/usability-20261026/import.png)
 
 <p><img src="docs/images/usability-20261026/calendar-mobile.png" width="280" alt="手机日期选择 合成场景" /> <img src="docs/images/usability-20261026/wall-mobile.png" width="280" alt="校园墙 合成场景" /></p>

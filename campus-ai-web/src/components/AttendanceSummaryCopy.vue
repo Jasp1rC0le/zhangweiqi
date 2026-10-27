@@ -25,13 +25,14 @@ onBeforeUnmount(() => resource.dispose())
 <template>
   <div class="attendance-summary-copy">
     <div class="summary-copy-row"><p>{{ context.scopeLabel }}</p><button type="button" :disabled="!text || disabled || context.disabled || state.busy" @click="copy">{{ state.busy ? '正在复制…' : '复制考勤摘要' }}</button></div>
-    <p class="summary-copy-note">仅复制汇总数字与范围，不含学生姓名或学号。系统剪贴板由你管理。</p>
+    <details class="summary-copy-note"><summary>复制说明</summary><p>仅复制汇总数字与范围，不含学生姓名或学号。系统剪贴板由你管理。</p></details>
     <p v-if="state.notice" class="summary-copy-notice" role="status">{{ state.notice }}</p>
     <div v-if="state.manualText && !disabled && !context.disabled" class="summary-copy-manual"><label :for="`${id}-summary`">待复制的考勤摘要</label><textarea :id="`${id}-summary`" ref="field" :value="state.manualText" readonly rows="8" spellcheck="false"></textarea><button type="button" @click="selectSummary">选中全部摘要</button></div>
   </div>
 </template>
 
 <style scoped>
+.summary-copy-note summary{cursor:pointer;min-height:32px;align-content:center;font-size:12px}
 .attendance-summary-copy { margin-block: 12px 18px; min-width: 0; }
 .summary-copy-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px 16px; }
 .summary-copy-row p { margin: 0; font-size: 14px; line-height: 1.7; color: var(--assistant-muted, #5d6876); overflow-wrap: anywhere; }

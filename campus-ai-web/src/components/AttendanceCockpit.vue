@@ -22,42 +22,42 @@ const recordedShare = computed(() => distribution.value?.total ? distribution.va
       <span>{{ from }} — {{ to }}<b v-if="stale">上次数据</b></span>
     </header>
     <template v-if="distribution">
-      <AttendanceSummaryCopy v-if="summaryContext" :context="summaryContext" :counts="counts" :planned="planned" :absent-students="absentStudents" :from="from" :to="to" :disabled="stale" />
-      <section class="cockpit-attention" :class="{ 'needs-review': reviewCount > 0 }" aria-label="考勤核对重点">
+      <section class="cockpit-attention" :class="{ 'needs-review': reviewCount > 0, 'pending-registration': !reviewCount && counts.unknown > 0 }" aria-label="考勤核对重点">
         <div>
-          <h3 v-if="reviewCount > 0">优先核对 {{ cockpitCount(reviewCount) }} 人次旷课或早退</h3>
-          <h3 v-else-if="!distribution.total">当前范围暂无考勤记录</h3>
-          <h3 v-else-if="counts.unknown">还有 {{ cockpitCount(counts.unknown) }} 人次待点名</h3>
-          <h3 v-else>已读取记录中，无旷课或早退</h3>
+          <h3 v-if="reviewCount > 0">{{ cockpitCount(reviewCount) }} 人次需核对</h3>
+          <h3 v-else-if="!distribution.total">暂无考勤记录</h3>
+          <h3 v-else-if="counts.unknown">{{ cockpitCount(counts.unknown) }} 人次待登记</h3>
+          <h3 v-else>暂无旷课或早退</h3>
           <p v-if="reviewCount > 0">旷课 {{ cockpitCount(counts.absent) }} 人次 · 早退 {{ cockpitCount(counts.earlyLeave) }} 人次</p>
-          <p v-else-if="!distribution.total">调整日期或班级，核对是否已配置课程。</p>
-          <p v-else-if="counts.unknown">可能尚未上课或未填写，不代表缺勤。</p>
-          <p v-else>仅反映当前筛选范围内已读取的记录。</p>
+
+
+
         </div>
         <div v-if="$slots.action" class="cockpit-action"><slot name="action" /></div>
       </section>
       <div class="cockpit-body">
         <section class="cockpit-distribution" aria-label="考勤人次分布">
-          <h3>人次分布</h3>
+          <h3>考勤分布</h3>
           <AttendanceDistribution :counts="counts" />
         </section>
-        <section class="cockpit-registration" aria-label="点名登记进度">
-          <h3>登记进度</h3>
-          <p class="registration-count"><strong>{{ cockpitCount(distribution.recorded) }}</strong><span>/ {{ cockpitCount(distribution.total) }} 人次已填写</span></p>
+        <section class="cockpit-registration" :class="{'registration-incomplete': counts.unknown > 0, 'registration-empty': !distribution.total}" aria-label="点名登记进度">
+          <h3>登记进度<span class="registration-percentage">{{ distribution.total ? distributionPercent(recordedShare) : '—' }}</span></h3>
+          <p class="registration-count"><strong>{{ cockpitCount(distribution.recorded) }}</strong><span>/ {{ cockpitCount(distribution.total) }} 人次</span></p>
           <div v-if="distribution.total" class="registration-track" role="progressbar" aria-label="已填写考勤人次"
             :aria-valuenow="distribution.recorded" :aria-valuemin="0" :aria-valuemax="distribution.total"
             :aria-valuetext="`${cockpitCount(distribution.recorded)} / ${cockpitCount(distribution.total)} 人次已填写，${distributionPercent(recordedShare)}，不是出勤率`">
             <span :style="{ width: `${recordedShare}%` }"></span>
           </div>
-          <p class="registration-pending">待点名 <strong>{{ cockpitCount(counts.unknown) }}</strong> 人次<span>未上课或未填写，不计入旷课。</span></p>
+          <p class="registration-pending">待点名 <strong>{{ cockpitCount(counts.unknown) }}</strong> 人次</p>
           <dl class="cockpit-facts">
             <div><dt>涉及旷课学生</dt><dd>{{ cockpitCount(absentStudents) }} <small>人 · 去重</small></dd></div>
             <div><dt>已配置安排</dt><dd>{{ cockpitCount(planned) }} <small>项</small></dd></div>
           </dl>
-          <p class="cockpit-readonly">只读核对；记录更正由任课教师完成。</p>
+
         </section>
       </div>
-      <details class="cockpit-definition"><summary>统计口径</summary><p>当前授权筛选范围的完整汇总，不是当前页小计。人数去重，人次按每节记录累计；已取消课程不计入。登记进度仅表示已填写记录的占比，不是出勤率。待点名可能包含尚未上课的安排。</p></details>
+      <AttendanceSummaryCopy v-if="summaryContext" :context="summaryContext" :counts="counts" :planned="planned" :absent-students="absentStudents" :from="from" :to="to" :disabled="stale" />
+      <details class="cockpit-definition"><summary>统计口径</summary><p>当前授权筛选范围的完整汇总，不是当前页小计。人数去重，人次按每节记录累计；已取消课程不计入。登记进度仅表示已填写记录的占比，不是出勤率。待点名可能包含尚未上课的安排，不计入旷课；记录更正由任课教师完成。</p></details>
     </template>
     <p v-else class="cockpit-incomplete" role="status">考勤统计不完整，请重新读取；未将缺失值显示为零。</p>
   </section>

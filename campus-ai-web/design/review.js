@@ -150,7 +150,7 @@ if (draftFixture && !exitedDemo) sessionDraftRecovery.bind(student)
 const admin = useAdminAuthStore(pinia)
 admin.loadCurrentUser = async () => { await fixtureAuth.loadCurrentUser(); return admin.user }
 const pages = { login: LoginView, exit: ReviewExit, canteens: CanteenView, admin: AdminView, projects: ProjectStudioView, account: AccountView, safety: SafetyFixture }
-const workspaceFixture=['workspace','wall','study','instruments','workspace-admin','feedback','reviews','timetable','teaching'].includes(requested)
+const workspaceFixture=['workspace','wall','study','instruments','canteens','workspace-admin','feedback','reviews','timetable','teaching'].includes(requested)
 const router = createRouter({
   history: createMemoryHistory(),
   routes: workspaceFixture ? [

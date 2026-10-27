@@ -1,0 +1,79 @@
+/* One accent per task. Status colors retain the same meaning in every workspace. */
+html:root body .workspace[data-section='canteens']{--assistant-accent:#ad4c1c;--assistant-accent-hover:#853913;--assistant-soft:#fff0df;--assistant-hover:#fae8d6;--assistant-panel:#fff8f0}
+html:root body .workspace[data-section='wall']{--assistant-accent:#7251ad;--assistant-accent-hover:#56398a;--assistant-soft:#f1ecfa;--assistant-hover:#e9e0f6}
+html:root body .workspace[data-section='timetable']{--assistant-accent:#087c78;--assistant-accent-hover:#065e5b;--assistant-soft:#e5f5f0;--assistant-hover:#d9eee8}
+html:root body .workspace[data-section='teaching']{--assistant-accent:#3d5db2;--assistant-accent-hover:#2e478c;--assistant-soft:#edf0fd;--assistant-hover:#e0e6f8}
+html:root body .workspace[data-section='admin']{--assistant-accent:#6850a5;--assistant-accent-hover:#4e387f;--assistant-soft:#f1ecfa;--assistant-hover:#e6dff4}
+html:root body .workspace[data-section='study']{--assistant-accent:#126e89;--assistant-accent-hover:#0d5267;--assistant-soft:#e9f5f8;--assistant-hover:#dceef3}
+html:root body .workspace .primary-navigation .nav-item.active{color:var(--assistant-accent);background:var(--assistant-soft)}
+html:root body .workspace.calm-workspace .table-page{background:transparent}
+html:root body .workspace.calm-workspace .table-main{padding-top:36px;max-width:1180px}
+html:root body .workspace.calm-workspace .table-intro{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:0 0 26px;border-bottom:0;margin-bottom:0}
+html:root body .workspace.calm-workspace .table-intro h1{font-size:clamp(30px,3vw,40px);line-height:1.25;margin:0;letter-spacing:-.03em}
+html:root body .workspace.calm-workspace .table-intro h1 span{color:var(--assistant-accent)}
+html:root body .workspace.calm-workspace .table-intro-note{padding:0;border:0}
+.table-rating-key{display:inline-flex;align-items:center;gap:4px;padding:10px 14px;border-radius:12px;background:#fff0df;color:#ad4c1c;font-size:12px}
+.table-rating-key .el-icon{width:14px;height:14px}.table-rating-key b{margin-left:6px;font-weight:500;white-space:nowrap}
+html:root body .workspace.calm-workspace .table-tools{margin-block:0 18px;gap:12px}
+html:root body .workspace.calm-workspace .table-search{background:#fffaf5;border-color:#edddd0}
+html:root body .workspace.calm-workspace .table-search .el-icon{color:#ad4c1c}
+html:root body .workspace.calm-workspace .table-filters{width:fit-content;max-width:100%;background:#fff5e9;margin-bottom:24px;overflow:auto}
+html:root body .workspace.calm-workspace .table-filters button.active{color:#ad4c1c;background:#ffe5c9}
+html:root body .workspace.calm-workspace .table-list-heading{margin:24px 0 16px}
+html:root body .workspace.calm-workspace .table-list-heading h2{font-size:18px}
+html:root body .workspace.calm-workspace .table-empty{min-height:42vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 20px;gap:14px;background:#fff8ef;border-radius:18px;color:#785f4b}
+html:root body .workspace.calm-workspace .table-empty>.el-icon{display:grid;place-items:center;width:64px;height:64px;border-radius:18px;background:#ffe8cd;color:#ad4c1c;margin:0;font-size:30px}
+html:root body .workspace.calm-workspace .table-empty h2{color:#493b32;font-size:24px;font-weight:500;margin:0;letter-spacing:-.02em}
+html:root body .workspace.calm-workspace .table-empty p{font-size:14px;line-height:1.7;margin:0;color:#785f4b}
+html:root body .workspace.calm-workspace .table-card{border-color:#efdfd2;padding:24px;background:#fff}
+html:root body .workspace.calm-workspace .table-photo{background:#fff3e7}
+html:root body .workspace.calm-workspace .table-score strong{color:#a34c1f}
+html:root body .workspace.calm-workspace .table-score{padding:12px 16px;border-radius:12px;background:#fff4e7}
+html:root body .workspace.calm-workspace .table-rules{font-size:13px;color:var(--assistant-muted)}
+html:root body .workspace.calm-workspace .table-rules summary{min-height:44px;align-content:center;cursor:pointer}
+/* Existing validated counts, with color and shorter labels rather than new metrics. */
+html:root body .workspace .cockpit-heading{margin-bottom:18px}
+html:root body .workspace .cockpit-heading h2{font-weight:600;font-size:24px}
+html:root body .workspace .cockpit-attention{background:#eaf6ef;padding:18px 22px;color:#236647;margin-top:14px}
+html:root body .workspace .cockpit-attention h3{font-size:18px;font-weight:600;color:inherit}
+html:root body .workspace .cockpit-attention.pending-registration{background:#fff5df;color:#875a13}
+html:root body .workspace .cockpit-attention.needs-review{background:#fff0ef;color:#aa3f4a}
+html:root body .workspace .cockpit-attention.needs-review h3,html:root body .workspace .cockpit-attention.needs-review p{color:#aa3f4a}
+html:root body .workspace .cockpit-body{gap:24px;align-items:stretch;grid-template-columns:minmax(0,1.5fr) minmax(260px,1fr)}
+html:root body .workspace .cockpit-distribution{padding:24px;background:#f7f8fb;border-radius:16px;min-width:0}
+html:root body .workspace .cockpit-registration{padding:24px;background:#edf6f2;border-radius:16px}
+html:root body .workspace .cockpit-body h3{display:flex;align-items:baseline;justify-content:space-between;font-size:16px;font-weight:600}
+.registration-percentage{font-size:28px;font-weight:600;letter-spacing:-.025em;color:#237757;font-variant-numeric:tabular-nums}
+html:root body .workspace .registration-count strong{font-size:30px;font-weight:600;color:#245d48}
+html:root body .workspace .registration-track{height:10px;background:#d5e7de;border-radius:5px}
+html:root body .workspace .registration-track>span{background:#2c9972}
+html:root body .workspace .registration-pending{padding:10px 12px;border-radius:10px;background:#fff5dd;color:#815a18}
+html:root body .workspace .cockpit-facts{border-color:#d3e5db}
+html:root body .workspace .cockpit-facts dd{font-size:20px;color:#245d48}
+html:root body .workspace .attendance-legend button[aria-pressed=true]{background:#fff;outline:1px solid #d9e0e7;outline-offset:-1px}
+html:root body .workspace .cockpit-definition{border:0;margin-top:12px}
+html:root body .workspace .operations-columns{border:0;gap:24px;padding-top:12px}
+html:root body .workspace .operations-queue{padding:24px;background:#f5f3fb;border-radius:16px}
+html:root body .workspace .operations-context>section{padding:24px;background:#f5f7fb;border-radius:16px}
+html:root body .workspace .operations-context>section+section{margin-top:20px;background:#eef5fb}
+html:root body .workspace .operation-task{min-height:74px;padding:14px 8px;border-color:#e4dfef}
+html:root body .workspace .operation-task .operation-detail{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+html:root body .workspace .operation-task strong.has-pending{color:#6a4da3;font-size:23px}
+html:root body .workspace .operation-task[data-tab='feedback'] strong.has-pending{color:#aa4d5c}
+html:root body .workspace .operation-task[data-tab='feedback'] .task-track i{background:#d56676}
+html:root body .workspace .operation-task[data-tab='knowledge'] .task-track i{background:#8d74bd}
+html:root body .workspace .operations-facts p{font-size:12px}
+html:root body .workspace .provider-list [data-provider='kimi'] .provider-track i{background:#6f8f63}
+html:root body .workspace .provider-list [data-provider='glm'] .provider-track i{background:#8d74bd}
+html:root body .workspace .operations-caption summary{min-height:32px;align-content:center;cursor:pointer}
+html:root body .workspace .sidebar .brand svg{color:#0b62db}
+html:root body .workspace .registration-incomplete{background:#fff7e6}
+html:root body .workspace .registration-incomplete .registration-percentage,html:root body .workspace .registration-incomplete .registration-count strong{color:#875a13}
+html:root body .workspace .registration-incomplete .registration-track{background:#f0e1bd}
+html:root body .workspace .registration-incomplete .registration-track>span{background:#c59432}
+html:root body .workspace .registration-empty{background:#f4f5f8}
+html:root body .workspace .registration-empty .registration-percentage{color:var(--assistant-muted)}
+@media(max-width:1100px){html:root body .workspace .cockpit-body{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:760px){html:root body .workspace.calm-workspace .table-main{padding-top:24px}html:root body .workspace.calm-workspace .table-intro{align-items:flex-start;gap:12px;padding-bottom:24px}html:root body .workspace.calm-workspace .table-intro h1{font-size:28px}.table-rating-key{padding:8px 10px;gap:2px}.table-rating-key .el-icon{width:11px;height:11px}html:root body .workspace.calm-workspace .table-empty{min-height:38vh}html:root body .workspace.calm-workspace .table-empty h2{font-size:21px}html:root body .workspace .cockpit-distribution,html:root body .workspace .cockpit-registration,html:root body .workspace .operations-queue,html:root body .workspace .operations-context>section{padding:20px}}
+
+@media(max-width:600px){html:root body .workspace.calm-workspace .table-shop-top{grid-template-columns:56px minmax(0,1fr) 76px;gap:12px}html:root body .workspace.calm-workspace .table-score{width:auto;min-width:0;box-sizing:border-box;padding:10px 8px}html:root body .workspace.calm-workspace .table-score span,html:root body .workspace.calm-workspace .table-score small{white-space:nowrap;font-size:11px}}
