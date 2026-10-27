@@ -73,7 +73,7 @@ test('existing intro, live orb, chapter tracking and dialog transition remain in
 
 test('mobile layout keeps actions usable without a nested split demonstration', () => {
   assert.match(css, /@media \(max-width: 760px\)/)
-  assert.match(css, /\.hero-demo \{ grid-template-columns: minmax\(0, 1fr\)/)
+  assert.match(css, /\.hero \{ grid-template-columns: minmax\(0, 1fr\)/)
   assert.match(css, /\.hero-example-modes button \{[^}]*min-height: 44px/)
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)/)
   assert.doesNotMatch(css, /transition:\s*all/)
@@ -84,7 +84,7 @@ test('user-identified centered reference keeps the orb intact and avoids a chat 
   assert.doesNotMatch(home, /hero-demo-top|hero-demo-more|hero-entry-tools|hero-demo-question/)
   assert.match(home, /name="hero-example"/)
   assert.match(css, /\.hero-visual \{[\s\S]*?overflow: visible/)
-  assert.match(css, /\.page-index button:is\(\.active, :hover\) \{ background: transparent/)
+  assert.match(view, /aria-label="介绍页面"/); assert.match(css, /\.page-index button \{[^}]*background: transparent/)
 })
 
 test('public scroll cues reuse SVG icons and the closing omits decorative eyebrows', () => {
@@ -104,4 +104,21 @@ test('public text palette has sufficient contrast on the selected light ground',
   const contrast = (a, b) => (Math.max(luminance(a), luminance(b)) + .05) / (Math.min(luminance(a), luminance(b)) + .05)
   for (const text of ['home-ink', 'home-muted', 'home-accent-hover']) assert.ok(contrast(values[text], values['home-paper']) >= 4.5)
   assert.ok(contrast(values['home-surface'], values['home-accent']) >= 4.5)
+})
+
+// A short last chapter can never reach the usual35% trigger at maximum scroll.
+test('actual chapter tracker activates the visible last chapter at the real bottom, and restores earlier chapters on scroll-up', () => {
+  const pages = [{id:'top'},{id:'experience'},{id:'canteen'},{id:'closing'}]
+  const activePage = {value:-1}
+  const scroller = {scrollTop:2261,scrollHeight:3277,clientHeight:1016}
+  const tops = {top:-2261,experience:-1393,canteen:-362.5,closing:356.6875}
+  const context = {pages,activePage,pageScrollFrame:null,innerHeight:1016,requestAnimationFrame:fn=>{fn();return 1},document:{scrollingElement:scroller,documentElement:scroller,getElementById:id=>({getBoundingClientRect:()=>({top:tops[id.replace('chapter-','')]})})}}
+  actualFunction('trackChapter',context)()
+  assert.equal(activePage.value,3)
+  context.pageScrollFrame=null;scroller.clientHeight=1185;scroller.scrollTop=2092;tops.closing=525.6875
+  actualFunction('trackChapter',context)()
+  assert.equal(activePage.value,3)
+  context.pageScrollFrame=null;scroller.scrollTop=1800;tops.top=-1800;tops.experience=-932;tops.canteen=98.5;tops.closing=817.6875
+  actualFunction('trackChapter',context)()
+  assert.equal(activePage.value,2)
 })

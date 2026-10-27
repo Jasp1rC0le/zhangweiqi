@@ -13,7 +13,7 @@ import { IDENTITY_ROLES } from '@/utils/teachingIdentity'
 import LegalNotice from '@/components/LegalNotice.vue'
 import WorkspaceIcon from '@/components/WorkspaceIcon.vue'
 import NavigationIcon from '@/components/NavigationIcon.vue'
-import CanteenPreview from '@/components/CanteenPreview.vue'
+import HomeLifeScene from '@/components/HomeLifeScene.vue'
 import '@/styles/landing-onboarding.css'
 import '@/styles/landing-polish.css'
 import '@/styles/landing-apple.css'
@@ -38,7 +38,7 @@ const reducedMotion = ref(motionPreference.matches)
 const modalDuration = computed(() => reducedMotion.value ? 0 : { enter: 700, leave: 340 })
 const modalOrigin = ref({})
 const destination = ref('/chat')
-const destinationLabel = computed(() => ({ '/canteens': '食堂评分', '/study': '实验与作业', '/projects': '我的项目', '/wall': '校园墙' })[destination.value] || `${heroExample.value.label}工作台`)
+const destinationLabel = computed(() => ({ '/canteens': '食堂评分', '/study': '实验与作业', '/projects': '我的项目', '/wall': '校园墙', '/timetable': '课表' })[destination.value] || `${heroExample.value.label}工作台`)
 const documentHidden = ref(document.hidden)
 const authBusy = computed(() => loading.value || registerLoading.value)
 let previousBodyOverflow = ''
@@ -136,6 +136,7 @@ const capabilities = [
   },
 ]
 const campusTools = [
+  { route: '/timetable', icon: 'timetable', title: '课表', description: '导入周课表，查看课程与时间' },
   { route: '/study', icon: 'study', title: '实验与作业', description: '写下题目与卡住的步骤，拆解下一步' },
   { route: '/projects', icon: 'projects', title: '我的项目', description: '集中整理材料，提交前检查遗漏' },
   { route: '/wall', icon: 'wall', title: '校园墙', description: '交流课程经验，向同学发起求助' },
@@ -387,6 +388,11 @@ function trackChapter() {
     pages.forEach((page, index) => {
       if (document.getElementById(`chapter-${page.id}`)?.getBoundingClientRect().top <= innerHeight * .35) current = index
     })
+    const scroller = document.scrollingElement || document.documentElement
+    const lastSection = document.getElementById(pages.at(-1)?.id)
+    if (scroller && lastSection && scroller.scrollHeight > scroller.clientHeight
+        && scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 2
+        && lastSection.getBoundingClientRect().top < innerHeight) current = pages.length - 1
     activePage.value = current
   })
 }
@@ -487,20 +493,20 @@ onBeforeUnmount(() => {
       <section class="hero" aria-labelledby="hero-title">
         <div class="hero-copy">
           <div class="hero-intro">
-          <h1 id="hero-title">校园问题，随时问<br /><em>论文代码，一起解</em></h1>
-          <p class="hero-subtitle">查校内信息、梳理论文、调试代码。</p>
+          <h1 id="hero-title">把好奇心，<br /><em>变成下一步。</em></h1>
+          <p class="hero-subtitle">校园问答、论文思路、代码灵感。<br />一个入口，陪你把问题往前推进。</p>
           </div>
           <div class="hero-actions">
             <button class="hero-cta" type="button" @click="openLogin('login', $event)">
-              登录，开始使用 <span class="action-circle"><ArrowRight aria-hidden="true" /></span>
+              开始体验 <span class="action-circle"><ArrowRight aria-hidden="true" /></span>
             </button>
             <button class="explore-cue" type="button" @click="goToPage(1)">
-              <span>向下探索 <small>看看它能帮你做什么</small></span>
+              <span>探索更多 <small>看看它能帮你做什么</small></span>
               <span class="explore-cue-arrow" aria-hidden="true"><ArrowRight /></span>
             </button>
           </div>
         </div>
-        <div class="hero-visual">
+        <div class="hero-visual" :data-mode="entryMode">
           <span class="orb-ambient orb-ambient-blue" aria-hidden="true"></span>
           <span class="orb-ambient orb-ambient-pink" aria-hidden="true"></span>
           <span class="orb-orbit orb-orbit-outer" aria-hidden="true"></span>
@@ -537,22 +543,37 @@ onBeforeUnmount(() => {
     <span id="chapter-experience" class="story-anchor" aria-hidden="true"></span>
     <section id="experience" class="experience story-page" :class="{ 'is-current': activePage === 1, 'is-tall': tallPages.includes('experience') }" aria-labelledby="experience-title">
       <div class="section-intro">
-        <h2 id="experience-title">每一种好奇，都有它的工作台</h2>
-        <p>问清楚，想深入，做出来。<br />三种入口，始终由你选择。</p>
+        <h2 id="experience-title">不止一个答案。<br />是让想法向前的工作台。</h2>
+        <p>从零散的问题，到清楚的思路。<br />选一个入口，开始你的下一步。</p>
       </div>
       <div class="capability-grid">
-        <article v-for="item in capabilities" :key="item.number" class="capability-card">
-          <WorkspaceIcon class="capability-icon" :mode="item.number === '01' ? 'standard' : item.number === '02' ? 'kimi' : 'glm'" />
-          <h3>{{ item.title }}</h3>
+        <article v-for="item in capabilities" :key="item.number" class="capability-card" :data-kind="item.number">
+          <div class="capability-preview" aria-hidden="true">
+            <template v-if="item.number === '01'">
+              <div class="preview-toolbar"><CampMark /><span>校园问答</span></div>
+              <p class="preview-question">图书馆周末几点关门？</p>
+              <div class="preview-answer"><WorkspaceIcon mode="standard" /><p>先核对公开资料，<br /><strong>再给你有来源的回答。</strong></p></div>
+              <div class="preview-source"><NavigationIcon name="study" /><span>学校公开资料</span><ArrowRight /></div>
+            </template>
+            <template v-else-if="item.number === '02'">
+              <div class="preview-toolbar"><WorkspaceIcon mode="kimi" /><span>从问题到提纲</span></div>
+              <div class="preview-paper"><span class="paper-heading">让研究，先有结构。</span><ol><li>明确研究问题</li><li>搭建章节结构</li><li>整理依据与来源</li></ol><span class="paper-rule"></span><span class="paper-rule short"></span></div>
+            </template>
+            <template v-else>
+              <div class="preview-toolbar"><WorkspaceIcon mode="glm" /><span>沿着逻辑，找到答案</span></div>
+              <div class="preview-code"><span class="code-file">hello.js</span><pre><code><span class="code-purple">async function</span> nextStep() {
+  <span class="code-purple">const</span> idea = <span class="code-green">'Hello, world'</span>
+  <span class="code-purple">return</span> <span class="code-blue">explore</span>(idea)
+}</code></pre><div class="code-result"><svg viewBox="0 0 16 16"><path d="m3 8 3 3 7-7" /></svg>读懂报错，再验证修改</div></div>
+            </template>
+          </div>
+          <div class="capability-caption"><h3>{{ item.title }}</h3><button type="button" :aria-label="`登录后使用${item.title}功能`" @click="openWorkspace(item.number === '01' ? 'standard' : item.number === '02' ? 'kimi' : 'glm', $event)"><ArrowRight aria-hidden="true" /></button></div>
           <p>{{ item.description }}</p>
-          <button type="button" :aria-label="`登录后使用${item.title}功能`" @click="openWorkspace(item.number === '01' ? 'standard' : item.number === '02' ? 'kimi' : 'glm', $event)">
-            <span>进入{{ item.title }}</span
-            ><ArrowRight aria-hidden="true" />
-          </button>
         </article>
       </div>
+      <p class="showcase-note">功能示意 · 不会自动发送问题</p>
       <div class="campus-tools" aria-label="更多校园工具">
-        <p>从一个问题，到真正完成一件事</p>
+        <p>学习之外，也照顾你的校园日常。</p>
         <div class="campus-tool-links">
           <button v-for="tool in campusTools" :key="tool.route" type="button" @click="openLogin('login', $event, tool.route)">
             <NavigationIcon :name="tool.icon" /><span><strong>{{ tool.title }}</strong><small>{{ tool.description }}</small></span><ArrowRight aria-hidden="true" />
@@ -563,24 +584,25 @@ onBeforeUnmount(() => {
 
     <span id="chapter-canteen" class="story-anchor" aria-hidden="true"></span>
     <section id="canteen" class="life-section story-page" :class="{ 'is-current': activePage === 2, 'is-tall': tallPages.includes('canteen') }" aria-labelledby="life-title">
-      <CanteenPreview />
+      <HomeLifeScene />
       <div class="life-content">
-        <h2 id="life-title">认真学习<br /><i>也好好吃饭</i></h2>
+        <h2 id="life-title">认真学习。<br /><i>也好好生活。</i></h2>
         <p>
-          商家资料由管理员核实发布。查看同学们的真实评分，也留下自己的体验。
+          选一顿合心意的饭，分享新鲜事，认识同校搭子。
         </p>
         <div class="life-status">
           <span class="status-light"></span> 商家资料由本校管理员审核发布
         </div>
         <button type="button" @click="openLogin('login', $event, '/canteens')">
-          登录后查看 <ArrowRight aria-hidden="true" />
+          看看食堂 <ArrowRight aria-hidden="true" />
         </button>
+        <button class="life-secondary" type="button" @click="openLogin('login', $event, '/wall')">逛校园墙 <ArrowRight aria-hidden="true" /></button>
       </div>
     </section>
 
     <span id="chapter-closing" class="story-anchor" aria-hidden="true"></span>
     <section id="closing" class="closing story-page" :class="{ 'is-current': activePage === 3, 'is-tall': tallPages.includes('closing') }" aria-labelledby="closing-title">
-      <h2 id="closing-title">带上好奇心<br /><i>剩下的，一起想</i></h2>
+      <CampMark class="closing-mark" aria-hidden="true" /><h2 id="closing-title">你的下一步，<br /><i>从这里开始。</i></h2>
       <button type="button" @click="openLogin('login', $event)">
         开始我的第一段对话 <ArrowRight aria-hidden="true" />
       </button>
@@ -889,7 +911,7 @@ onBeforeUnmount(() => {
   background: var(--paper);
   color: var(--ink);
   overflow: hidden;
-  font-family: Inter, 'Noto Sans SC', 'PingFang SC', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'PingFang SC', sans-serif;
 }
 button,
 a {
@@ -1923,10 +1945,8 @@ a:focus-visible {
 .hero h1 em {
   display: inline-block;
   padding: 5px 7px 10px 0;
-  color: transparent;
-  background: linear-gradient(90deg, #007aff, #5856d6 36%, #af52de 69%, #ff375f);
-  background-clip: text;
-  -webkit-background-clip: text;
+  color: var(--home-ink, #151925);
+  background: none;
 }
 .hero-subtitle {
   max-width: 530px;

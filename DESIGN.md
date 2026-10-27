@@ -27,14 +27,21 @@ colors:
   assistant-danger-soft: "#fff0f1"
   assistant-line: "#e2e7ec"
   assistant-hover: "#e8edf2"
-  home-paper: "#fbfbfd"
+  home-paper: "#f5f6fa"
   home-surface: "#ffffff"
-  home-ink: "#29323c"
-  home-muted: "#5d6876"
-  home-accent: "#536f90"
-  home-accent-hover: "#405b7b"
-  home-soft: "#eaf0f6"
-  home-line: "#e2e7ec"
+  home-ink: "#151925"
+  home-muted: "#606775"
+  home-accent: "#0066cc"
+  home-accent-hover: "#004f9e"
+  home-soft: "#e9f0fb"
+  home-line: "#dce1eb"
+  home-night: "#11141e"
+  home-night-muted: "#b7bed0"
+  home-night-ink: "#f5f7ff"
+  home-life-paper: "#f3e4d8"
+  home-life-stage: "#f3dfc4"
+  home-life-action: "#754124"
+  home-life-action-hover: "#54301c"
 typography:
   title:
     fontSize: "30px"
@@ -62,9 +69,9 @@ typography:
     lineHeight: 1.6
   home-display:
     fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', 'PingFang SC', sans-serif"
-    fontSize: "clamp(38px, 4.35vw, 68px)"
-    fontWeight: 600
-    lineHeight: 1.14
+    fontSize: "clamp(44px, 5.3vw, 84px)"
+    fontWeight: 650
+    lineHeight: 1.17
     letterSpacing: "-0.035em"
   home-action:
     fontSize: "16px"
@@ -80,8 +87,9 @@ rounded:
   assistant-radius-lg-mobile: "30px"
   assistant-frame-radius: "24px"
   assistant-control-radius: "14px"
-  home-cta: "20px"
+  home-cta: "999px"
   home-example: "16px"
+  home-example-mode: "10px"
 spacing:
   inline-gap: "8px"
   action-gap: "10px"
@@ -90,7 +98,7 @@ spacing:
   assistant-desktop-inset: "14px"
   assistant-composer-inset: "10px"
   assistant-composer-inset-mobile: "8px"
-  home-gutter: "clamp(24px, 5vw, 80px)"
+  home-gutter: "clamp(24px, 5vw, 88px)"
 components:
   work-button-primary:
     backgroundColor: "{colors.work-blue}"
@@ -239,12 +247,27 @@ components:
     textColor: "{colors.home-surface}"
     typography: "{typography.home-action}"
     rounded: "{rounded.home-cta}"
-    padding: "14px 26px"
-  home-example-choice:
+    padding: "14px 24px"
+  home-example-dock:
     backgroundColor: "{colors.home-surface}"
     textColor: "{colors.home-ink}"
     rounded: "{rounded.home-example}"
-    padding: "16px 20px"
+    padding: "22px"
+    width: "min(440px, 94%)"
+  home-example-mode:
+    backgroundColor: "transparent"
+    textColor: "{colors.home-muted}"
+    rounded: "{rounded.home-example-mode}"
+    padding: "8px 12px"
+  home-example-mode-active:
+    backgroundColor: "{colors.home-soft}"
+    textColor: "{colors.home-accent-hover}"
+    rounded: "{rounded.home-example-mode}"
+  home-life-cta:
+    backgroundColor: "{colors.home-life-action}"
+    textColor: "{colors.home-surface}"
+    rounded: "{rounded.pill}"
+    padding: "12px 20px"
 ---
 
 # Design System: Campthink
@@ -256,11 +279,13 @@ components:
 
 <!-- Approved public-home merge: 2026-10-14. Final source: campus-ai-web/src/styles/landing-apple.css, imported after landing-polish.css in views/LoginView.vue; scope .landing.apple-home only. Fresh FULL centered finish review: .impeccable/review/apple-home-centered-2026-10-14/finish-review.md (ship). User-reference.png overrides asynchronous option-letter mapping; generated compositions are critique references, not shipping raster. No comp, plate or pixel pass. -->
 
+<!-- Approved public-home scoped refresh: 2026-10-28, documenting the user's 2026-10-27 authorization. Current sources: LoginView.vue landing before Teleport, landing-apple.css, HomeLifeScene.vue. Surface authority: .impeccable/surfaces/homepage-renewal-20261027.md. Supersedes October14 centered/88px-orb composition and its home controls only; app/auth domains remain separate. Source documentation only; current finish disposition is owned by .impeccable/review/homepage-renewal-20261027/finish-review.md. -->
+
 ## Overview
 
 **Creative North Star: "Campthink"**
 
-沿用用户确认的 Campthink 品牌：明亮的阅读面、深色正文、明确动作、柔和圆角和既有彩球。2026-10-14 获准的公开首页采用独立 Apple 覆盖，保留品牌蓝标题和原有动态彩球；登录弹窗、注册与 Pro 保留原有视觉和动画。登录后的聊天和共享外壳采用用户于 2026-10-13 选定的 C / Apple 方向，以珍珠白、深灰和低饱和灰蓝形成层次。色彩与形状来自当前实现，不另起视觉命名。
+沿用用户确认的 Campthink 品牌：明亮的阅读面、深色正文、明确动作、柔和圆角和既有彩球。2026-10-27 获准更新的公开首页沿用独立 Apple 覆盖，以珍珠白、深墨色正文、明确蓝色动作、实体彩球、墨黑能力画廊与暖色校园生活形成节奏；这是用户确认的首页品牌扩展。登录弹窗、注册与 Pro 保留各自既有设计边界。登录后的聊天和共享外壳采用用户于 2026-10-13 选定的 C / Apple 方向，以珍珠白、深灰和低饱和灰蓝形成层次。色彩与形状来自当前实现，不另起视觉命名。
 
 桌面工作区保持同一个左侧导航，在右侧内容容器切换页面；手机将内容变为单列并使用抽屉导航。本文件只提取可重复使用的规则；课表的首次导入构图、私有图片、独有配色与尺寸仍归其页面说明。2026-10-11 课表记录取得空态和合成已保存态的桌面/手机两轮截图，审阅结论为fix。首次表单和手机信息区已按结论修改，首次表单通过真实应用DOM复核；该记录的最新手机修改未重复截图，因此不声明课表最终视觉验收通过。
 
@@ -273,13 +298,20 @@ components:
 - 聊天：760px 阅读上限，开放回答，圆形 44px 附件和发送／停止控件，紧凑三列输入器。按钮按下以 140ms 响应缩至 0.96；减少动态效果时取消动画、过渡与缩放。
 - 证据：独立 finish review disposition 为 `ship`，覆盖当前聊天及共享外壳；1440、870、390px 开发截图用于审阅。540/540 前端测试、定向 ESLint/Oxlint 与构建通过属于本轮提供的验证记录，文档合并不重复执行。后端、真实认证、模型计费、物理键盘和屏幕阅读器未在本轮重新验收。
 
-### Approved Apple public-home scope exception — 2026-10-14
+### Historical Apple public-home scope exception — 2026-10-14
 
 - 用户明确授权公开首页扩展，取代早先“首页排除”规则的这一局部范围；最终选择以用户附图为准，不以异步生成文件的 A/B 名称为准。
-- 当前来源为最后导入的 `landing-apple.css`，只约束 `.landing.apple-home`。登录弹窗、注册、Pro、角色／管理员发现、路由与后端契约保持原有边界。
-- `home-*` 记录此范围实际消费的材料和控件；首页构图、阅读顺序与 Persuade 模式归 `.impeccable/surfaces/apple-home.md`，不推广为任务页布局。
+- 当时来源为最后导入的 `landing-apple.css`，只约束 `.landing.apple-home`。登录弹窗、注册、Pro、角色／管理员发现、路由与后端契约保持原有边界。
+- 当时的构图、阅读顺序与 Persuade 模式归 `.impeccable/surfaces/apple-home.md`。居中、小彩球及原生选择器构图已被下述 2026-10-27 首页更新取代；此处验收仅是历史记录。
 - 新的 FULL finish review 为 `ship`。本轮提供的 26 项定向／565 项完整前端测试、严格局部 lint 和构建均通过；本次文档合并仅核对既有证据与源码，不重跑应用验证。两轮居中核验与原生图像尺寸差异已披露，真机、物理键盘、屏幕阅读器、FPS 和 10% 动画回放未验。
 - 使用示例明确标注非实时；没有新增能力、机构、指标或上线事实。生成图仅作审阅参考，没有新增上线位图。旧 comp gate 失败仍为失败，已披露为被本次代码实现取代。
+
+### Approved public-home renewal — 2026-10-27; documented 2026-10-28
+
+- 用户授权参考 Nanfu.global、Apple 和九月版本，恢复有视觉主体、功能实物与明暗节奏的公开介绍。它取代 2026-10-14 的居中／88px 彩球规则；不改变登录后应用系统。
+- 当前权威为 `.impeccable/surfaces/homepage-renewal-20261027.md`。源码为 `LoginView.vue` 中 Teleport 之前的 landing、最后导入的 `landing-apple.css` 和 `HomeLifeScene.vue`；`home-*` 仅约束 `.landing.apple-home`。
+- 实现材料为原有 CSS 动态彩球、原生问答／提纲／代码视觉示意与 SVG 校园工具；保持非实时示例声明，没有新增上线位图或第三方品牌资产。
+- 本次仅合并源码设计记录。当前 finish 结论归 `.impeccable/review/homepage-renewal-20261027/finish-review.md`，不把旧 `ship` 或源码提取当作本轮验收。全屏认证、真实键盘与新批次认证改造未记录为已交付。
 
 ### Historical functional workspace extension — 2026-10-12
 
@@ -302,7 +334,7 @@ components:
 
 **Key Characteristics:**
 
-- 品牌页面保留浅色阅读面、品牌蓝与既有彩球；获准首页采用灰蓝主要动作。
+- 品牌页面保留浅色阅读面、明确动作与既有彩球；获准首页以蓝色 CTA、实体彩球、深色能力画廊和暖色生活场景形成节奏。
 - 登录后共享外壳采用珍珠白、深灰与低饱和灰蓝。
 - 按用途区分柔和内框、控件与圆形聊天动作。
 - 固定左侧导航与右侧切页，手机单列与抽屉导航。
@@ -311,23 +343,25 @@ components:
 
 ## Colors
 
-既有品牌页面保留纸白和品牌蓝；获准公开首页与当前聊天、共享外壳分别以各自珍珠白和灰蓝形成阅读层次。已有杏色只延续彩球的暖色部分。frontmatter 保留源码的 CSS 色值，并按作用域应用。
+既有品牌页面保留纸白和品牌蓝；获准公开首页采用珍珠白、墨黑和暖杏色的章节材料，主要动作为蓝色；当前聊天、共享外壳仍保留各自系统。既有杏色继续用于彩球暖色部分。frontmatter 保留源码的 CSS 色值，并按作用域应用。
 
 sidecar 的八级色阶由这些颜色生成，供面板展示明暗变化；它们不是源码色板或新增 CSS token。
 
 ### Primary
 
-- **Campthink 蓝**（`ct-blue`）：获准首页标题的实色强调，以及作用域外的既有品牌标点、共享链接与焦点提示；`.calm-workspace` 内已映射到 `assistant-accent`。
+- **Campthink 蓝**（`ct-blue`）：作用域外的既有品牌标点、共享链接与焦点提示；当前首页标题使用 `home-ink`；`.calm-workspace` 内已映射到 `assistant-accent`。
 - **工作页蓝**（`work-blue`）：保留既有工作按钮的默认值；已批准的 `.calm-workspace` 内由 `workspace-calm.css` 映射到 `assistant-accent`。
-- **浅蓝**（`ct-blue-soft`）：现有首页内容分区及与蓝色动作相关的浅色表面。
+- **浅蓝**（`ct-blue-soft`）：历史首页内容分区及作用域外与蓝色动作相关的浅色表面；当前首页使用独立 `home-*` 材料。
 - **助手动作蓝**（`assistant-accent`）：2026-10-15用户获准加强登录后动作层级，应用于主要动作、头像、图标与键盘焦点；**助手深蓝**（`assistant-accent-hover`）用于悬停发送、链接与选中文字。
-- **助手浅蓝**（`assistant-soft`）：聊天用户气泡、助手头像底色及聊天／共享外壳的当前导航状态。作用域为登录后的Apple外壳，不覆盖公开首页灰蓝。
+- **助手浅蓝**（`assistant-soft`）：聊天用户气泡、助手头像底色及聊天／共享外壳的当前导航状态。作用域为登录后的Apple外壳，不覆盖公开首页蓝色动作。
 - **正常绿、核对琥珀和异常红**（`assistant-success`／`assistant-warning`／`assistant-danger`）：考勤的按时、待点名/迟到、已记录旷课状态；底色分别使用相应`-soft`值。始终同时显示状态文字和单位，不靠颜色单独判断。绿不用于推断未点名者已经到场。
-- **首页灰蓝**（`home-accent`／`home-accent-hover`）：独立公开首页的主要动作、链接、图标与可见焦点；**首页浅灰蓝**（`home-soft`）用于其导航动作悬停。
+- **首页动作蓝**（`home-accent`／`home-accent-hover`）：独立公开首页的主要动作、链接、图标与浅底可见焦点；**首页浅蓝**（`home-soft`）用于示例模式的悬停和选中。深色能力区使用浅蓝焦点。
 
 ### Tertiary
 
-- **杏色**（`ct-apricot`）：既有首页与登录彩球中的暖色。延续原有装饰，不扩展为数据状态或新页面主色。
+- **杏色**（`ct-apricot`）：既有首页与登录彩球中的暖色。延续原有装饰，不扩展为数据状态；首页生活章节另有下述局部暖色材料。
+
+- **首页暖纸／生活场景**（`home-life-paper`／`home-life-stage`）：校园生活的并置材料；**生活棕**（`home-life-action`／`home-life-action-hover`）用于该章节主要入口及次级文字入口，不转为应用语义色。
 
 ### Neutral
 
@@ -339,11 +373,12 @@ sidecar 的八级色阶由这些颜色生成，供面板展示明暗变化；它
 - **助手珍珠白**（`assistant-bg`）：聊天与共享外壳的外层底色；**助手白面**（`assistant-surface`）用于右侧容器、聊天页头、输入器及新对话按钮。
 - **助手浅层**（`assistant-panel`）：来源、附件、建议入口和附件圆形控件；**助手悬停层**（`assistant-hover`）用于共享导航、会话与账户悬停。
 - **助手深灰**（`assistant-ink`）与**助手次级灰**（`assistant-muted`）：当前聊天与共享外壳的正文和辅助文字；**助手浅边线**（`assistant-line`）用于聊天页头与次级工具分隔。
-- **首页珍珠白**（`home-paper`）与**首页白面**（`home-surface`）：公开首页背景与示例表面；**首页深灰**／**首页次级灰**（`home-ink`／`home-muted`）区分正文与说明，**首页浅边线**（`home-line`）用于轻分隔。
+- **首页珍珠白**（`home-paper`）与**首页白面**（`home-surface`）：公开首页背景与示例表面；**首页深灰**／**首页次级灰**（`home-ink`／`home-muted`）区分正文与说明，**首页浅边线**（`home-line`）用于示例分隔。
+- **首页墨夜**（`home-night`）、**夜间正文**（`home-night-ink`）与**夜间次级灰**（`home-night-muted`）：仅供能力画廊和校园工具区形成深色阅读面。
 
 左栏和工作表单已有偏灰绿的中性色层次，侧栏选中项使用浅蓝底。组件中列出的这些源码值属于各自共享组件，不能据此把整个产品改成另一套主色。
 
-**The Quiet Workspace Scope Rule.** 工作区 Apple 配色和外壳规则只约束 `.workspace:is(.chat-focused,.calm-workspace)`；2026-10-14 另行批准的首页扩展只约束 `.landing.apple-home`，保留原有彩球动态。登录弹窗、注册和 Pro 继续保留原有视觉与动画。旧共享组件默认值在 `.calm-workspace` 中受现有映射与覆盖约束，聊天气泡和输入器不推广到其他模块。
+**The Quiet Workspace Scope Rule.** 工作区 Apple 配色和外壳规则只约束 `.workspace:is(.chat-focused,.calm-workspace)`；2026-10-27 另行批准更新的首页系统只约束 `.landing.apple-home`，保留原有彩球动态及独立明暗章节材料。登录弹窗、注册和 Pro 继续保留原有视觉与动画。旧共享组件默认值在 `.calm-workspace` 中受现有映射与覆盖约束，聊天气泡和输入器不推广到其他模块。
 
 ## Typography
 
@@ -358,7 +393,7 @@ sidecar 的八级色阶由这些颜色生成，供面板展示明暗变化；它
 - **Label**：桌面导航与常规动作文本（14px）；表单标签保持现有 15px、600 字重。辅助说明使用 14px 和 1.7 行高。
 - **Answer / Assistant Body**：聊天回答在桌面与手机均使用 16px、1.85 行高；`answer` 保留原有桌面尺寸记录，`assistant-body` 记录试点字体栈与双端规则。旧手机 14px、1.8 行高不再适用于聊天试点。
 - **Assistant Compose / Heading**：聊天输入为 16px、1.7 行高；回答内部标题为 18px、600 字重、1.6 行高。用户消息为 16px、1.75 行高；它与助手正文共同保持可读尺寸。
-- **Home Display / Action**：使用源码中的 Apple 系统栈和实色品牌蓝强调；桌面标题为 `home-display`，1100px 以下改为 `clamp(34px, 4.1vw, 48px)`，760px 以下为 `clamp(31px, 8.2vw, 52px)`／1.28 行高。主要动作桌面为 `home-action`，手机为 15px；正文及原生示例选择器保持源码的双端可读尺寸，详情见 sidecar。
+- **Home Display / Action**：使用源码中的 Apple 系统栈和实色深墨色标题；桌面标题为 `home-display`，1100px 以下为 `clamp(44px, 5.3vw, 64px)`，760px 以下为 `clamp(39px, 10.5vw, 64px)`，行高均为 1.17。主要动作桌面为 `home-action`，手机为 15px；副标题为 18px／1.85，1100px 以下 16px，760px 以下 15px／1.8。示例问题与结果为 14px，模式为 14px，非实时说明为 11px；原生代码示意为 12px／1.9 等宽栈，详情见 sidecar。
 
 桌面阅读尺寸由后加载的可读性样式调整（起于 1024px），不能把前面样式中的更小字号当作桌面当前值。装饰性的微小文字、kicker 和 eyebrow 不纳入可复用文字层级。
 
@@ -366,7 +401,7 @@ sidecar 的八级色阶由这些颜色生成，供面板展示明暗变化；它
 
 ## Layout
 
-获准公开首页的独立容器上限为 1240px，边距使用 `home-gutter`，760px 以下为 24px；它不继承工作区侧栏或 pane。首页构图与前景示例的响应式编排仅在 surface brief 记录，不能据此替换任务页布局。
+获准公开首页的独立容器上限为 1400px，边距使用 `home-gutter`，760px 以下为 24px；它不继承工作区侧栏或 pane。桌面采用文案与彩球并置，手机依次阅读标题／动作和完整视觉舞台；深色能力区与暖色生活区保留不同材料。首屏、章节与示例的具体编排由 `.impeccable/surfaces/homepage-renewal-20261027.md` 拥有，不能据此替换任务页布局。
 
 以下两段是作用域外的既有默认记录；当前 `.chat-focused` 与 `.calm-workspace` 采用下文 244px／24px 的 Apple 外壳。既有桌面工作区采用左导航与右内容的两列框架；默认导航列为 254px，宽屏（起于 1500px）为 275px。导航内部可滚动，切换右侧页面时继续保留侧栏。已有“展开工作区”动作可隐藏侧栏，返回后恢复。
 
@@ -396,7 +431,9 @@ sidecar 的八级色阶由这些颜色生成，供面板展示明暗变化；它
 - **Apple 输入器**：低对比扩散阴影（`0 1px 2px rgb(27 42 60 / 4%), 0 8px 28px rgb(27 42 60 / 5%)`）；该 `assistant-shadow` 已由输入器消费。焦点组合为 `0 0 0 2px var(--assistant-accent), var(--assistant-shadow)`。
 - **聊天工具浮层**：两层扩散阴影（`0 4px 8px rgb(27 42 60 / 6%), 0 16px 40px rgb(27 42 60 / 10%)`）；回答、用户气泡与发送按钮保持无阴影。
 - **新对话动作**：轻分离（`0 1px 3px rgb(27 42 60 / 4%)`）；**桌面内框**使用单层细线效果（`0 0 0 1px rgb(27 42 60 / 4%)`），手机取消。
-- **首页示例表面**：低对比扩散阴影（`0 4px 20px rgb(27 42 60 / 5%)`），只用于已存在的两个白色示例表面；首页背景、主要动作和能力区无外框阴影。彩球保留源码的内光和扩散光感。
+- **首页示例停靠面**：扩散阴影（`0 26px 65px -20px #29385540`），用于彩球前景的单个白色示例面；首页背景、主要动作和能力卡外层无阴影。
+- **首页彩球**：内光与扩散光（`inset -26px -24px 54px #3453992e, 0 36px 64px -28px #3c4f7d4d`），只属于实体彩球。
+- **首页生活应用图形**：下方柔影（`0 26px 40px -16px #5d3c2f38`），仅用于暖色生活场景里的三个倾斜图形。
 
 管理员登录的硬偏移阴影是现有页面的待审实现，未纳入共享阴影词汇。
 
@@ -412,7 +449,7 @@ sidecar 的八级色阶由这些颜色生成，供面板展示明暗变化；它
 
 当前功能页的分段筛选采用 14px 外层（`assistant-control-radius`）与 10px 内项，外层内边距和项间距均为 4px；不套用旧胶囊筛选的轮廓。复合搜索外层为 12px 曲线，内部输入透明；手机历史删除保留原有 8px 曲线和小图标，只扩大独立触区。
 
-获准公开首页的主要 CTA 使用 `home-cta` 曲线，前景示例使用 `home-example` 曲线；原生选择器保留自身 8px 曲线，收尾按钮仍为源码的 28px 曲线。不能把该局部轮廓推广到工作区。
+获准公开首页的主 CTA 与收尾按钮采用 `home-cta` 胶囊，前景示例与能力预览使用 `home-example` 曲线，示例模式按钮使用 `home-example-mode`。能力入口为 44px 圆形触区，能力卡外层无框；生活场景的三个图形使用 29% 曲线与局部倾斜。不能把这些首页轮廓推广到工作区。
 
 ## Components
 
@@ -478,11 +515,13 @@ sidecar 的八级色阶由这些颜色生成，供面板展示明暗变化；它
 - **Segments:** 工作页签与评分筛选采用 `assistant-segment`／`assistant-segment-item` 轮廓；选中项使用助手浅灰蓝底、深灰蓝文字、透明边线和无阴影。手机工作／评分／项目页签最小高度为 44px。
 - **Mobile History:** 独立选择与删除的几何规则见 Layout；删除仍用原有内联小图标、标签、危险悬停色与确认流程，禁用不透明度为 0.45，不把删除控件叠放在选择触区内。
 
-### Apple Public-Home Controls — 2026-10-14
+### Apple Public-Home Controls — 2026-10-27
 
-- **CTA:** 灰蓝实色、白字、无边线或阴影；`home-cta` 记录实际主入口，最小高度桌面 56px、手机 48px，手机内边距 12px 22px。悬停加深，按下以 180ms 缩至 0.96；可见焦点为 2px 灰蓝外框、4px 偏移，减少动态效果时取消过渡与缩放。
-- **Native Example:** 原生 `select` 保留真实选择行为、`aria-label` 与非实时说明的 `aria-describedby`；白色包装使用 `home-example-choice`，内部选择器透明、最小高 44px、桌面 16px／手机 15px。相邻解释使用同一白面、示例曲线与低对比阴影，`aria-live="polite"` 呈现已选示例。sidecar 的独立快照只展示原生控件，不模拟实时回答。
-- **Motion Ownership:** 原始 `landing-polish.css` 保留彩球内部 `auth-orb-current 16s linear infinite`，非当前章节、页面隐藏或弹窗打开时暂停；减少动态效果时取消。入场、滚动、示例过渡与登录弹窗继续由原有实现拥有，首页覆盖只添加自身动作反馈。
+- **CTA:** 蓝色实面、白字、无边线或阴影；`home-cta` 记录胶囊主入口和收尾动作。主入口最小高度桌面 54px、手机 48px；手机内边距 12px 22px。悬停加深，按下以 180ms 缩至 0.97；浅底可见焦点为 2px 蓝色外框、5px 偏移，深色能力区改为浅蓝焦点。减少动态效果时取消过渡与缩放。
+- **Example Dock:** 一个白色前景面承载问答／论文／代码三个原生按钮，以 `aria-pressed` 表示选中，group 通过 `aria-describedby` 关联“使用示例 · 非实时回答”。模式最小高 44px，问句与结果分层，中间用浅线分隔；已移除旧原生 select。手动切换使用 `aria-live="polite"`，播放时关闭播报。面板快照不模拟模型、路由或自动回答。
+- **Demonstration Playback:** 播放由用户触发，每步 4500ms，三步结束；可暂停，手选模式停止播放。页面隐藏、示例离屏、非首章节、开弹窗或减少动态效果时停止；减少动态效果隐藏播放按钮。进度和问句切换使用当前局部规则，不推广为全站轮播。
+- **Capability / Life Media:** 三个能力项使用原生代码绘制问答来源、提纲和代码示意，统一注明“功能示意 · 不会自动发送问题”；入口通过既有登录流程选择功能。生活章节使用 `HomeLifeScene` 的原生 SVG 图形、轨道和暖色材料，图像角色提供简明标签；图形不是可点击应用、真实截图或实时校园数据。
+- **Navigation / Motion Ownership:** 顶部导航、章节定位与正常文档滚动共存；章节索引在 1100px 以下隐藏，不截获滚轮。`landing-polish.css` 拥有原有入场和 `auth-orb-current 16s linear infinite` 内部动态；首页根据隐藏、示例离屏、非当前章节或弹窗打开暂停彩球，减少动态效果取消。认证弹窗及全屏认证后续需求仍是独立范围。
 
 ## Do's and Don'ts
 
@@ -493,11 +532,11 @@ sidecar 的八级色阶由这些颜色生成，供面板展示明暗变化；它
 - **Do** 复用共享工作页按钮、字段、面板和筛选状态，读取后置圆角及可读性覆盖。
 - **Do** 保留可见键盘焦点、窄屏换行与现有减少动态效果处理。
 - **Do** 在已批准的聊天与共享外壳作用域复用 `assistant-*` 的已消费规则，聊天保持双端 16px 正文、760px 阅读上限和单行三列输入器。
-- **Do** 仅在 2026-10-14 获准公开首页消费 `home-*`，保留动态彩球、实色标题和非实时示例说明；构图权威见该 surface brief。
+- **Do** 仅在获准公开首页消费 `home-*`，保留实体彩球、蓝色动作、深色能力画廊、暖色生活场景与非实时示例说明；当前构图权威见 `.impeccable/surfaces/homepage-renewal-20261027.md`。
 
 ### Don't:
 
-- **Don't** 在普通扩展中改造已确认的登录弹窗、注册或 Pro 视觉与动画。2026-10-15用户明确要求的注册身份选择允许新增字段与必要滚动修复，不扩展为视觉重做；首页另有2026-10-14批准的局部例外。
+- **Don't** 在普通扩展中改造已确认的登录弹窗、注册或 Pro 视觉与动画。2026-10-15用户明确要求的注册身份选择允许新增字段与必要滚动修复，不扩展为视觉重做；首页另有 2026-10-27 更新授权的局部例外；全屏认证及后续键盘批次不由该例外视为已交付。
 - **Don't** 将课表独有的配色、标题、图片尺寸或导入构图提升为全站规则。
 - **Don't** 将源码扫描记录或未取得截图的页面写成视觉验收通过。
 - **Don't** 将现有 kicker、eyebrow、未经用户选定的系统展示字体或硬偏移阴影的待审实现提升为后续页面的共享规范；首页明确选定的 Apple 字体仅约束该局部范围。
