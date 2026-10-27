@@ -1,68 +1,40 @@
 <script setup>
-import {computed,onBeforeUnmount,onMounted,ref,watch} from 'vue'
-import {readCourseImageCapability,recognizeCourseImage} from '@/api/courseSchedule'
-import {courseImageFileIssue,prepareCourseImageResult,reviewCourseImageRows,courseImageAdoptionWarnings} from '@/utils/courseImageRecognition'
+import {onBeforeUnmount,onMounted,ref,watch} from 'vue'
+import {readCourseImageCapability,importCourseImage} from '@/api/courseSchedule'
+import {courseImageFileIssue} from '@/utils/courseImageRecognition'
 import {takeCourseFile} from '@/utils/courseFile'
 import NavigationIcon from './NavigationIcon.vue'
-const props=defineProps({scope:String,disabled:Boolean}),emit=defineEmits(['busy','pending','adopt'])
-const capability=ref(null),loading=ref(false),file=ref(null),imageUrl=ref(''),busy=ref(false),error=ref(''),notice=ref(''),candidate=ref(null),reviewed=ref(false),applied=ref('')
+const props=defineProps({scope:String,revision:{type:Number,default:0},disabled:Boolean}),emit=defineEmits(['busy','pending','imported','refresh'])
+const capability=ref(null),loading=ref(false),file=ref(null),imageUrl=ref(''),busy=ref(false),error=ref(''),notice=ref('')
 let generation=0,disposed=false,controller=null,capController=null
-const signature=computed(()=>candidate.value?JSON.stringify(candidate.value):''),pending=computed(()=>!!file.value&&(!applied.value||signature.value!==applied.value))
-const adopted=computed(()=>!!candidate.value&&applied.value===signature.value)
-watch(busy,v=>emit('busy',v),{flush:'sync'});watch(pending,v=>emit('pending',v),{flush:'sync'});watch(signature,()=>{reviewed.value=false},{flush:'sync'})
-const rowIssue=computed(()=>{if(!candidate.value)return'';try{reviewCourseImageRows(candidate.value.rows);return''}catch(e){return e.message}})
+watch(busy,v=>emit('busy',v),{flush:'sync'})
 async function loadCapability(){
   capController?.abort();const c=new AbortController();capController=c;const owner=props.scope;loading.value=true
-  try{const {data}=await readCourseImageCapability(c.signal);if(disposed||c.signal.aborted||owner!==props.scope)return;if(data?.version!==2||data.provider!=='local-ocr'||data.external!==false||typeof data.engine!=='string'||data.maxBytes!==2097152)throw new Error('后台本地识别尚未更新');capability.value=data;error.value=''}
-  catch{if(!disposed&&!c.signal.aborted&&owner===props.scope){capability.value=null;error.value='本地识别暂不可用，可先切换表格导入'}}
+  try{const {data}=await readCourseImageCapability(c.signal);if(disposed||c.signal.aborted||owner!==props.scope)return;if(data?.version!==2||data.provider!=='local-ocr'||data.external!==false||data.automaticImport!==true||data.maxBytes!==2097152)throw new Error();capability.value=data;error.value=''}
+  catch{if(!disposed&&!c.signal.aborted&&owner===props.scope){capability.value=null;error.value='本地识别暂不可用，可切换表格导入'}}
   finally{if(capController===c){loading.value=false;capController=null}}
 }
-function reset(){generation++;controller?.abort();controller=null;busy.value=false;file.value=null;if(imageUrl.value)URL.revokeObjectURL(imageUrl.value);imageUrl.value='';candidate.value=null;applied.value='';reviewed.value=false;error.value='';notice.value=''}
+function reset(){generation++;controller?.abort();controller=null;busy.value=false;file.value=null;if(imageUrl.value)URL.revokeObjectURL(imageUrl.value);imageUrl.value='';error.value='';notice.value='';emit('pending',false)}
 async function choose(event){const selected=takeCourseFile(event.target);if(!selected||props.disabled||busy.value)return;const issue=courseImageFileIssue(selected);if(issue){error.value=issue;return}reset();file.value=selected;imageUrl.value=URL.createObjectURL(selected);await recognize()}
-function cancel(){generation++;controller?.abort();controller=null;busy.value=false;notice.value='已停止等待，本次未保存；后台可能仍在完成临时识别'}
+function cancel(){generation++;controller?.abort();controller=null;busy.value=false;notice.value='已停止等待，请重新读取课表确认导入结果'}
 async function recognize(){
   if(props.disabled||busy.value||!file.value||!capability.value?.available||!props.scope)return
-  const run=++generation,owner=props.scope,c=new AbortController();controller=c;busy.value=true;error.value='';notice.value='后台正在读取课表，不调用大模型'
-  try{const {data}=await recognizeCourseImage(file.value,c.signal);if(disposed||run!==generation||owner!==props.scope||c.signal.aborted)return;const next=prepareCourseImageResult(data);candidate.value=next;applied.value='';notice.value=`识别出${next.rows.length}行待核对记录；请与原图逐行比对`}
-  catch(e){if(!disposed&&run===generation&&owner===props.scope&&!c.signal.aborted){error.value=e.response?.data?.message||e.message||'图片识别暂未完成';notice.value='此前的填写与已保存课表没有改变；不会自动重试'}}
+  const run=++generation,owner=props.scope,revision=props.revision,c=new AbortController();controller=c;busy.value=true;error.value='';notice.value='正在识别并导入…'
+  try{const {data}=await importCourseImage(file.value,revision,c.signal);if(disposed||run!==generation||owner!==props.scope||c.signal.aborted)return;if(!data?.schedule||!Number.isInteger(data.importedRows)||data.importedRows<1||data.importedRows>120||!Number.isInteger(data.week)||data.week<1||data.week>30)throw new Error('导入回执不完整，请重新读取课表确认');emit('imported',{...data,owner});notice.value=`已导入${data.importedRows}门课 · 第${data.week}周`}
+  catch(e){if(!disposed&&run===generation&&owner===props.scope&&!c.signal.aborted){error.value=e.response?.data?.message||e.response?.data?.detail||e.message||'导入结果尚未确认';notice.value='可重新读取课表查看结果；不会自动重发图片'}}
   finally{if(run===generation){busy.value=false;controller=null}}
-}
-function adopt(){
-  if(props.disabled||busy.value||!candidate.value||rowIssue.value||!reviewed.value)return
-  const owner=props.scope,run=generation,result=reviewCourseImageRows(candidate.value.rows),snapshot=signature.value
-  emit('adopt',{...result,metadata:{...candidate.value.metadata},warnings:courseImageAdoptionWarnings(candidate.value,result.excluded),source:'后台本地OCR并经本人核对',owner,onApplied:()=>{if(!disposed&&owner===props.scope&&run===generation&&snapshot===signature.value){applied.value=snapshot;notice.value='已加入下方预览，确认保存后生效'}}})
 }
 watch(()=>props.scope,()=>{reset();capController?.abort();if(props.scope)void loadCapability()},{flush:'sync'})
 onMounted(loadCapability);onBeforeUnmount(()=>{disposed=true;reset();capController?.abort()})
 </script>
 <template>
   <section class="course-image-import" aria-label="截图导入">
-    <p v-if="loading" role="status">正在检查本地识别…</p>
-    <p v-else-if="capability&&!capability.available" role="status">截图识别暂不可用，请切换“表格文件”导入。</p>
+    <p v-if="loading" role="status">正在准备识别…</p>
+    <p v-else-if="capability&&!capability.available" role="status">截图识别暂不可用，可使用表格文件。</p>
     <button v-if="!capability&&!loading" class="work-button" type="button" @click="loadCapability">重新读取识别能力</button>
-    <div v-if="!adopted" class="image-method-actions"><label class="image-picker" :class="{'image-picker-compact':file}"><NavigationIcon name="timetable" /><strong>{{file?'换张截图':'上传课表截图'}}</strong><span v-if="!file">后台本地识别 · PNG / JPG · 最大2MB</span><input type="file" accept="image/png,image/jpeg,.png,.jpg,.jpeg" :disabled="disabled||busy||!capability?.available" @change="choose" /></label><button v-if="file&&!busy" class="work-button" type="button" :disabled="disabled" @click="reset">清除</button></div>
-    <div v-if="file&&!adopted" class="image-selected">
-      <figure class="image-local-preview"><img :src="imageUrl" alt="本次待识别课表图片，仅本机预览" /><figcaption>{{file.name}} <a :href="imageUrl" target="_blank" rel="noopener noreferrer">放大原图</a></figcaption></figure>
-      <div class="image-recognize-controls">
-      <p class="image-destination">{{busy?'正在识别…':'图片只在本站后台临时处理'}}</p>
-      <div class="image-method-actions"><button v-if="busy" class="work-button" type="button" @click="cancel">停止等待</button><button v-else-if="error" class="work-button" type="button" :disabled="disabled||!capability?.available" @click="recognize">重试识别</button></div>
-      </div>
-    </div>
-    <div v-if="adopted" class="image-applied" role="status"><NavigationIcon name="sources" /><span>截图已核对，确认保存后生效</span><button class="work-button" type="button" :disabled="disabled||busy" @click="applied=''">重新核对</button></div>
-    <p v-if="error" class="image-error" role="alert">{{error}}</p><p v-if="notice&&!adopted" class="image-notice" role="status">{{notice}}</p>
-    <section v-if="candidate&&!adopted" class="image-review" aria-label="图片识别待核对记录">
-      <h3>核对课程</h3><p class="image-notice">{{candidate.metadata.week?'第'+candidate.metadata.week+'周 · ':''}}{{candidate.metadata.semester||'学期待填写'}} · 不补其他周</p>
-      <ol class="image-rows"><li v-for="row in candidate.rows" :key="row.id" :class="{'image-row-excluded':!row.include}">
-        <label class="image-consent"><input v-model="row.include" type="checkbox" :disabled="disabled||busy" />{{row.name||'待填写课程名'}}</label>
-        <p class="image-row-brief">周{{['','一','二','三','四','五','六','日'][Number(row.weekday)]||'?'}} · {{row.mode==='period'?'第'+row.start+'—'+row.end+'节':row.start+'—'+row.end}} · {{row.room||'教室未填'}}</p>
-        <p v-if="row.reviewNote" class="image-error">{{row.reviewNote}}</p>
-        <details :open="!!row.reviewNote"><summary>修改这门课</summary><fieldset :disabled="disabled||busy||!row.include" class="image-row-fields"><label>课程名称<input v-model="row.name" maxlength="100" placeholder="补充清晰的课程名称" @input="row.nameReviewed=!row.reviewNote" /></label><label>任课教师<input v-model="row.teacher" maxlength="100" placeholder="未知留空" /></label><label>星期<select v-model="row.weekday"><option value="">待确认</option><option v-for="(day,i) in ['周一','周二','周三','周四','周五','周六','周日']" :key="day" :value="String(i+1)">{{day}}</option></select></label><label>时间类型<select v-model="row.mode" @change="row.start='';row.end='' "><option value="period">第几节</option><option value="clock">钟点</option></select></label><label>开始<input v-model="row.start" :placeholder="row.mode==='period'?'如1':'如08:30'" maxlength="5" /></label><label>结束<input v-model="row.end" :placeholder="row.mode==='period'?'如2':'如10:05'" maxlength="5" /></label><label>上课周次<input v-model="row.weeks" maxlength="160" placeholder="如9" /></label><label>教室<input v-model="row.room" maxlength="100" placeholder="未注明可留空" /></label></fieldset></details>
-        <label v-if="row.reviewNote" class="image-consent"><input v-model="row.nameReviewed" type="checkbox" :disabled="disabled||busy||!row.include" />这门课的名称已核对</label>
-      </li></ol>
-      <p v-if="rowIssue" class="image-error" role="status">{{rowIssue}}</p>
-      <label class="image-consent"><input v-model="reviewed" type="checkbox" :disabled="disabled||busy||!!rowIssue" />已核对保留的课程、教师、时间和周次</label>
-      <button class="work-button primary" type="button" :disabled="disabled||busy||!reviewed||!!rowIssue" @click="adopt">预览这些课程</button>
-    </section>
+    <div class="image-method-actions"><label class="image-picker" :class="{'image-picker-compact':file}"><NavigationIcon name="timetable"/><strong>{{file?'换张截图':'上传课表截图'}}</strong><span v-if="!file">自动识别时间并保存 · PNG / JPG · 最大2MB</span><input type="file" accept="image/png,image/jpeg,.png,.jpg,.jpeg" :disabled="disabled||busy||!capability?.available" @change="choose"/></label><button v-if="file&&!busy" class="work-button" type="button" :disabled="disabled" @click="reset">清除</button></div>
+    <div v-if="file" class="image-selected"><figure class="image-local-preview"><img :src="imageUrl" alt="本次课表截图，本地预览"/></figure><div><p role="status">{{notice}}</p><button v-if="busy" class="work-button" type="button" @click="cancel">停止等待</button></div></div>
+    <p v-if="error" class="image-error" role="alert">{{error}}</p><button v-if="error||notice.includes('停止等待')" class="work-button" type="button" :disabled="disabled||busy" @click="emit('refresh')">重新读取课表</button>
   </section>
 </template>
 <style scoped>

@@ -43,6 +43,13 @@ public class CourseScheduleService {
         return saveInternal(userId,input,false,"本人导入或修改个人副本");
     }
     @Transactional
+    public State saveImported(Long userId,Input input,long expectedSchool) {
+        // Hold the account authorization row through the revision-protected image commit.
+        if(jdbc.queryForList("SELECT id FROM users WHERE id=? AND school_id=? AND status=1 FOR UPDATE",Long.class,userId,expectedSchool).isEmpty())
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,"账号或学校已变化，未导入课表");
+        return saveInternal(userId,input,false,"课表截图自动导入");
+    }
+    @Transactional
     public State saveReviewed(Long userId, Input input,String reason) {
         if(!historyAvailable())throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,"个人课表历史尚未启用，没有修改");
         if(reason==null||reason.isBlank()||reason.length()>500)throw invalid("请填写500字以内的修改原因");

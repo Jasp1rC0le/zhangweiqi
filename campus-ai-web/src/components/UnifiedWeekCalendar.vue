@@ -385,7 +385,7 @@ onBeforeUnmount(() => {
           <h2>{{ focus.name }}</h2>
           <p class="calendar-focus-state">{{ state.week.focusLabel }}</p>
           <p>
-            {{ focus.date.slice(5).replace('-', '/') }} · {{ focus.timeLabel }} ·
+            {{ focus.date.slice(5).replace('-', '/') }} · {{ focus.timeLabel }}<span v-if="focus.startPeriod && focus.endPeriod"> · 第{{ focus.startPeriod }}{{ focus.startPeriod===focus.endPeriod?'':'—'+focus.endPeriod }}节</span> ·
             {{ focus.room || '教室未填写' }}
           </p>
           <p v-if="focus.teacher">
@@ -445,7 +445,7 @@ onBeforeUnmount(() => {
       </div>
       <ul class="calendar-day-list">
         <li v-for="entry in displayed" :key="entry.id" :class="{ cancelled: entry.cancelled }">
-          <time><small v-if="state.pagination?.totalPages > 1">{{ entry.date.slice(5).replace('-', '/') }} · 周{{ days[entry.weekday - 1] }}</small>{{ entry.timeLabel }}</time>
+          <time><small v-if="state.pagination?.totalPages > 1">{{ entry.date.slice(5).replace('-', '/') }} · 周{{ days[entry.weekday - 1] }}</small>{{ entry.timeLabel }}<small v-if="entry.startPeriod && entry.endPeriod" class="calendar-period">第{{ entry.startPeriod }}{{ entry.startPeriod===entry.endPeriod?'':'—'+entry.endPeriod }}节</small></time>
           <div>
             <strong>{{ entry.name }}</strong>
             <p>

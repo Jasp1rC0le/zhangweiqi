@@ -25,7 +25,6 @@ import CourseWeekGrid from './CourseWeekGrid.vue'
 import PersonalScheduleOperations from './PersonalScheduleOperations.vue'
 import SchoolTimetableGuide from './SchoolTimetableGuide.vue'
 import CourseImageImport from './CourseImageImport.vue'
-import { mergeWeeklyImage } from '@/utils/weeklyImageMerge'
 import { parseCourseText, coursesToCsv, describeCourseChanges } from '@/utils/courseImport'
 import { readCourseUpload } from '@/utils/courseUpload'
 import { useTimetableClock } from '@/utils/useTimetableClock'
@@ -39,6 +38,7 @@ import { focusWorkflowElement, cancelWorkflowFocus } from '@/utils/teachingWorkf
 
 const props = defineProps({ manageOnly: { type: Boolean, default: false }, layoutReady: { type: String, default: 'ready' }, exportRequested: { type: Boolean, default: false }, manageRequested: { type: Boolean, default: false } })
 
+const emit = defineEmits(['imported'])
 const store = useCourseScheduleStore(),
   clock = useTimetableClock()
 const editing = ref(false),
@@ -354,29 +354,15 @@ async function chooseFile(event) {
     }
   }
 }
-async function adoptCourseImage(result) {
-  if(disposed||unavailable.value||result.owner!==store.principal)return
-  const owner=store.principal,base=store.schedule,baseRevision=base?.revision||0
-  let merged
-  try{merged=mergeWeeklyImage(base,result.courses,result.metadata)}catch(failure){error.value=failure.message;return}
-  const nextRaw=coursesToCsv(merged.courses)
-  if(raw.value.trim()&&raw.value!==nextRaw&&!(await confirm('本次结果会替换未保存预览；已保存课表不变。',{title:'采用这次识别结果？',confirmText:'替换未保存预览',cancelText:'保留当前填写'})))return
-  if(disposed||owner!==store.principal)return
-  if((store.schedule?.revision||0)!==baseRevision){error.value='已保存课表发生变化，请重新读取后再采用识别结果';versionConflict.value=true;return}
-  const generation=++fileGeneration
-  fileRead?.abort();fileRead=null;invalidatePreview();error.value=''
-  result={...result,courses:merged.courses,metadata:merged.metadata,conflicts:courseConflicts(merged.courses),warnings:[...result.warnings,...merged.warnings]}
-  if(result.metadata.semester)form.semester=result.metadata.semester
-  if(result.metadata.firstMonday)form.firstMonday=result.metadata.firstMonday
-  raw.value=coursesToCsv(result.courses)||JSON.stringify({semester:form.semester,firstMonday:form.firstMonday,courses:result.courses})
-  await nextTick()
-  if(disposed||owner!==store.principal||generation!==fileGeneration)return
-  preview.value={courses:result.courses,metadata:result.metadata,warnings:result.warnings,conflicts:result.conflicts,duplicates:result.duplicates,source:result.source,revision:baseRevision}
-  fileLabel.value='本人核对后的图片识别结果';fileNotice.value=`待保存${result.courses.length}条课程；请核对学期、第1周日期和下方新增/移除差异，尚未保存`
-  result.onApplied()
-  await nextTick()
-  if(!disposed&&owner===store.principal&&generation===fileGeneration){previewTarget.value?.focus({preventScroll:true});previewTarget.value?.scrollIntoView({block:'start',behavior:'auto'})}
+async function afterImageImported(result) {
+  if(disposed||result.owner!==store.principal)return
+  try{if(!store.adopt(result.schedule,result.owner))return}catch{error.value='导入回执尚未核实，请重新读取课表';return}
+  fileGeneration++;fileRead?.abort();fileRead=null;editing.value=false;raw.value='';preview.value=null;confirmed.value=false;imagePending.value=false;error.value='';versionConflict.value=false
+  notice.value=`已自动导入${result.importedRows}门课 · 第${result.week}周${result.warnings?.length?'；部分名称可能有误，可在课表修改':''}`
+  const weekdays=result.schedule.courses.filter(c=>c.weeks.includes(result.week)).map(c=>c.weekday)
+  emit('imported',{owner:result.owner,date:addDays(result.schedule.firstMonday,7*(result.week-1)+Math.min(...weekdays)-1),count:result.importedRows,week:result.week,warnings:result.warnings?.length||0})
 }
+async function refreshAfterImage(){await store.load(true);if(!store.error)editing.value=false}
 async function save() {
   if(imagePending.value){notice.value='请先采用或清除上方图片识别候选，再保存课程；现有课表没有改变';return}
   if (
@@ -541,7 +527,7 @@ onBeforeUnmount(() => {
         <div>
           <h2 ref="heading" tabindex="-1" :data-workflow-ready="layoutReady">{{ store.schedule.semester }}</h2>
           <p>
-            {{ store.schedule.courses.length }}条课程安排 · 核对于
+            {{ store.schedule.courses.length }}条课程安排 · 更新于
             {{ dateLabel(store.schedule.checkedAt) }}
           </p>
         </div>
@@ -691,14 +677,15 @@ onBeforeUnmount(() => {
       <h2 ref="importHeading" tabindex="-1" :data-workflow-ready="layoutReady">
         {{ store.schedule ? '更新课表' : '导入课表' }}
       </h2>
-      <p class="course-import-intro">上传 → 核对课程 → 确认保存</p>
+      <p class="course-import-intro">{{ importMode === 'image' ? '上传后自动识别并保存' : '上传 → 核对课程 → 确认保存' }}</p>
       <div class="course-import-methods" role="group" aria-label="选择课表导入方式">
         <button class="work-button" type="button" :aria-pressed="importMode === 'image'" :disabled="unavailable" @click="importMode = 'image'"><NavigationIcon name="timetable" />课表截图</button>
         <button class="work-button" type="button" :aria-pressed="importMode === 'file'" :disabled="unavailable" @click="importMode = 'file'"><NavigationIcon name="sources" />表格文件</button>
       </div>
-      <CourseImageImport v-show="importMode === 'image'" :scope="store.principal" :disabled="baseUnavailable" @busy="imageBusy=$event" @pending="imagePending=$event" @adopt="adoptCourseImage" />
+      <CourseImageImport v-show="importMode === 'image'" :scope="store.principal" :revision="store.schedule?.revision||0" :disabled="baseUnavailable||!store.loaded||!!store.error" @busy="imageBusy=$event" @pending="imagePending=$event" @imported="afterImageImported" @refresh="refreshAfterImage" />
+<button v-if="importMode === 'image'" class="work-button" type="button" :disabled="imageBusy" @click="cancel">返回课表</button>
       <SchoolTimetableGuide v-show="importMode === 'file'" />
-      <fieldset :disabled="unavailable">
+      <fieldset v-show="importMode === 'file'" :disabled="unavailable">
         <div v-show="importMode === 'file'" class="course-actions">
           <label class="course-file"
             >选择表格文件<input

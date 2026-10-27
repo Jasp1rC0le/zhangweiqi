@@ -1,0 +1,27 @@
+package com.campusai.timetable;
+import com.campusai.mapper.UserMapper;
+import com.campusai.user.entity.User;
+import org.junit.jupiter.api.*;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
+import java.time.*;
+import java.util.*;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+import static com.campusai.timetable.CourseScheduleService.*;
+class CourseImageImportServiceTest {
+ final LocalTimetableOcrService ocr=mock(LocalTimetableOcrService.class);final CourseScheduleService schedules=mock(CourseScheduleService.class);final UserMapper users=mock(UserMapper.class);final CourseImageImportService service=new CourseImageImportService(ocr,schedules,users,1);final byte[] bytes={1};
+ static User user(long school){var u=new User();u.setId(7L);u.setStatus(1);u.setSchoolId(school);return u;}
+ static Snapshot snapshot(int revision,List<Course> courses){return new Snapshot(revision,"已有学期",LocalDate.parse("2026-09-07"),7,courses,Instant.EPOCH,Instant.EPOCH);}
+ static SchoolTimetableImageParser.Row row(int day,int first,int last,String name){return new SchoolTimetableImageParser.Row(name,day,null,null,first,last,List.of(9),"D-101","","名称符号可能不清楚");}
+ static LocalTimetableOcrService.Result result(Integer week,List<SchoolTimetableImageParser.Row> rows){return new LocalTimetableOcrService.Result(2,"local-ocr","synthetic",false,"2026秋","2026-09-07",week,"2026-11-02",rows,List.of("名称符号可能不清楚"));}
+ @BeforeEach void setup(){when(users.findById(7L)).thenReturn(user(1));when(schedules.get(7L)).thenReturn(new State(null));when(ocr.recognize(7,bytes)).thenReturn(result(9,List.of(row(1,1,4,"合成课川"),row(2,5,6,"合成课乙"))));when(schedules.saveImported(eq(7L),any(),eq(1L))).thenAnswer(c->{Input in=c.getArgument(1);return new State(new Snapshot(in.revision()+1,in.semester(),in.firstMonday(),in.remindDays(),in.courses(),Instant.EPOCH,Instant.EPOCH));});}
+ @Test void oneUploadAutomaticallySavesWithConfiguredPeriodsAndClockTimesWithoutConfirmation(){var r=service.importImage(7,0,bytes);assertEquals(2,r.importedRows());assertEquals("08:30",r.recognized().get(0).startTime());assertEquals("11:55",r.recognized().get(0).endTime());assertEquals("14:00",r.recognized().get(1).startTime());assertEquals("15:35",r.recognized().get(1).endTime());assertEquals(1,r.schedule().revision());assertEquals("合成课川",r.schedule().courses().get(0).name());assertFalse(r.warnings().isEmpty());verify(schedules,times(1)).saveImported(eq(7L),any(),eq(1L));}
+ @Test void aWeeklyImportRetainsOtherWeeksAndExactExistingTeacher(){var old=new Course("合成课川",1,null,null,List.of(1,9,10),"D-101",1,4,"原教师");when(schedules.get(7L)).thenReturn(new State(snapshot(3,List.of(old))));var r=service.importImage(7,3,bytes);assertTrue(r.keptOtherWeeks());assertEquals("已有学期",r.schedule().semester());var kept=r.schedule().courses().stream().filter(c->c.name().equals(old.name())).findFirst().orElseThrow();assertEquals(List.of(1,9,10),kept.weeks());assertEquals("原教师",kept.teacher());}
+ @Test void staleRevisionStopsBeforeOcrAndNeverRetriesWrite(){when(schedules.get(7L)).thenReturn(new State(snapshot(2,List.of())));assertEquals(409,assertThrows(ResponseStatusException.class,()->service.importImage(7,0,bytes)).getStatusCode().value());verifyNoInteractions(ocr);verify(schedules,never()).saveImported(anyLong(),any(),anyLong());}
+ @Test void concurrentSaveKeepsTheOriginalExpectedRevision(){when(schedules.get(7L)).thenReturn(new State(snapshot(2,List.of())));when(schedules.saveImported(eq(7L),any(),eq(1L))).thenThrow(new ResponseStatusException(HttpStatus.CONFLICT));assertEquals(409,assertThrows(ResponseStatusException.class,()->service.importImage(7,2,bytes)).getStatusCode().value());verify(schedules,times(1)).saveImported(eq(7L),argThat(i->i.revision()==2),eq(1L));}
+ @Test void unconfiguredOrOverlappingPeriodsDoNotWrite(){for(var rows:List.of(List.of(row(1,9,10,"夜间课")),List.of(row(1,1,4,"甲"),row(1,3,4,"乙")))){when(ocr.recognize(7,bytes)).thenReturn(result(9,rows));assertEquals(422,assertThrows(ResponseStatusException.class,()->service.importImage(7,0,bytes)).getStatusCode().value());}verify(schedules,never()).saveImported(anyLong(),any(),anyLong());}
+ @Test void missingWeekAndChangedSchoolDoNotSave(){when(ocr.recognize(7,bytes)).thenReturn(result(null,List.of(row(1,1,2,"甲"))));assertEquals(422,assertThrows(ResponseStatusException.class,()->service.importImage(7,0,bytes)).getStatusCode().value());when(users.findById(7L)).thenReturn(user(1),user(2));assertEquals(403,assertThrows(ResponseStatusException.class,()->service.importImage(7,0,bytes)).getStatusCode().value());verify(schedules,never()).saveImported(anyLong(),any(),anyLong());}
+ @Test void everyPreviouslySuppliedBellHasExactBidirectionalMapping(){for(var slot:CampusBellSchedule.SLOTS){var span=CampusBellSchedule.exact(slot.start(),slot.end());assertNotNull(span);assertEquals(slot.period(),span.startPeriod());assertEquals(slot.period(),span.endPeriod());}assertNull(CampusBellSchedule.span(9,10));}
+ @Test void clockBasedTeacherRecordIsPreservedForTheEquivalentRecognizedPeriods(){var old=new Course("合成课川",1,"08:30","11:55",List.of(9),"D-101",null,null,"原教师");when(schedules.get(7L)).thenReturn(new State(snapshot(2,List.of(old))));var r=service.importImage(7,2,bytes);assertEquals("原教师",r.schedule().courses().stream().filter(c->c.name().equals(old.name())).findFirst().orElseThrow().teacher());}
+}

@@ -1,6 +1,7 @@
 import http from './http'
 export const readCourseImageCapability = (signal) => http.get('/api/timetable/courses/image-capabilities', { signal })
 export const recognizeCourseImage = (file, signal) => http.post('/api/timetable/courses/recognize-image', file, { signal, timeout: 90000, headers: { 'Content-Type': file.type } })
+export const importCourseImage = (file, revision, signal) => http.post('/api/timetable/courses/import-image', file, { params: { revision }, signal, timeout: 90000, headers: { 'Content-Type': file.type } })
 export const readCourseSchedule = (signal) => http.get('/api/timetable/courses', { signal })
 export const saveCourseSchedule = (payload,signal) => http.put('/api/timetable/courses', payload,{signal})
 export const confirmCourseSchedule = (revision) =>

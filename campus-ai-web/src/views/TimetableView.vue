@@ -5,16 +5,18 @@ import { useCourseScheduleStore } from '@/stores/courseSchedule'
 import UnifiedWeekCalendar from '@/components/UnifiedWeekCalendar.vue'
 import ScheduleExportPanel from '@/components/ScheduleExportPanel.vue'
 import { computed, ref, nextTick, onMounted, watch, onBeforeUnmount } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { userSessionGeneration } from '@/api/http'
 import {scheduleExportRoute} from '@/utils/scheduleFileIntent'
 const legacy = useTimetableStore()
 const personal = useCourseScheduleStore()
 const importDetails = ref(), importPanel = ref(),scheduleExportPanel=ref()
-const importOpen = ref(false)
+const importOpen = ref(false),pageHeading=ref(),importReceipt=ref('')
+watch(()=>personal.principal,()=>{importReceipt.value=''},{flush:'sync'})
 const importAction = ref(false)
 watch(() => importPanel.value?.importing, active => { if (!active) importAction.value = false })
-const route = useRoute()
+const route = useRoute(), router = useRouter()
+async function importedImage(value){if(value?.owner!==personal.principal)return;const owner=value.owner;importAction.value=false;importOpen.value=false;if(importDetails.value)importDetails.value.open=false;importReceipt.value=`已导入${value.count}门课 · 第${value.week}周${value.warnings?'；部分名称可能有误，可修改':''}`;await router.replace({path:'/timetable',query:{queryView:'STUDENT',queryDate:value.date}});await nextTick();if(!disposed&&owner===personal.principal&&route.query.queryDate===value.date){pageHeading.value?.focus({preventScroll:true});pageHeading.value?.scrollIntoView({block:'start',behavior:'auto'})}}
 const calendarLayout = ref({ owner: '', status: 'waiting' })
 const calendarOwner = computed(() => personal.principal ? `${personal.principal}:${userSessionGeneration.value}` : '')
 const calendarExportContext = ref(null)
@@ -64,7 +66,7 @@ function loadLegacy(event) {
 <template>
   <main class="work-page timetable-page">
     <header class="timetable-heading">
-      <h1>{{ importAction ? '导入课表' : title }}</h1>
+      <h1 ref="pageHeading" tabindex="-1">{{ importAction ? '导入课表' : title }}</h1>
 
       <div class="timetable-actions" v-if="!importAction" aria-label="课表操作">
       <button v-if="!['COUNSELOR','SECRETARY'].includes(scope)" class="timetable-import-action" type="button" :disabled="importPanel?.dirty||importPanel?.unavailable" @click="openImport">{{ personal.schedule ? '更新课表' : '导入课表' }}</button>
@@ -72,11 +74,12 @@ function loadLegacy(event) {
       <button v-if="!['COUNSELOR','SECRETARY'].includes(scope)" class="timetable-import-action timetable-export-action" type="button" @click="openOperations">修改个人安排</button>
       </div>
     </header>
+    <p v-if="importReceipt&&!importAction" class="timetable-import-receipt" role="status">{{importReceipt}}</p>
     <UnifiedWeekCalendar v-show="!importAction" @available="unifiedAvailable = $event" @scope="scope = $event" @layout="calendarLayoutChanged" @export-context="calendarExportChanged" />
     <ScheduleExportPanel v-show="!importAction" ref="scheduleExportPanel" :owner="calendarOwner" :preferred-view="scope" :preset="fileExportPreset" :calendar-context="calendarExportContext" />
     <details ref="importDetails" class="import-management" :class="{'import-focused':importAction}" :open="importOpen || !unifiedAvailable" @toggle="importOpen = $event.target.open">
       <summary>管理个人课表</summary>
-      <CourseSchedulePanel ref="importPanel" :layout-ready="layoutReadiness" :export-requested="route.query.tool === 'personal-export'" :manage-requested="route.query.tool === 'personal-manage'" :manage-only="unifiedAvailable" />
+      <CourseSchedulePanel ref="importPanel" @imported="importedImage" :layout-ready="layoutReadiness" :export-requested="route.query.tool === 'personal-export'" :manage-requested="route.query.tool === 'personal-manage'" :manage-only="unifiedAvailable" />
     </details>
     <details v-show="!importAction" class="legacy-source" @toggle="loadLegacy">
       <summary>旧版原件</summary>
@@ -97,6 +100,7 @@ function loadLegacy(event) {
   </main>
 </template>
 <style scoped>
+.timetable-import-receipt{margin:0 0 18px;font-size:14px;line-height:1.7;color:var(--assistant-success,#187248)}
 .import-focused>summary{display:none}.import-focused{border-top:0!important;padding-top:0!important;margin-top:0!important}
 .timetable-page {
   max-width: 1160px;

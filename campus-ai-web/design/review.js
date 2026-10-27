@@ -28,6 +28,7 @@ import { createCanteenFixture } from './canteenFixture.js'
 import { createMaterialIntakeFixture } from './materialIntakeFixture.js'
 import { createPrivateMaterialFixture } from './privateMaterialFixture.js'
 import { installVoiceInputFixture } from './voiceInputFixture.js'
+import { mergeWeeklyImage } from '../src/utils/weeklyImageMerge.js'
 import { createWallFixture } from './wallFixture.js'
 import ChatView from '../src/views/ChatView.vue'
 import WallView from '../src/views/WallView.vue'
@@ -83,7 +84,16 @@ const feedbackReceipts=new Map()
 let failFeedback=new URLSearchParams(window.location.search).has('failFeedback')
 const adapter = async (config) => {
   // Explicitly synthetic local OCR review; never calls a provider.
-  if(config.url==='/api/timetable/courses/image-capabilities')return{data:{version:2,provider:'local-ocr',engine:'synthetic-local',external:false,maxBytes:2097152,available:true},status:200,statusText:'OK',headers:{},config}
+  if(config.url==='/api/timetable/courses/image-capabilities')return{data:{version:2,provider:'local-ocr',engine:'synthetic-local',external:false,automaticImport:true,maxBytes:2097152,available:true},status:200,statusText:'OK',headers:{},config}
+  if(config.url==='/api/timetable/courses/import-image'){
+    document.documentElement.dataset.autoImageImports=String(Number(document.documentElement.dataset.autoImageImports||0)+1)
+    if(new URLSearchParams(window.location.search).has('visionFailure')||!teachingFlow)throw{response:{status:503,data:{message:'模拟识别失败，未自动保存'}},config}
+    const old=(await teachingFlow.adapter({url:'/api/timetable/courses',method:'get'})).data.schedule
+    const courses=[{name:'合成自动课程A',weekday:1,startPeriod:1,endPeriod:4,weeks:[9],room:'合成教室A',teacher:''},{name:'合成自动课程B川',weekday:3,startPeriod:5,endPeriod:6,weeks:[9],room:'合成教室B',teacher:''}]
+    const merged=mergeWeeklyImage(old,courses,{semester:'合成自动导入学期',firstMonday:'2026-09-07',week:9})
+    const saved=await teachingFlow.adapter({url:'/api/timetable/courses',method:'put',data:JSON.stringify({revision:config.params.revision,semester:merged.metadata.semester,firstMonday:merged.metadata.firstMonday,remindDays:7,courses:merged.courses})})
+    return{data:{schedule:saved.data.schedule,importedRows:2,week:9,keptOtherWeeks:old?.firstMonday==='2026-09-07',bellVersion:'user-supplied-2026-10-14',warnings:['合成课程名称符号可能有误'],recognized:[]},status:200,statusText:'OK',headers:{},config}
+  }
   if(config.url==='/api/timetable/courses/recognize-image'){
     document.documentElement.dataset.visionRequests=String(Number(document.documentElement.dataset.visionRequests||0)+1)
     if(new URLSearchParams(window.location.search).has('visionFailure'))throw{response:{status:503,data:{message:'模拟识别失败，请保留图片后重试'}},config}
