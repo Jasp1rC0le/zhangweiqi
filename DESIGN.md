@@ -1,6 +1,6 @@
 ---
 name: Campthink
-description: Campthink 既有品牌规则、Apple 聊天及登录后共享外壳与获准的公开首页扩展，依据源码分域提取。
+description: Campthink 既有品牌规则、Apple 聊天及登录后共享外壳、获准公开首页与全屏认证扩展，依据源码分域提取。
 colors:
   ct-paper: "#f7f6f2"
   ct-white: "#fffefa"
@@ -42,6 +42,13 @@ colors:
   home-life-stage: "#f3dfc4"
   home-life-action: "#754124"
   home-life-action-hover: "#54301c"
+  auth-surface: "#fbfcff"
+  auth-field: "#f3f5f9"
+  auth-ink: "#151925"
+  auth-muted: "#606775"
+  auth-accent: "#0066cc"
+  auth-accent-hover: "#004f9e"
+  auth-brand: "#edf2fc"
 typography:
   title:
     fontSize: "30px"
@@ -76,6 +83,12 @@ typography:
   home-action:
     fontSize: "16px"
     fontWeight: 500
+  auth-input:
+    fontSize: "16px"
+  auth-heading:
+    fontSize: "34px"
+    lineHeight: 1.25
+    letterSpacing: "-0.025em"
 rounded:
   ct-radius-control: "16px"
   ct-radius-panel: "24px"
@@ -90,6 +103,7 @@ rounded:
   home-cta: "999px"
   home-example: "16px"
   home-example-mode: "10px"
+  auth-control: "12px"
 spacing:
   inline-gap: "8px"
   action-gap: "10px"
@@ -268,6 +282,17 @@ components:
     textColor: "{colors.home-surface}"
     rounded: "{rounded.pill}"
     padding: "12px 20px"
+  auth-field:
+    backgroundColor: "{colors.auth-field}"
+    typography: "{typography.auth-input}"
+    rounded: "{rounded.auth-control}"
+  auth-submit:
+    backgroundColor: "{colors.auth-accent}"
+    textColor: "#fff"
+    typography: "{typography.auth-input}"
+    rounded: "{rounded.auth-control}"
+  auth-submit-hover:
+    backgroundColor: "{colors.auth-accent-hover}"
 ---
 
 # Design System: Campthink
@@ -281,6 +306,8 @@ components:
 
 <!-- Approved public-home scoped refresh: 2026-10-28, documenting the user's 2026-10-27 authorization. Current sources: LoginView.vue landing before Teleport, landing-apple.css, HomeLifeScene.vue. Surface authority: .impeccable/surfaces/homepage-renewal-20261027.md. Supersedes October14 centered/88px-orb composition and its home controls only; app/auth domains remain separate. Source documentation only; current finish disposition is owned by .impeccable/review/homepage-renewal-20261027/finish-review.md. -->
 
+<!-- Approved auth/viewport scoped merge: 2026-10-30, for the user's fullscreen-auth-keyboard-20261028 batch. Sources: LoginView.vue authentication helpers and Teleport only; ChatView.vue visible-viewport hookup; utils/visualViewport.js; styles/auth-fullscreen.css and chat-viewport.css. Earlier dated statements that auth remained unchanged are historical scope boundaries, superseded only by this separately authorized auth/viewport exception. This source documentation is not a fresh finish verdict, physical iOS/WeChat keyboard certification or deployment claim. -->
+
 ## Overview
 
 **Creative North Star: "Campthink"**
@@ -290,6 +317,8 @@ components:
 桌面工作区保持同一个左侧导航，在右侧内容容器切换页面；手机将内容变为单列并使用抽屉导航。本文件只提取可重复使用的规则；课表的首次导入构图、私有图片、独有配色与尺寸仍归其页面说明。2026-10-11 课表记录取得空态和合成已保存态的桌面/手机两轮截图，审阅结论为fix。首次表单和手机信息区已按结论修改，首次表单通过真实应用DOM复核；该记录的最新手机修改未重复截图，因此不声明课表最终视觉验收通过。
 
 聊天页先作为用户确认的局部试点，2026-10-12 获准扩展到功能工作区。当前 Apple 覆盖以 `apple-workspace.css` 为最终来源，作用域仅为 `.workspace:is(.chat-focused,.calm-workspace)`：聊天采用开放回答、统一几何头像和单行浮动输入框，共享外壳采用同一配色与柔和桌面内框。其他模块的数据、内容语义、布局和交互沿用现有实现；首页不受工作区覆盖，而由下述独立批准范围约束，登录弹窗、注册和 Pro 继续受保护。
+
+后续独立获准的全屏认证以完整窗口呈现品牌和表单，手机将品牌压缩为一行；手机聊天由当前可见视口约束输入区域。以下较早记录中的“登录／注册视觉不变”保留为当时的历史边界，由 2026-10-28 全屏认证／键盘批次的局部授权取代。它不扩展到首页、联系、Pro、角色、法律或产品能力定义。
 
 ### Approved Apple chat and shared shell — 2026-10-13
 
@@ -312,6 +341,14 @@ components:
 - 当前权威为 `.impeccable/surfaces/homepage-renewal-20261027.md`。源码为 `LoginView.vue` 中 Teleport 之前的 landing、最后导入的 `landing-apple.css` 和 `HomeLifeScene.vue`；`home-*` 仅约束 `.landing.apple-home`。
 - 实现材料为原有 CSS 动态彩球、原生问答／提纲／代码视觉示意与 SVG 校园工具；保持非实时示例声明，没有新增上线位图或第三方品牌资产。
 - 本次仅合并源码设计记录。当前 finish 结论归 `.impeccable/review/homepage-renewal-20261027/finish-review.md`，不把旧 `ship` 或源码提取当作本轮验收。全屏认证、真实键盘与新批次认证改造未记录为已交付。
+
+### Approved fullscreen authentication and mobile visible viewport — 2026-10-28; documented 2026-10-30
+
+- 用户在首页批次之后独立要求全屏登录、平滑进入退出，并修正所给 iPhone／微信截图中的聊天输入位置。范围仅为认证 Teleport、共享视口几何及手机聊天输入容器；首页批次当时未交付认证的记录继续保留为历史证据。
+- `auth-fullscreen.css` 在认证域覆盖旧弹窗几何，保留原品牌／彩球；`chat-viewport.css` 仅为聊天补充输入高度和手机视口所有权。它们不改变联系窗口、Pro、认证载荷、同意／重试／关闭锁、账户角色与审核、管理员发现、私有草稿、路由／API／后端及法律定义。
+- 桌面认证保留品牌与表单两栏，手机改为紧凑品牌行与内部滚动表单；手机打开认证后将焦点放在关闭控件，不自动唤起输入键盘。当前键盘几何按可见高度和相对布局的顶部偏移共同更新，原生捏合缩放继续由浏览器处理。
+- 本次只合并源码文档。父任务提供的当前验证为 1229 项前端 JS 测试、严格检查与构建通过，文档代理未重跑。首次 finish 的 `fix` 保留为历史记录；两项修复后的独立续审为 `ship`，依据为 `.impeccable/review/fullscreen-auth-keyboard-20261028/finish-review-resumed-20261030.md`，只覆盖该认证与手机输入批次。
+- 桌面 1440×900／1280×800、手机 390×844／393×852、短视口、顶部偏移、布局缩短及输入高度证据为开发几何夹具。它们不能证明物理 iOS／微信键盘、真实账户提交、动画帧率、屏幕阅读器或部署验收。
 
 ### Historical functional workspace extension — 2026-10-12
 
@@ -340,6 +377,7 @@ components:
 - 固定左侧导航与右侧切页，手机单列与抽屉导航。
 - 保留现有彩球与已确认的动画表达。
 - 聊天采用无框回答、浅色用户气泡、统一助手头像与单行浮动输入框。
+- 全屏认证保留品牌与内部表单滚动，手机聊天以可见视口保留多行输入空间。
 
 ## Colors
 
@@ -356,6 +394,7 @@ sidecar 的八级色阶由这些颜色生成，供面板展示明暗变化；它
 - **助手浅蓝**（`assistant-soft`）：聊天用户气泡、助手头像底色及聊天／共享外壳的当前导航状态。作用域为登录后的Apple外壳，不覆盖公开首页蓝色动作。
 - **正常绿、核对琥珀和异常红**（`assistant-success`／`assistant-warning`／`assistant-danger`）：考勤的按时、待点名/迟到、已记录旷课状态；底色分别使用相应`-soft`值。始终同时显示状态文字和单位，不靠颜色单独判断。绿不用于推断未点名者已经到场。
 - **首页动作蓝**（`home-accent`／`home-accent-hover`）：独立公开首页的主要动作、链接、图标与浅底可见焦点；**首页浅蓝**（`home-soft`）用于示例模式的悬停和选中。深色能力区使用浅蓝焦点。
+- **认证动作蓝**（`auth-accent`／`auth-accent-hover`）：仅供全屏认证主要提交动作及悬停，值按认证源码独立记录，不将首页胶囊轮廓或工作区交互跨域带入。
 
 ### Tertiary
 
@@ -375,6 +414,7 @@ sidecar 的八级色阶由这些颜色生成，供面板展示明暗变化；它
 - **助手深灰**（`assistant-ink`）与**助手次级灰**（`assistant-muted`）：当前聊天与共享外壳的正文和辅助文字；**助手浅边线**（`assistant-line`）用于聊天页头与次级工具分隔。
 - **首页珍珠白**（`home-paper`）与**首页白面**（`home-surface`）：公开首页背景与示例表面；**首页深灰**／**首页次级灰**（`home-ink`／`home-muted`）区分正文与说明，**首页浅边线**（`home-line`）用于示例分隔。
 - **首页墨夜**（`home-night`）、**夜间正文**（`home-night-ink`）与**夜间次级灰**（`home-night-muted`）：仅供能力画廊和校园工具区形成深色阅读面。
+- **认证白面／字段面**（`auth-surface`／`auth-field`）：全屏认证背景与表单控件；**认证深灰／次级灰**（`auth-ink`／`auth-muted`）用于标题、说明和启用字段占位文字。输入与 Element Plus 选择器的占位色只在认证作用域生效，联系与全局占位规则沿用。**认证品牌浅层**（`auth-brand`）用于手机品牌行。
 
 左栏和工作表单已有偏灰绿的中性色层次，侧栏选中项使用浅蓝底。组件中列出的这些源码值属于各自共享组件，不能据此把整个产品改成另一套主色。
 
@@ -394,6 +434,7 @@ sidecar 的八级色阶由这些颜色生成，供面板展示明暗变化；它
 - **Answer / Assistant Body**：聊天回答在桌面与手机均使用 16px、1.85 行高；`answer` 保留原有桌面尺寸记录，`assistant-body` 记录试点字体栈与双端规则。旧手机 14px、1.8 行高不再适用于聊天试点。
 - **Assistant Compose / Heading**：聊天输入为 16px、1.7 行高；回答内部标题为 18px、600 字重、1.6 行高。用户消息为 16px、1.75 行高；它与助手正文共同保持可读尺寸。
 - **Home Display / Action**：使用源码中的 Apple 系统栈和实色深墨色标题；桌面标题为 `home-display`，1100px 以下为 `clamp(44px, 5.3vw, 64px)`，760px 以下为 `clamp(39px, 10.5vw, 64px)`，行高均为 1.17。主要动作桌面为 `home-action`，手机为 15px；副标题为 18px／1.85，1100px 以下 16px，760px 以下 15px／1.8。示例问题与结果为 14px，模式为 14px，非实时说明为 11px；原生代码示意为 12px／1.9 等宽栈，详情见 sidecar。
+- **Auth Input / Heading**：认证输入与提交文字使用 `auth-input`，手机也保持相同输入字号；标题使用 `auth-heading`，手机降为 30px。标签为 14px，说明为 15px／1.7；沿用既有系统栈，不新增字体。选择器由其实际内嵌输入继承认证字号。
 
 桌面阅读尺寸由后加载的可读性样式调整（起于 1024px），不能把前面样式中的更小字号当作桌面当前值。装饰性的微小文字、kicker 和 eyebrow 不纳入可复用文字层级。
 
@@ -412,6 +453,14 @@ sidecar 的八级色阶由这些颜色生成，供面板展示明暗变化；它
 右侧切页采用短暂淡入和轻微纵向移动；进入 220ms、离开 110ms，工作区出现为 260ms。遵守现有减少动态效果媒体查询。首页、登录和 Pro 的动画保留各自实现，不用右侧切页参数覆盖它们。
 
 当前聊天和共享外壳保留 244px 侧栏，可收起至 0；桌面外侧留白使用 `assistant-desktop-inset`，右侧白色容器使用 `assistant-frame-radius`。聊天回答与输入区最大宽度均为 760px，阅读区桌面左右留 32px。页头为 80px，手机为 68px，包含助手身份与新对话动作。760px 以下取消外侧留白、内框曲线与内框阴影，侧栏为覆盖式抽屉（`min(290px, 84vw)`），阅读区左右留 20px，输入区左右留 12px并考虑底部安全区与可见视口高度。用户消息最大占阅读区的 85%，手机为 92%。
+
+全屏认证独占可见窗口，桌面两栏比例为 `.95fr 1.05fr`，表单宽度上限为 560px；自身无外边距、外框曲线、边线或投影。表单占满可用高度并在内部纵向滚动，长注册不推动外部文档。760px 以下变为品牌行与表单单列，品牌行常态 80px、键盘打开时 60px，隐藏装饰彩球和大文案；表单宽度上限为 480px，并保留安全区内边距。关闭控件始终位于独立上层。
+
+可见视口观察器把高度、相对布局顶部偏移与键盘状态合并到每帧一次的更新，只有几何／状态变化才通知。失焦和宽度变化重建高度基线；捏合缩放时不把缩放几何解释为键盘，也不接管原生缩放。认证与聊天卸载时停止观察器并移除监听、取消待执行帧。认证进出及焦点恢复使用自身生命周期，不借用工作区切页动画。
+
+手机聊天根固定在可见高度与顶部偏移构成的窗口内，不对键盘驱动的根高度／位置更新添加动画；消息区独立滚动。仅在手机聊天路由存在时限制 html／body 文档平移，切到课表等其他页面后作用域自动失效，恢复文档滚动。输入框采用 `flex: 0 0 auto`，使既有实测高度生效；高度至少 44px，最高为 138px 与可见视口四分之一取小值且不低于 44px，超过上限后在输入框内部滚动，不裁掉最后输入行。
+
+**The Visible Viewport Ownership Rule.** 认证与手机聊天分别拥有自身可见视口；高度与顶部偏移必须成对更新，输入框必须遵守实测高度和内部滚动上限，监听与文档滚动约束必须随所属页面释放。合成几何通过不替代物理手机键盘验收。
 
 聊天消息组间距为桌面 32px、手机 28px；头像与回答相隔 14px、手机 10px。聊天消息出现与输入高度变化使用 180ms、侧栏使用 200ms；缓动为 `assistant-ease`，见 sidecar。新对话、页头小动作与发送按钮使用 140ms 色彩及缩放过渡，按下为 0.96；不把按下缩放应用到每个导航行。减少动态效果时取消聊天和功能工作区动画、过渡与按下缩放，并使用即时滚动。仅在读者停留底部时跟随流式回答，上翻后保留阅读位置；“回到最新回答”位于整个输入停靠区上方（`bottom: calc(100% + 12px)`），包含附件预览造成的高度变化。
 
@@ -450,6 +499,8 @@ sidecar 的八级色阶由这些颜色生成，供面板展示明暗变化；它
 当前功能页的分段筛选采用 14px 外层（`assistant-control-radius`）与 10px 内项，外层内边距和项间距均为 4px；不套用旧胶囊筛选的轮廓。复合搜索外层为 12px 曲线，内部输入透明；手机历史删除保留原有 8px 曲线和小图标，只扩大独立触区。
 
 获准公开首页的主 CTA 与收尾按钮采用 `home-cta` 胶囊，前景示例与能力预览使用 `home-example` 曲线，示例模式按钮使用 `home-example-mode`。能力入口为 44px 圆形触区，能力卡外层无框；生活场景的三个图形使用 29% 曲线与局部倾斜。不能把这些首页轮廓推广到工作区。
+
+全屏认证的字段与主提交动作采用 `auth-control` 曲线，包装和主动作最小高 50px；外层认证面铺满窗口且无圆角。它们是认证域的独立轮廓，不替换联系或 Pro 容器。
 
 ## Components
 
@@ -508,6 +559,13 @@ sidecar 的八级色阶由这些颜色生成，供面板展示明暗变化；它
 - **Secondary Tools:** 附件、模型模式、草稿设置与额度收纳在工具菜单；菜单宽 340px，24px 圆角、12px 内边距，左对齐附件披露并位于其上方 56px，按视口限制宽高并可滚动。模式以 `aria-pressed` 标识选中状态。附件先呈现可编辑的本地文字预览，确认后才加入输入框；发送仍由用户另行触发。
 - **Focus / Motion:** 普通独立控件键盘焦点为 2px 助手灰蓝外框、3px 偏移；输入器用外层 2px 焦点阴影与原有扩散阴影组合，内嵌输入不重复描边。搜索包装与滚动组采用下节的单一焦点归属和向内偏移。菜单和消息保持短促淡入与 3px 纵移；小动作的 140ms 按下响应和减少动态效果规则见 Layout 与 sidecar。
 
+### Fullscreen Authentication and Visible Typing — 2026-10-28 batch
+
+- **Surface / Fields:** 认证 Teleport 使用全屏两栏／手机品牌行，内部表单滚动，字段与提交动作使用 `auth-field`／`auth-submit`。启用的输入和选择器占位文字使用认证次级灰；该局部修复不改变联系字段。标题、输入与动作层级见 Typography。
+- **Focus / Retention:** 桌面进入后聚焦当前认证模式首个输入；手机进入后只聚焦关闭按钮并阻止由聚焦引起的文档滚动。保留 Tab 约束、标签页键盘操作、关闭时返回入口焦点、忙碌关闭锁、失败草稿与原有认证行为。手机聚焦输入越出可见区域时仅滚动内部表单；提交动作能与输入同时容纳时才尝试一并露出。
+- **Entry / Exit:** Vue 认证生命周期等待进入 520ms、退出 260ms；CSS 容器位移分别为 480ms、240ms，进入从下移 28px 到原位，退出下移 16px。外层与透明度过渡按 sidecar 独立记录，不套用联系窗口的时长。减少动态效果使 Vue 等待为 0，取消此认证过渡与位移。
+- **Chat Textarea:** 保留现有多行测高、可见高度上限、超限内部滚动和草稿语义；只在聊天作用域解除继承的 flex 拉伸／压缩，让输入实测高度生效。手机聊天的固定根与独立消息滚动遵守 Layout 中的视口所有权；后续语音、身份或后台工作不由本记录声明已交付。
+
 ### Apple Functional Controls
 
 - **Canvas / Fields:** 页面根透明，白色 pane 是画布；评分搜索外层为白色、1px 浅边线与 12px 圆角，内层输入透明、高 44px。历史搜索保留原有输入密度。历史与评分复合搜索由外层 `:focus-within` 绘制 2px 灰蓝焦点、向外偏移 2px；内层 `input:focus-visible` 无 outline 和 box-shadow，不再套独立字段的背景规则。
@@ -533,6 +591,7 @@ sidecar 的八级色阶由这些颜色生成，供面板展示明暗变化；它
 - **Do** 保留可见键盘焦点、窄屏换行与现有减少动态效果处理。
 - **Do** 在已批准的聊天与共享外壳作用域复用 `assistant-*` 的已消费规则，聊天保持双端 16px 正文、760px 阅读上限和单行三列输入器。
 - **Do** 仅在获准公开首页消费 `home-*`，保留实体彩球、蓝色动作、深色能力画廊、暖色生活场景与非实时示例说明；当前构图权威见 `.impeccable/surfaces/homepage-renewal-20261027.md`。
+- **Do** 仅在独立获准的全屏认证域消费 `auth-*`；手机认证保持输入字号、内部滚动和关闭控件焦点，手机聊天同时跟踪可见高度与顶部偏移。
 
 ### Don't:
 
@@ -542,6 +601,7 @@ sidecar 的八级色阶由这些颜色生成，供面板展示明暗变化；它
 - **Don't** 将现有 kicker、eyebrow、未经用户选定的系统展示字体或硬偏移阴影的待审实现提升为后续页面的共享规范；首页明确选定的 Apple 字体仅约束该局部范围。
 - **Don't** 把工作区 Apple 覆盖与独立首页覆盖跨域混用，或扩大到登录弹窗、注册和 Pro；也不将聊天气泡、无框回答与输入器搬到其他模块。
 - **Don't** 将合成开发截图和所选预览当作真实用户内容或上线位图；未消费的 `assistant-space-*` 与 `assistant-radius-sm` 声明不构成已落实的组件规则。
+- **Don't** 将本批合成视口证据或局部 `ship` 结论写成物理 iOS／微信键盘、全站或部署验收。
 
 ### 教学身份扩展
 

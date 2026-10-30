@@ -81,6 +81,8 @@ import '@/styles/workspace-refinement.css'
 import '@/styles/chat-refinement.css'
 import '@/styles/workspace-composition.css'
 import '@/styles/workspace-color.css'
+import '@/styles/chat-viewport.css'
+import { observeVisualViewport } from '@/utils/visualViewport'
 
 const router = useRouter()
 const route = useRoute()
@@ -90,8 +92,13 @@ const chatSidebarCollapsed = expandedWorkspace
 const chatTools = ref()
 const chatAttachment = ref()
 const keyboardHeight = ref('100dvh')
-function updateChatViewport() {
-  keyboardHeight.value = `${window.visualViewport?.height || window.innerHeight}px`
+const keyboardTop = ref('0px')
+const keyboardOpen = ref(false)
+let chatViewportObserver
+function updateChatViewport(box) {
+  keyboardHeight.value = `${box.height}px`
+  keyboardTop.value = `${box.top}px`
+  keyboardOpen.value = box.keyboardOpen
   nextTick(resizeComposer)
 }
 function toggleChatSidebar() {
@@ -1507,10 +1514,9 @@ async function confirmLogout() {
   } finally { logoutBusy.value = false }
 }
 
+watch(() => [isChatRoute.value, mobileLayout.value], () => chatViewportObserver?.refresh())
 onMounted(async () => {
-  updateChatViewport()
-  window.visualViewport?.addEventListener('resize', updateChatViewport)
-  window.addEventListener('resize', updateChatViewport)
+  chatViewportObserver = observeVisualViewport(window, updateChatViewport)
   window.addEventListener('keydown', handleEscape)
   window.addEventListener('pointerdown', dismissChatTools)
   mobileMedia.addEventListener('change', updateMobileLayout)
@@ -1539,8 +1545,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
-  window.visualViewport?.removeEventListener('resize', updateChatViewport)
-  window.removeEventListener('resize', updateChatViewport)
+  chatViewportObserver?.stop()
   disposed = true
   routeReadSequence++
   cancelAnswer()
@@ -1556,7 +1561,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div :data-section="isChatRoute ? selectedModelKey : route.name" class="workspace persistent-workspace" :class="{ 'workspace-expanded': !isChatRoute && expandedWorkspace, 'chat-focused': isChatRoute, 'calm-workspace': !isChatRoute && route.name !== 'pro', 'chat-sidebar-collapsed': isChatRoute && chatSidebarCollapsed && !mobileLayout }" :style="isChatRoute ? { '--chat-viewport-height': keyboardHeight, ...(mobileLayout ? { height: keyboardHeight } : {}) } : undefined" :inert="membershipVisible || membershipPresent">
+  <div :data-section="isChatRoute ? selectedModelKey : route.name" class="workspace persistent-workspace" :class="{ 'workspace-expanded': !isChatRoute && expandedWorkspace, 'chat-focused': isChatRoute, 'chat-keyboard-open': isChatRoute && mobileLayout && keyboardOpen, 'calm-workspace': !isChatRoute && route.name !== 'pro', 'chat-sidebar-collapsed': isChatRoute && chatSidebarCollapsed && !mobileLayout }" :style="isChatRoute ? { '--chat-viewport-height': keyboardHeight, '--chat-viewport-top': keyboardTop, ...(mobileLayout ? { height: keyboardHeight } : {}) } : undefined" :inert="membershipVisible || membershipPresent">
     <aside ref="sidebarElement" id="campus-sidebar" class="sidebar" :class="{ 'mobile-open': mobileSidebarOpen }" :inert="logoutConfirmVisible || (mobileLayout && !mobileSidebarOpen) || (!mobileLayout && (isChatRoute ? chatSidebarCollapsed : expandedWorkspace))" aria-label="校园导航">
       <div class="sidebar-top">
         <div class="brand">

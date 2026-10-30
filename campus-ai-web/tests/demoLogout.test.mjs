@@ -2,6 +2,8 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import vm from 'node:vm'
+import { parse as parseVue } from '@vue/compiler-sfc'
+import { parse as parseJavaScript } from '@babel/parser'
 import { createDemoLogout } from '../design/demoLogout.js'
 
 test('demo logout clears only its in-memory identity and navigates once', async () => {
@@ -28,11 +30,11 @@ test('demo navigation failure rejects and permits an explicit retry', async () =
 
 async function actualDialog(logout) {
   const source = await readFile(new URL('../src/views/ChatView.vue', import.meta.url), 'utf8')
-  const start = source.indexOf('async function confirmLogout() {')
-  const end = source.indexOf('\n\nonMounted(', start)
-  assert.ok(start >= 0 && end > start)
+  const script = parseVue(source).descriptor.scriptSetup.content
+  const fn = parseJavaScript(script, {sourceType:'module'}).program.body.find(node => node.type === 'FunctionDeclaration' && node.id.name === 'confirmLogout')
+  assert.ok(fn)
   const paths = [], context = vm.createContext({ logoutBusy: { value: false }, logoutError: { value: 'old' }, authStore: { logout }, window: { location: { replace: path => paths.push(path) } } })
-  vm.runInContext(source.slice(start, end) + '\nthis.confirm = confirmLogout', context)
+  vm.runInContext(script.slice(fn.start, fn.end) + '\nthis.confirm = confirmLogout', context)
   return { context, paths }
 }
 

@@ -55,11 +55,11 @@ test('long drafts grow only within their viewport allowance and never truncate c
 })
 
 test('viewport listeners are symmetric and text is resized after keyboard or window changes', () => {
-  for (const target of ['window.visualViewport?', 'window']) {
-    assert.ok(view.includes(`${target}.addEventListener('resize', updateChatViewport)`))
-    assert.ok(view.includes(`${target}.removeEventListener('resize', updateChatViewport)`))
-  }
-  const viewportUpdate = view.slice(view.indexOf('function updateChatViewport()'), view.indexOf('function toggleChatSidebar()'))
+  assert.ok(view.includes('observeVisualViewport(window, updateChatViewport)'))
+  assert.ok(view.includes('chatViewportObserver?.stop()'))
+  const observer = read('src/utils/visualViewport.js')
+  assert.ok(observer.includes("[viewport, 'resize'], [viewport, 'scroll']"))
+  const viewportUpdate = view.slice(view.indexOf('function updateChatViewport('), view.indexOf('function toggleChatSidebar()'))
   assert.ok(viewportUpdate.includes('nextTick(resizeComposer)'))
   assert.match(view, /composerHeight\(element.scrollHeight, window.visualViewport\?\.height \|\| window.innerHeight\)/)
   assert.ok(view.includes("'--chat-viewport-height': keyboardHeight"))

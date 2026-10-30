@@ -1,0 +1,26 @@
+/* Honor the measured textarea height; inherited flex:1 otherwise collapses wrapped text. */
+html:root body .workspace.chat-focused .composer textarea { flex: 0 0 auto; }
+/* The mobile conversation owns its visible viewport; the document must not pan beneath it. */
+@media (max-width: 760px) {
+  html:has(.workspace.chat-focused), body:has(.workspace.chat-focused) { overflow: hidden; overscroll-behavior: none; }
+  html:root body .app-shell:has(.workspace.chat-focused),
+  html:root body .route-page:has(> .workspace.chat-focused) { min-height: 0; }
+  html:root body .workspace.chat-focused {
+    position: fixed;
+    top: var(--chat-viewport-top, 0px);
+    left: 0;
+    right: 0;
+    bottom: auto;
+    width: 100%;
+    height: var(--chat-viewport-height, 100dvh);
+    min-height: 0;
+    margin: 0;
+    transition: none;
+  }
+  html:root body .workspace.chat-focused .chat-main { height: 100%; max-height: 100%; min-height: 0; }
+  html:root body .workspace.chat-focused .message-scroller { min-height: 0; }
+  html:root body .workspace.chat-focused .workspace-scene:has(> .welcome) { min-height: 0; padding-block: 16px; }
+  html:root body .workspace.chat-focused.chat-keyboard-open .welcome { display: none; }
+  html:root body .workspace.chat-focused.chat-keyboard-open .composer-wrap { padding-top: 8px; padding-bottom: max(8px, env(safe-area-inset-bottom)); }
+  html:root body .workspace.chat-focused.chat-keyboard-open .composer-meta { display: none; }
+}

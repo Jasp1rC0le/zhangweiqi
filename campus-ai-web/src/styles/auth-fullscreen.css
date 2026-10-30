@@ -1,0 +1,98 @@
+/* Full-window authentication. Contact, Pro and the public introduction retain their owners. */
+html:root body .login-overlay.auth-fullscreen {
+  --el-text-color-placeholder: #606775;
+  position: fixed;
+  inset: var(--auth-viewport-top, 0px) 0 auto;
+  width: 100%;
+  height: var(--auth-viewport-height, 100dvh);
+  display: block;
+  padding: 0;
+  overflow: hidden;
+  background: #fbfcff;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+html:root body .auth-fullscreen .auth-dialog,
+html:root body .auth-fullscreen .auth-dialog.is-register {
+  display: grid;
+  grid-template-columns: .95fr 1.05fr;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  min-height: 0;
+  max-height: none;
+  margin: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  color: #151925;
+  background: #fbfcff;
+}
+html:root body .auth-fullscreen .auth-dialog .auth-art { min-height: 0; height: 100%; padding: clamp(28px, 4vw, 64px); border-radius: 0; }
+html:root body .auth-fullscreen .art-brand { font-size: 24px; }
+html:root body .auth-fullscreen .auth-art p { position: absolute; inset: auto 40px 12%; font-size: clamp(34px, 3.4vw, 54px); font-weight: 600; line-height: 1.3; letter-spacing: -.03em; color: #202b42; }
+html:root body .auth-fullscreen .auth-art p small { display: block; margin-top: 20px; font-size: 15px; font-style: normal; letter-spacing: 0; }
+html:root body .auth-fullscreen .auth-mini-orb { width: min(29vw, 350px); top: 20%; right: 16%; }
+html:root body .auth-fullscreen .auth-body,
+html:root body .auth-fullscreen .auth-dialog.is-register .auth-body {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+  justify-content: flex-start;
+  width: min(100%, 560px);
+  height: 100%;
+  min-height: 0;
+  max-height: none;
+  margin-inline: auto;
+  padding: max(64px, env(safe-area-inset-top)) clamp(28px, 4vw, 58px) max(40px, env(safe-area-inset-bottom));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: 24px;
+}
+html:root body .auth-fullscreen .auth-tabs { flex: none; margin-top: auto; margin-bottom: 28px; }
+html:root body .auth-fullscreen .auth-stage { flex: none; min-height: 0; }
+html:root body .auth-fullscreen .auth-note { flex: none; margin-top: 24px; margin-bottom: auto; padding-top: 0; color: #606775; line-height: 1.7; }
+html:root body .auth-fullscreen .auth-form h2 { color: #151925; font-size: 34px; line-height: 1.25; letter-spacing: -.025em; }
+html:root body .auth-fullscreen .form-lead { color: #606775; font-size: 15px; line-height: 1.7; margin-bottom: 28px; }
+html:root body .auth-fullscreen .auth-body label { color: #303947; font-size: 14px; }
+html:root body .auth-fullscreen .auth-body :is(input, textarea) { font-size: 16px; }
+html:root body .auth-fullscreen .auth-body :is(.el-input__wrapper, .el-select__wrapper) { min-height: 50px; background: #f3f5f9; border-radius: 12px; }
+html:root body .auth-fullscreen .form-submit { min-height: 50px; border-radius: 12px; color: #fff; background: #0066cc; font-size: 16px; }
+html:root body .auth-fullscreen .form-submit:hover:not(:disabled) { background: #004f9e; }
+html:root body .auth-fullscreen .dialog-close { position: absolute; top: max(20px, env(safe-area-inset-top)); right: 24px; z-index: 3; width: 44px; height: 44px; border: 0; color: #303947; background: #edf1f7; }
+html:root body .auth-fullscreen .dialog-close:hover { background: #dfe8f6; }
+html:root body .auth-fullscreen.campus-modal-enter-active { transition: opacity 220ms ease; }
+html:root body .auth-fullscreen.campus-modal-leave-active { transition: opacity 240ms ease; }
+html:root body .auth-fullscreen.campus-modal-enter-active .auth-dialog { transition: transform 480ms cubic-bezier(.16, 1, .3, 1), opacity 260ms ease; }
+html:root body .auth-fullscreen.campus-modal-enter-from .auth-dialog { transform: translateY(28px); opacity: 0; }
+html:root body .auth-fullscreen.campus-modal-leave-active .auth-dialog { transition: transform 240ms ease, opacity 200ms ease; }
+html:root body .auth-fullscreen.campus-modal-leave-to .auth-dialog { transform: translateY(16px); opacity: 0; }
+html:root body .auth-fullscreen.campus-modal-enter-active :is(.auth-art, .auth-tabs, .auth-stage, .auth-note) { animation: none; }
+@media (max-width: 760px) {
+  html:root body .auth-fullscreen .auth-dialog,
+  html:root body .auth-fullscreen .auth-dialog.is-register { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  html:root body .auth-fullscreen .auth-dialog .auth-art { display: flex; align-items: center; min-height: 80px; height: 80px; padding: max(20px, env(safe-area-inset-top)) 24px 20px; background: #edf2fc; }
+  html:root body .auth-fullscreen .art-brand { font-size: 21px; }
+  html:root body .auth-fullscreen .auth-art p,
+  html:root body .auth-fullscreen .auth-mini-orb { display: none; }
+  html:root body .auth-fullscreen .dialog-close { top: max(18px, env(safe-area-inset-top)); right: 18px; }
+  html:root body .auth-fullscreen .auth-body,
+  html:root body .auth-fullscreen .auth-dialog.is-register .auth-body { width: min(100%, 480px); max-height: none; padding: 28px 24px max(24px, env(safe-area-inset-bottom)); }
+  html:root body .auth-fullscreen .auth-form h2 { font-size: 30px; }
+  html:root body .auth-fullscreen .form-lead { margin-bottom: 24px; }
+  html:root body .auth-fullscreen .auth-note { font-size: 12px; }
+  html:root body .auth-fullscreen.auth-keyboard-open .auth-dialog .auth-art { min-height: 60px; height: 60px; padding-block: 12px; }
+  html:root body .auth-fullscreen.auth-keyboard-open .dialog-close { top: 8px; }
+  html:root body .auth-fullscreen.auth-keyboard-open .auth-body { padding-block: 16px; }
+  html:root body .auth-fullscreen.auth-keyboard-open .auth-tabs { margin-top: 0; margin-bottom: 16px; }
+  html:root body .auth-fullscreen.auth-keyboard-open .auth-note { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html:root body .auth-fullscreen.campus-modal-enter-active,
+  html:root body .auth-fullscreen.campus-modal-leave-active,
+  html:root body .auth-fullscreen.campus-modal-enter-active .auth-dialog,
+  html:root body .auth-fullscreen.campus-modal-leave-active .auth-dialog { transition: none; }
+  html:root body .auth-fullscreen.campus-modal-enter-from .auth-dialog,
+  html:root body .auth-fullscreen.campus-modal-leave-to .auth-dialog { transform: none; }
+}

@@ -17,6 +17,8 @@ import HomeLifeScene from '@/components/HomeLifeScene.vue'
 import '@/styles/landing-onboarding.css'
 import '@/styles/landing-polish.css'
 import '@/styles/landing-apple.css'
+import '@/styles/auth-fullscreen.css'
+import { observeVisualViewport } from '@/utils/visualViewport'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -36,7 +38,23 @@ const contactPresent = ref(false)
 const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)')
 const reducedMotion = ref(motionPreference.matches)
 const modalDuration = computed(() => reducedMotion.value ? 0 : { enter: 700, leave: 340 })
+const authModalDuration = computed(() => reducedMotion.value ? 0 : { enter: 520, leave: 260 })
 const modalOrigin = ref({})
+const authViewport = ref({ height: window.innerHeight, top: 0, keyboardOpen: false })
+let authViewportObserver
+function keepAuthInputVisible() {
+  if (!loginPresent.value || !window.matchMedia('(max-width: 760px)').matches) return
+  const input = document.activeElement
+  if (!input?.matches?.('input, textarea') || !input.closest('.auth-fullscreen')) return
+  const box = input.getBoundingClientRect(), body = input.closest('.auth-body')?.getBoundingClientRect()
+  const top = Math.max(body?.top || 0, authViewport.value.top) + 12
+  const bottom = Math.min(body?.bottom || innerHeight, authViewport.value.top + authViewport.value.height) - 12
+  const action = input.closest('.auth-form')?.querySelector('.form-submit')
+  const actionBox = action?.getBoundingClientRect()
+  const canShowAction = actionBox && actionBox.bottom - box.top <= bottom - top
+  if (box.top < top || box.bottom > bottom) input.scrollIntoView({ block: 'nearest', behavior: 'instant' })
+  else if (canShowAction && actionBox.bottom > bottom) action.scrollIntoView({ block: 'nearest', behavior: 'instant' })
+}
 const destination = ref('/chat')
 const destinationLabel = computed(() => ({ '/canteens': '食堂评分', '/study': '实验与作业', '/projects': '我的项目', '/wall': '校园墙', '/timetable': '课表' })[destination.value] || `${heroExample.value.label}工作台`)
 const documentHidden = ref(document.hidden)
@@ -169,6 +187,7 @@ async function openLogin(mode = 'login', event, target = '/chat') {
 
 function focusLogin() {
   if (!loginVisible.value) return
+  if (window.matchMedia('(max-width: 760px)').matches) { document.querySelector('.auth-fullscreen .dialog-close')?.focus({ preventScroll: true }); return }
   if (authMode.value === 'register') registerUsernameInput.value?.focus({ preventScroll: true })
   else usernameInput.value?.focus({ preventScroll: true })
 }
@@ -180,6 +199,7 @@ function openWorkspace(key, event) {
 
 function closeLogin() {
   if (loading.value || registerLoading.value) return
+  if (typeof document !== 'undefined' && document.activeElement?.closest?.('.auth-fullscreen')) document.activeElement.blur()
   loginVisible.value = false
 }
 
@@ -424,6 +444,7 @@ function updateMotionPreference(event) { reducedMotion.value = event.matches }
 function updateVisibility() { documentHidden.value = document.hidden }
 
 onMounted(() => {
+  authViewportObserver = observeVisualViewport(window, box => { authViewport.value = box; if (loginPresent.value) nextTick(keepAuthInputVisible) })
   demoVisibilityObserver = new IntersectionObserver(entries => { demoInView.value = entries.some(entry => entry.isIntersecting && entry.intersectionRatio >= .2) }, { threshold: [0, .2] })
   if (heroDemo.value) demoVisibilityObserver.observe(heroDemo.value)
   motionPreference.addEventListener('change', updateMotionPreference)
@@ -437,6 +458,7 @@ onMounted(() => {
   trackChapter()
 })
 onBeforeUnmount(() => {
+  authViewportObserver?.stop()
   demoPlayback.stop()
   demoVisibilityObserver?.disconnect()
   disposed = true
@@ -618,8 +640,8 @@ onBeforeUnmount(() => {
     <LegalNotice />
 
     <Teleport to="body">
-      <Transition name="campus-modal" :duration="modalDuration" @after-enter="focusLogin" @after-leave="finishLoginClose">
-        <div v-if="loginVisible" class="overlay campus-overlay login-overlay" :class="{ 'motion-paused': documentHidden }" :style="modalOrigin" @mousedown.self="closeLogin">
+      <Transition name="campus-modal" :duration="authModalDuration" @after-enter="focusLogin" @after-leave="finishLoginClose">
+        <div v-if="loginVisible" class="overlay campus-overlay login-overlay auth-fullscreen" :class="{ 'motion-paused': documentHidden, 'auth-keyboard-open': authViewport.keyboardOpen }" :style="{ ...modalOrigin, '--auth-viewport-height': `${authViewport.height}px`, '--auth-viewport-top': `${authViewport.top}px` }" @mousedown.self="closeLogin">
           <section
             class="auth-dialog"
             :class="{ 'is-register': authMode === 'register' }"
