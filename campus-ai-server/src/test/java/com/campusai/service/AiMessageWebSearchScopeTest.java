@@ -232,6 +232,6 @@ class AiMessageWebSearchScopeTest {
 
     private List<WebSearchResult> find(String question, List<KnowledgeSearchResult> localResults,
                                        AiModelProfile profile) {
-        return ReflectionTestUtils.invokeMethod(service, "findWebResults", question, localResults, profile);
+        return ReflectionTestUtils.invokeMethod(service, "findWebResults", question, localResults, profile, null);
     }
 }

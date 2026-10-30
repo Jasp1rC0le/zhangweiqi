@@ -27,6 +27,7 @@ import com.campusai.service.KnowledgeSearchService;
 import com.campusai.service.UserProfileService;
 import com.campusai.search.WebSearchService;
 import com.campusai.search.PublicKnowledgeCoverage;
+import com.campusai.search.OfficialWebResearchService;
 import com.campusai.search.model.WebSearchResult;
 import com.campusai.user.entity.User;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -190,6 +191,7 @@ public class AiMessageServiceImpl
     private final AiUsageRecorder usageRecorder;
     private final AiCallAdmission admission;
     private final UserProfileService profiles;
+    private final OfficialWebResearchService officialResearch;
 
     public AiMessageServiceImpl(
             AiConversationMapper conversationMapper,
@@ -246,7 +248,6 @@ public class AiMessageServiceImpl
                 admission, null);
     }
 
-    @Autowired
     public AiMessageServiceImpl(
             AiConversationMapper conversationMapper,
             AiMessageMapper messageMapper,
@@ -259,6 +260,16 @@ public class AiMessageServiceImpl
             AiUsageRecorder usageRecorder,
             AiCallAdmission admission,
             UserProfileService profiles) {
+        this(conversationMapper,messageMapper,citationMapper,feedbackMapper,userMapper,aiModelClient,
+                knowledgeSearchService,webSearchService,usageRecorder,admission,profiles,null);
+    }
+
+    @Autowired
+    public AiMessageServiceImpl(AiConversationMapper conversationMapper,AiMessageMapper messageMapper,
+            AiMessageCitationMapper citationMapper,AiMessageFeedbackMapper feedbackMapper,UserMapper userMapper,
+            AiModelClient aiModelClient,KnowledgeSearchService knowledgeSearchService,WebSearchService webSearchService,
+            AiUsageRecorder usageRecorder,AiCallAdmission admission,UserProfileService profiles,
+            OfficialWebResearchService officialResearch) {
 
         this.conversationMapper = conversationMapper;
         this.messageMapper = messageMapper;
@@ -272,6 +283,7 @@ public class AiMessageServiceImpl
         this.usageRecorder = usageRecorder;
         this.admission = admission;
         this.profiles = profiles;
+        this.officialResearch = officialResearch;
     }
 
     @Override
@@ -312,11 +324,11 @@ public class AiMessageServiceImpl
                         ? List.of()
                         : knowledgeSearchService.search(
                                 currentUser.getSchoolId(),
-                                userContent
+                                officialResearch==null?userContent:officialResearch.knowledgeQuery(currentUser.getSchoolId(),userContent)
                         );
         List<WebSearchResult> webResults = asksSystemTime(userContent) || asksWebCapability
                 ? List.of()
-                : findWebResults(userContent, searchResults, modelProfile);
+                : findWebResults(userContent, searchResults, modelProfile,currentUser.getSchoolId());
         AiMessage userMessage =
                 createUserMessage(
                         conversationId,
@@ -452,11 +464,11 @@ public class AiMessageServiceImpl
                         ? List.of()
                         : knowledgeSearchService.search(
                                 currentUser.getSchoolId(),
-                                userContent
+                                officialResearch==null?userContent:officialResearch.knowledgeQuery(currentUser.getSchoolId(),userContent)
                         );
         List<WebSearchResult> webResults = asksSystemTime(userContent) || asksWebCapability
                 ? List.of()
-                : findWebResults(userContent, searchResults, modelProfile);
+                : findWebResults(userContent, searchResults, modelProfile,currentUser.getSchoolId());
         AiMessage userMessage = createUserMessage(
                 conversationId,
                 userContent
@@ -988,10 +1000,10 @@ public class AiMessageServiceImpl
     private List<WebSearchResult> findWebResults(
             String question,
             List<KnowledgeSearchResult> localResults,
-            AiModelProfile modelProfile) {
+            AiModelProfile modelProfile, Long schoolId) {
 
         if (!shouldSearchWeb(question, localResults, modelProfile)) return List.of();
-        return webSearchService.search(question);
+        return officialResearch==null?webSearchService.search(question):officialResearch.search(schoolId,question);
     }
 
     private boolean shouldSearchWeb(String question,
