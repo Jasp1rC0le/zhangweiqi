@@ -38,7 +38,7 @@ public class JwtInterceptor implements HandlerInterceptor {
         // 已发布商家的照片不含账户数据；允许浏览器图片元素直接加载。
         if ("GET".equalsIgnoreCase(request.getMethod())
                 && request.getRequestURI() != null
-                && request.getRequestURI().matches("/api/canteens/merchants/[0-9]+/photo")) {
+                && request.getRequestURI().matches("/api/canteens/merchants/[0-9]+/(?:photo|photos/[0-9]+)")) {
             return true;
         }
 

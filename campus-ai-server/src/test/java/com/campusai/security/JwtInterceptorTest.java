@@ -12,6 +12,14 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class JwtInterceptorTest {
+    @Test void publishedImageRouteDoesNotExposePhotoManagementOrGalleryLists() {
+        var jwt=mock(JwtService.class);var sessions=mock(AuthSessionService.class);
+        var interceptor=new JwtInterceptor(jwt,sessions);var response=mock(HttpServletResponse.class);
+        assertThat(interceptor.preHandle(new org.springframework.mock.web.MockHttpServletRequest("GET","/api/canteens/merchants/1/photos/7"),response,new Object())).isTrue();
+        for(var request:java.util.List.of(new org.springframework.mock.web.MockHttpServletRequest("GET","/api/canteens/merchants/1/photos"),new org.springframework.mock.web.MockHttpServletRequest("POST","/api/canteens/merchants/1/photos/7")))
+            assertThatThrownBy(()->interceptor.preHandle(request,response,new Object())).isInstanceOf(UnauthorizedException.class);
+        verifyNoInteractions(jwt,sessions);
+    }
 
     @Test
     void rejectsStudentAtEveryAdminPathEvenWithValidSession() {

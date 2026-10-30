@@ -103,6 +103,19 @@ public class AdminCanteenController {
         return photos.publish(school(userId, role), items, files);
     }
 
+    @PostMapping(value = "/merchants/{id}/photos", consumes = "multipart/form-data")
+    public List<CanteenPhotoService.Photo> addPhotos(@RequestAttribute("currentUserId") Long userId,
+            @RequestAttribute("currentUserRole") String role, @PathVariable Long id,
+            @RequestPart("files") List<MultipartFile> files) {
+        return photos.append(school(userId, role), id, files);
+    }
+
+    @GetMapping("/merchants/{id}/photos")
+    public List<CanteenPhotoService.Photo> photoList(@RequestAttribute("currentUserId") Long userId,
+            @RequestAttribute("currentUserRole") String role, @PathVariable Long id) {
+        return photos.photoList(school(userId, role), id, false);
+    }
+
     @GetMapping("/reviews")
     public List<CanteenService.AdminReview> reviews(@RequestAttribute("currentUserId") Long userId,
             @RequestAttribute("currentUserRole") String role) {

@@ -34,6 +34,13 @@ class BochaWebSearchServiceTest {
                 """);
     }
 
+    @Test
+    void unsafeOrInternalSourceLinksAreRejected() {
+        for(String link:List.of("javascript:alert(1)","http://127.0.0.1/admin","http://localhost/","https://user:secret@example.edu/","https://[::1]/"))
+            assertThat(BochaWebSearchService.safeLink(link)).isFalse();
+        assertThat(BochaWebSearchService.safeLink("https://xsgz.tsguas.edu.cn/info/1029/2497.htm")).isTrue();
+    }
+
     private void assertResult(String payload) {
         RestClient.Builder builder = RestClient.builder()
                 .baseUrl("https://api.example.test");

@@ -12,6 +12,9 @@ import org.springframework.web.client.RestClient;
 
 import java.time.Duration;
 import java.util.List;
+import java.net.URI;
+import java.util.Locale;
+import java.util.HashSet;
 
 @Service
 public class BochaWebSearchService implements WebSearchService {
@@ -92,22 +95,24 @@ public class BochaWebSearchService implements WebSearchService {
                 return List.of();
             }
 
-            return pages.value().stream()
+            var seen = new HashSet<String>();
+            return pages.value().stream().limit(50)
                     .filter(result -> result != null
                             && result.name() != null
                             && result.url() != null)
                     .map(result -> new WebSearchResult(
-                            result.name().trim(),
-                            result.url().trim(),
-                            selectSummary(result),
-                            result.datePublished()
+                            clip(result.name(),200),
+                            clip(result.url(),1000),
+                            clip(selectSummary(result),3000),
+                            clip(result.datePublished(),100)
                     ))
                     .filter(result -> !result.title().isBlank()
                             && !result.url().isBlank()
-                            && !result.content().isBlank())
+                            && !result.content().isBlank() && safeLink(result.url()) && seen.add(result.url()))
+                    .limit(maxResults)
                     .toList();
         } catch (RuntimeException exception) {
-            log.warn("博查网页搜索失败，降级为本地知识库：{}", exception.getMessage());
+            log.warn("网页搜索失败，保留本地资料；错误类型：{}", exception.getClass().getSimpleName());
             return List.of();
         }
     }
@@ -122,6 +127,19 @@ public class BochaWebSearchService implements WebSearchService {
             return result.summary().trim();
         }
         return result.snippet() == null ? "" : result.snippet().trim();
+    }
+
+    private static String clip(String value,int length) {
+        if(value==null)return "";String s=value.strip();return s.length()>length?s.substring(0,length):s;
+    }
+    static boolean safeLink(String value) {
+        try {
+            URI u=URI.create(value);String host=u.getHost();
+            if(!("http".equals(u.getScheme())||"https".equals(u.getScheme()))||host==null||u.getRawUserInfo()!=null)return false;
+            host=host.toLowerCase(Locale.ROOT);
+            if(host.contains(":")||host.startsWith("[")||host.equals("localhost")||host.endsWith(".localhost")||host.endsWith(".local"))return false;
+            return !host.matches("[0-9.]+")&&host.contains(".");
+        } catch(IllegalArgumentException e){return false;}
     }
 
     private record BochaRequest(

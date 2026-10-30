@@ -82,7 +82,7 @@ class AiMessageWebSearchScopeTest {
             "不联网，学校最新通知只按现有资料回答。",
             "不要搜索，我只想理解现有通知。",
             "无需联网，按当前日期比较历史截止。",
-            "只用知识库判断政策。"
+            "只用知识库判断政策。", "只按知识库回答奖学金申请。", "仅用本地资料回答助学金。"
     })
     void userOptOutAppliesEvenWithoutLocalResults(String question) {
         assertThat(find(question, List.of(), AiModelProfile.STANDARD)).isEmpty();
@@ -200,6 +200,34 @@ class AiMessageWebSearchScopeTest {
                 "不要联网，只按已收录的基础实验实训中心制度回答：新教师第一年下企业多久，期末交什么材料？",
                 "不联网，图书馆周末几点关门？", "只用知识库，新教师可以直接开课吗？")
                 .flatMap(question -> Stream.of(Arguments.of(false, question), Arguments.of(true, question)));
+    }
+
+    @Test
+    void sourceOnlyIntentNeverSearchesEvenWithEmptyKnowledgeInAnyMode() {
+        for(var profile:List.of(AiModelProfile.STANDARD,AiModelProfile.KIMI,AiModelProfile.GLM))
+            for(String q:List.of("只按这份奖学金原文解释申请条件","只用这份奖学金原文解释申请条件","仅用这份奖学金通知回答"))
+                assertThat(find(q,List.of(),profile)).isEmpty();
+        verifyNoInteractions(web);
+    }
+    @Test
+    void dontOnlyUseKnowledgeMeansSupplementRatherThanOptOut() {
+        String q="不要只用知识库，学校奖学金怎么申请？";
+        var expected=List.of(new WebSearchResult("本校公开政策","https://xsgz.tsguas.edu.cn/","申请条件与申报程序",""));
+        when(web.search(q)).thenReturn(expected);
+        assertThat(find(q,local,AiModelProfile.STANDARD)).isEqualTo(expected);
+        verify(web).search(q);
+    }
+    @Test
+    void explicitNetworkOptOutAndPrivateDataStillWin() {
+        assertThat(find("不要联网，也不要只用知识库判断奖学金",local,AiModelProfile.STANDARD)).isEmpty();
+        assertThat(find("别只用知识库，联网查我的成绩和奖学金",List.of(),AiModelProfile.KIMI)).isEmpty();
+        verifyNoInteractions(web);
+    }
+    @Test void conciseFormattingDoesNotDisableExplicitSearch() {
+        String q="只用一句话，联网介绍天津中德应用技术大学奖学金官方入口";
+        var expected=List.of(new WebSearchResult("本校公开政策","https://xsgz.tsguas.edu.cn/","公开入口",""));
+        when(web.search(q)).thenReturn(expected);
+        assertThat(find(q,List.of(),AiModelProfile.KIMI)).isEqualTo(expected);
     }
 
     private List<WebSearchResult> find(String question, List<KnowledgeSearchResult> localResults,

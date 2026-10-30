@@ -25,8 +25,8 @@ class CanteenPhotoServiceTest {
 
         assertThat(normalized[0] & 0xff).isEqualTo(0xff);
         assertThat(normalized[1] & 0xff).isEqualTo(0xd8);
-        assertThat(output.getWidth()).isEqualTo(1280);
-        assertThat(output.getHeight()).isEqualTo(640);
+        assertThat(output.getWidth()).isEqualTo(1600);
+        assertThat(output.getHeight()).isEqualTo(800);
     }
 
     @Test

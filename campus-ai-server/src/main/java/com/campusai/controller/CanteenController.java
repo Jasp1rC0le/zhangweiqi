@@ -14,7 +14,6 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 @RestController
 @RequestMapping("/api/canteens")
@@ -82,11 +81,24 @@ public class CanteenController {
     }
 
     @GetMapping(value = "/merchants/{id}/photo", produces = MediaType.IMAGE_JPEG_VALUE)
-    public ResponseEntity<byte[]> photo(@PathVariable Long id) {
-        byte[] jpeg = photos.publicPhoto(id);
+    public ResponseEntity<byte[]> photo(@PathVariable Long id, @RequestParam(defaultValue="false") boolean preview) {
+        byte[] jpeg = preview ? photos.publicPreview(id) : photos.publicPhoto(id);
         if (jpeg == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "商家照片不存在");
         return ResponseEntity.ok().contentType(MediaType.IMAGE_JPEG)
-                .cacheControl(CacheControl.maxAge(1, TimeUnit.MINUTES)).body(jpeg);
+                .cacheControl(CacheControl.noCache()).eTag(CanteenPhotoService.contentTag(jpeg)).body(jpeg);
+    }
+
+    @GetMapping("/merchants/{id}/photos")
+    public List<CanteenPhotoService.Photo> photoList(@RequestAttribute("currentUserId") Long userId, @PathVariable Long id) {
+        return photos.photoList(currentUser(userId).getSchoolId(), id, true);
+    }
+
+    @GetMapping(value = "/merchants/{id}/photos/{photoId}", produces = MediaType.IMAGE_JPEG_VALUE)
+    public ResponseEntity<byte[]> galleryPhoto(@PathVariable Long id, @PathVariable Long photoId) {
+        byte[] jpeg = photos.publicGalleryPhoto(id, photoId);
+        if (jpeg == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "照片不存在");
+        return ResponseEntity.ok().contentType(MediaType.IMAGE_JPEG)
+                .cacheControl(CacheControl.noCache()).eTag(CanteenPhotoService.contentTag(jpeg)).body(jpeg);
     }
 
     private User currentUser(Long userId) {
