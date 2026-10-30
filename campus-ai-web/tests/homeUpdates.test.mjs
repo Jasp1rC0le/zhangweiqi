@@ -64,7 +64,7 @@ test('home readiness and updates compile with native disclosure, disabled action
 })
 test('account update arrival keeps the existing identity workflow and routes through guarded navigation', () => {
   const source = readFileSync(new URL('../src/views/AccountView.vue', import.meta.url), 'utf8')
-  assert.match(source, /\['#teaching-identity','#product-updates'\]/)
+  assert.match(source, /\['#teaching-identity','#product-updates','#invoice-info'\]/)
   assert.match(source, /focusWorkflowElement\(target\.value\?\.\$el/)
   assert.match(source, /owner===principal\(\)&&route\.hash===hash/)
   assert.match(source, /await router\.push\(item\.route\)/)

@@ -9,6 +9,7 @@ import TokenActivityPanel from '@/components/TokenActivityPanel.vue'
 import AccountIdentityPanel from '@/components/AccountIdentityPanel.vue'
 import TeachingIdentityPanel from '@/components/TeachingIdentityPanel.vue'
 import ProductUpdates from '@/components/ProductUpdates.vue'
+import SchoolInvoiceInfo from '@/components/SchoolInvoiceInfo.vue'
 import { wasRouteFailureHandled } from '@/utils/routeRecovery'
 import { createDraftCheckpoint } from '@/utils/draftCheckpoint'
 import { useUnsavedChanges } from '@/utils/useUnsavedChanges'
@@ -18,7 +19,7 @@ import { createAccountLifecycle } from '@/utils/accountLifecycle'
 import { createLatestRequest } from '@/utils/latestRequest'
 
 const router = useRouter()
-const route=useRoute(),identityPanel=ref(),updatesPanel=ref()
+const route=useRoute(),identityPanel=ref(),updatesPanel=ref(),invoicePanel=ref()
 let focusDisposed=false
 const auth = useAuthStore()
 const owner = computed(() => auth.user ? `${auth.user.id}:${auth.user.schoolId}:${userSessionGeneration.value}` : '')
@@ -171,7 +172,7 @@ async function deleteAccount() {
   } finally { if (ticket.current()) deleteBusy.value = false }
 }
 
-async function focusAccountWorkflow(){const principal=()=>auth.user?`${auth.user.id}:${auth.user.schoolId}:${userSessionGeneration.value}`:'',owner=principal(),hash=route.hash;if(!owner||!['#teaching-identity','#product-updates'].includes(hash))return;await nextTick();const target=hash==='#product-updates'?updatesPanel:identityPanel;if(!focusDisposed&&owner===principal()&&route.hash===hash)focusWorkflowElement(target.value?.$el,()=>!focusDisposed&&owner===principal()&&route.hash===hash)}
+async function focusAccountWorkflow(){const principal=()=>auth.user?`${auth.user.id}:${auth.user.schoolId}:${userSessionGeneration.value}`:'',owner=principal(),hash=route.hash;if(!owner||!['#teaching-identity','#product-updates','#invoice-info'].includes(hash))return;await nextTick();const target=hash==='#product-updates'?updatesPanel:hash==='#invoice-info'?invoicePanel:identityPanel;if(!focusDisposed&&owner===principal()&&route.hash===hash)focusWorkflowElement(target.value?.$el,()=>!focusDisposed&&owner===principal()&&route.hash===hash)}
 async function openProductFeature(item) { if(accountBusy.value||focusDisposed)return;try{await router.push(item.route)}catch(error){if(!wasRouteFailureHandled(error))ElMessage.error('页面暂时没能打开，请再试一次')} }
 watch(()=>route.hash,focusAccountWorkflow,{flush:'post'})
 watch(owner, () => {
@@ -197,9 +198,9 @@ onMounted(focusAccountWorkflow)
       <div class="account-intro">
       <h1>账户与设置</h1>
       <p class="lede">管理偏好、安全和个人数据。</p>
-      <nav class="account-nav" aria-label="账户设置目录"><a href="#product-updates">产品更新</a><a href="#teaching-identity">教学身份</a><a href="#personal">个人信息</a><a href="#security">找回邮箱</a><a href="#token-activity">额度记录</a><a href="#my-data">我的数据</a><a href="#sessions">登录会话</a><a href="#close-account">注销账户</a></nav></div>
+      <nav class="account-nav" aria-label="账户设置目录"><a href="#product-updates">产品更新</a><a href="#invoice-info">学校开票</a><a href="#teaching-identity">教学身份</a><a href="#personal">个人信息</a><a href="#security">找回邮箱</a><a href="#token-activity">额度记录</a><a href="#my-data">我的数据</a><a href="#sessions">登录会话</a><a href="#close-account">注销账户</a></nav></div>
 
-      <div class="account-sections"><ProductUpdates id="product-updates" ref="updatesPanel" :disabled="accountBusy" @activate="openProductFeature" /><AccountIdentityPanel /><TeachingIdentityPanel ref="identityPanel" tabindex="-1" /><section id="personal" class="account-card">
+      <div class="account-sections"><ProductUpdates id="product-updates" ref="updatesPanel" :disabled="accountBusy" @activate="openProductFeature" /><SchoolInvoiceInfo ref="invoicePanel" :disabled="accountBusy" /><AccountIdentityPanel /><TeachingIdentityPanel ref="identityPanel" tabindex="-1" /><section id="personal" class="account-card">
         <h2>个人信息</h2>
         <p>选填，用于个性化建议，不作为校园事实来源。</p>
         <p v-if="profileLoading" role="status">正在读取个人信息…</p>

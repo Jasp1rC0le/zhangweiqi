@@ -21,6 +21,13 @@ export const primaryNavigation = Object.freeze(
 export const workspaceTools = Object.freeze(
   [
     {
+      name: 'school-invoice',
+      label: '学校开票',
+      path: '/account#invoice-info',
+      icon: 'sources',
+      description: '复制单位名称与税号',
+    },
+    {
       name: 'teaching',
       label: '教学考勤',
       path: '/teaching',

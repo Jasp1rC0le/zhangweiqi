@@ -22,9 +22,22 @@ export async function reportCanteenReview(merchantId, reviewId, reason, options 
   await http.post(`/api/canteens/merchants/${merchantId}/reviews/${reviewId}/report`, { reason }, options)
 }
 
-export function canteenMerchantPhotoUrl(id, version = '') {
+export function canteenMerchantPhotoUrl(id, version = '', preview = false) {
   const base = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
-  return `${base}/api/canteens/merchants/${id}/photo${version ? `?v=${version}` : ''}`
+  const query = new URLSearchParams()
+  if (version) query.set('v', version)
+  if (preview) query.set('preview', 'true')
+  return `${base}/api/canteens/merchants/${id}/photo${query.size ? `?${query}` : ''}`
+}
+
+export function canteenGalleryPhotoUrl(id, photoId) {
+  if (photoId === 0) return canteenMerchantPhotoUrl(id)
+  const base = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
+  return `${base}/api/canteens/merchants/${id}/photos/${photoId}`
+}
+
+export async function getMerchantPhotos(id, options = {}) {
+  return (await http.get(`/api/canteens/merchants/${id}/photos`, options)).data
 }
 
 export async function rateCanteenMerchant(id, score, comment, options = {}) {

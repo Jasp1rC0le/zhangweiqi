@@ -9,6 +9,7 @@ import { createCatalogDraftTransition } from '@/utils/catalogDraftTransition'
 import MaterialIntakePanel from '@/components/MaterialIntakePanel.vue'
 import MerchantPublisher from '@/components/MerchantPublisher.vue'
 import { canteenMerchantPhotoUrl } from '@/api/canteen'
+import { merchantPhotoIssue } from '@/utils/merchantPublishing'
 
 const auth = useAdminAuthStore()
 const owner = computed(() => auth.isLoggedIn && auth.user?.schoolId
@@ -184,6 +185,20 @@ async function uploadPhoto(item, event) {
     success: '照片已提交，服务端压缩并移除元数据；本页预览是刚选择的原文件。',
   })
 }
+async function addMenuPhotos(item, event) {
+  const files = Array.from(event.target.files || [])
+  event.target.value = ''
+  if (!files.length || writeLocked.value) return
+  const issue = merchantPhotoIssue(files)
+  if (issue) { state.error = issue; return }
+  const snapshot = Object.freeze({ ...item })
+  return catalog.run({
+    targetCurrent: () => sameCatalogEntry(merchants.value, snapshot),
+    execute: signal => api.appendAdminMerchantPhotos(snapshot.id, files, { signal }),
+    committed: () => { delete photoMissing[snapshot.id] },
+    success: '菜单照片已添加；相同内容自动去重，原封面保留。',
+  })
+}
 async function moderate(review, status) {
   if (writeLocked.value || !['PUBLISHED', 'HIDDEN'].includes(status) || status === review.status) return
   const snapshot = Object.freeze({ ...review })
@@ -251,7 +266,8 @@ async function moderate(review, status) {
         <article v-for="item in merchants" :key="item.id" class="admin-row">
           <div><strong>{{ item.name }}</strong><small>{{ canteenNames.get(item.canteenId) || '未知食堂' }} · {{item.location || '位置未填写'}} / {{ item.status === 'PUBLISHED' ? '已发布' : item.status === 'DRAFT' ? '草稿' : '已下架' }}</small><img v-if="photoPreviews[item.id] || (item.status==='PUBLISHED' && !photoMissing[item.id])" class="admin-photo-preview" :src="photoPreviews[item.id] || canteenMerchantPhotoUrl(item.id)" :alt="`${item.name}照片`" @error="photoMissing[item.id]=true" /></div>
           <div class="row-actions">
-            <label class="photo-upload">上传商家照片<input type="file" accept="image/jpeg,image/png" :disabled="writeLocked" @change="uploadPhoto(item, $event)" /></label>
+            <label class="photo-upload">添加菜单照片<input type="file" multiple accept="image/jpeg,image/png" :disabled="writeLocked" @change="addMenuPhotos(item, $event)" /></label>
+            <label class="photo-upload photo-replace">更换封面<input type="file" accept="image/jpeg,image/png" :disabled="writeLocked" @change="uploadPhoto(item, $event)" /></label>
             <label class="operating-label">营业状态
               <select :value="item.operatingStatus" :disabled="writeLocked" @change="changeOperating(item, $event.target.value)">
                 <option value="UNKNOWN">待确认</option><option value="OPEN">营业中</option><option value="CLOSED">暂停营业</option>

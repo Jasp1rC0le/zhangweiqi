@@ -12,6 +12,8 @@ import {
 } from '@/api/canteen'
 import { useAuthStore } from '@/stores/auth'
 import CanteenFoodArt from '@/components/CanteenFoodArt.vue'
+import MerchantPhotoViewer from '@/components/MerchantPhotoViewer.vue'
+import { merchantCategories, inMerchantCategory, merchantPlaceLabel } from '@/utils/merchantCategories'
 import { selectMerchants } from '@/utils/merchantList'
 import { createLatestRequest } from '@/utils/latestRequest'
 import { useUnsavedChanges } from '@/utils/useUnsavedChanges'
@@ -23,6 +25,7 @@ const auth = useAuthStore()
 const canteens = ref([])
 const merchants = ref([])
 const selectedCanteen = ref('all')
+const selectedCategory = ref('all')
 const ratingDrafts = reactive({})
 const loading = ref(true)
 const loadError = ref('')
@@ -30,6 +33,7 @@ const savingId = ref(null)
 const likingId = ref(null)
 const reportingReview = ref(null), reportReason = ref('内容不实'), reportingBusy = ref(false)
 const expandedId = ref(null)
+const photoMerchant = ref(null)
 const reviews = reactive({})
 const reviewErrors = reactive({})
 const reviewLoading = reactive({})
@@ -50,7 +54,7 @@ const visibleMerchants = computed(() =>
     canteen: selectedCanteen.value,
     query: searchQuery.value,
     sort: sortBy.value,
-  }),
+  }).filter(merchant => inMerchantCategory(merchant, selectedCategory.value)),
 )
 function reviewTime(value) {
   const date=new Date(/(Z|[+-]\d{2}:?\d{2})$/.test(value)?value:value+'+08:00')
@@ -61,6 +65,7 @@ const scoreLabel = ['选一个星级', '不太满意', '有待改进', '还不�
 function resetFilters() {
   searchQuery.value = ''
   selectedCanteen.value = 'all'
+  selectedCategory.value = 'all'
 }
 
 function applyMerchants(rows) {
@@ -73,7 +78,7 @@ function applyMerchants(rows) {
 }
 const listRequest = createLatestRequest({
   load: options => Promise.all([getCanteens(options), getCanteenMerchants(options)]),
-  onStart: () => { loading.value = true; loadError.value = '' },
+  onStart: () => { loading.value = true; loadError.value = ''; photoMerchant.value = null },
   onSuccess: ([places, rows]) => { canteens.value = places; applyMerchants(rows) },
   onError: error => { loadError.value = error.response?.data?.message || '暂时无法读取食堂信息，请稍后重试' },
   onFinish: () => { loading.value = false },
@@ -187,6 +192,8 @@ watch(scope, (next, previous) => {
     for (const key of Object.keys(values)) delete values[key]
   }
   merchants.value = []; canteens.value = []; expandedId.value = null
+  photoMerchant.value = null
+  selectedCategory.value = 'all'
   savingId.value = null; likingId.value = null
   reportingReview.value=null;reportingBusy.value=false
   if (next) load()
@@ -232,7 +239,7 @@ onMounted(async () => {
       <template v-else>
         <div class="table-draft-notice" role="status">
           <span v-if="pendingDraftIds.length">{{ pendingDraftIds.length }} 家评价尚未发布</span>
-          <button v-if="pendingDraftIds.length && (searchQuery || selectedCanteen !== 'all')" type="button" class="table-text-button" @click="resetFilters">显示全部商家</button>
+          <button v-if="pendingDraftIds.length && (searchQuery || selectedCanteen !== 'all' || selectedCategory !== 'all')" type="button" class="table-text-button" @click="resetFilters">显示全部商家</button>
         </div>
         <div v-if="merchants.length" class="table-tools">
           <label class="table-search"
@@ -249,7 +256,7 @@ onMounted(async () => {
             <option value="popular">评分人数最多</option>
           </select>
         </div>
-        <nav v-if="merchants.length" class="table-filters" aria-label="选择食堂">
+        <nav v-if="merchants.length && canteens.length > 1" class="table-filters" aria-label="选择食堂">
           <button
             :class="{ active: selectedCanteen === 'all' }"
             :aria-pressed="selectedCanteen === 'all'"
@@ -266,6 +273,9 @@ onMounted(async () => {
           >
             {{ canteen.name }}
           </button>
+        </nav>
+        <nav v-if="merchants.length" class="table-categories" aria-label="按想吃的类型筛选">
+          <button v-for="category in merchantCategories" :key="category.id" type="button" :aria-pressed="selectedCategory === category.id" @click="selectedCategory = category.id">{{ category.label }}</button>
         </nav>
         <div v-if="merchants.length" class="table-list-heading">
           <h2>
@@ -292,24 +302,25 @@ onMounted(async () => {
             :aria-label="merchant.name"
           >
             <div class="merchant-overview">
-              <a class="merchant-media" :href="merchant.hasPhoto ? canteenMerchantPhotoUrl(merchant.id) : undefined" :target="merchant.hasPhoto ? '_blank' : undefined" rel="noopener" :aria-label="merchant.hasPhoto ? `查看${merchant.name}完整照片` : `${merchant.name}暂无照片`">
+              <button class="merchant-media" type="button" :disabled="!merchant.hasPhoto" :aria-label="merchant.hasPhoto ? `查看${merchant.name}菜单照片` : `${merchant.name}暂无照片`" @click="photoMerchant = { id: merchant.id, name: merchant.name }">
                 <CanteenFoodArt v-if="demo && merchant.demoArt" :kind="merchant.demoArt" />
                 <img
                   v-else-if="merchant.hasPhoto"
-                  :src="canteenMerchantPhotoUrl(merchant.id)"
+                  :src="canteenMerchantPhotoUrl(merchant.id, '', true)"
                   :alt="merchant.name + '照片'"
                   loading="lazy"
                 />
                 <span v-else class="table-no-photo" aria-label="暂无店铺照片"
                   ><el-icon><Food /></el-icon></span
                 >
-              </a>
+                <span v-if="merchant.hasPhoto" class="merchant-media-caption">查看菜单<el-icon><ArrowRight /></el-icon></span>
+              </button>
               <div class="merchant-details">
                 <p class="table-location">
-                  {{ merchant.canteenName }} · {{ merchant.location || '位置待补充' }}
+                  {{ merchantPlaceLabel(merchant) }}
                 </p>
                 <h3>{{ merchant.name }}</h3>
-                <p class="table-description">{{ merchant.description }}</p>
+                <p v-if="merchant.description" class="table-description">{{ merchant.description }}</p>
                 <span v-if="merchant.operatingStatus === 'CLOSED'" class="table-status"
                   >暂停营业</span
                 >
@@ -340,7 +351,6 @@ onMounted(async () => {
                 <el-icon><Pointer /></el-icon><span>{{ merchant.featuredReview.likes }}</span>
               </button>
             </div>
-            <div v-else class="table-first-review">还没有公开评价</div>
             <div class="table-card-actions">
               <button class="merchant-write-review" type="button" @click="writeReview(merchant)">写评价</button>
 
@@ -464,15 +474,18 @@ onMounted(async () => {
         </details>
       </template>
     </main>
+    <MerchantPhotoViewer v-if="photoMerchant" :merchant="photoMerchant" :scope="scope" @close="photoMerchant=null" />
   </div>
 </template>
 
 <style scoped>
+.table-categories{display:flex;gap:8px;overflow-x:auto;padding:0 0 18px;scrollbar-color:#c6b5a8 transparent}.table-categories button{flex:none;min-height:44px;padding:9px 18px;border:0;border-radius:12px;background:#f5eee7;color:#74513b;font:inherit;font-size:15px;cursor:pointer}.table-categories button[aria-pressed=true]{background:#a34c1f;color:#fff}.table-categories button:hover:not([aria-pressed=true]){background:#eddfd1}.table-categories button:focus-visible{outline:2px solid #a34c1f;outline-offset:3px}
 .table-draft-notice{display:flex;align-items:center;gap:12px;height:44px;box-sizing:border-box;overflow:auto;color:#5d6876;font-size:14px;line-height:1.5}
 .merchant-review-time{display:block;margin-top:8px;color:#5d6876;font-size:12px}.table-review{flex-wrap:wrap}.table-review .merchant-review-actions{display:flex;gap:12px;flex:0 0 auto}.merchant-review-actions button,.merchant-report-form button{min-height:44px;padding:8px 12px;border:0;background:#f2f5fa;color:#5d6876;border-radius:10px;font:inherit;cursor:pointer}.merchant-report-form{flex-basis:100%;display:flex;gap:12px;align-items:end;flex-wrap:wrap}.merchant-report-form label{display:grid;gap:6px}.merchant-report-form select{font:inherit;font-size:16px;min-height:44px;max-width:100%;padding:8px;border:1px solid #d6dde5;border-radius:10px}
 @media(min-width:1100px){.merchant-catalog{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}.merchant-catalog .merchant-overview{grid-template-columns:minmax(0,1fr) auto;gap:16px}.merchant-catalog .merchant-media{grid-column:1/-1}.merchant-catalog .merchant-media img{height:180px}}
 .merchant-overview{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:20px 16px}
-.merchant-media{grid-column:1/-1;display:block;min-width:0;overflow:hidden;border-radius:12px;background:#f6f3ef;text-decoration:none}
+.merchant-media{position:relative;grid-column:1/-1;display:block;min-width:0;width:100%;padding:0;border:0;overflow:hidden;border-radius:12px;background:#f6f3ef;text-decoration:none;cursor:zoom-in}
+.merchant-media-caption{display:flex;align-items:center;justify-content:flex-end;gap:6px;min-height:32px;padding:3px 12px;background:#f6f3ef;color:#6d452c;font-size:13px;line-height:1.5}.merchant-media-caption .el-icon{font-size:14px}.merchant-media:disabled{opacity:1;cursor:default}
 .merchant-media img{display:block;width:100%;height:190px;object-fit:contain}
 .merchant-media :deep(svg){display:block;width:100%;height:220px}
 .merchant-details{min-width:0}.merchant-details h3{margin:6px 0 0;font-size:24px;line-height:1.35;letter-spacing:-.025em;overflow-wrap:anywhere}
