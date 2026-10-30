@@ -43,6 +43,13 @@ export async function uploadAdminMerchantPhoto(id, file, options = {}) {
   return (await http.post(`/api/admin/canteens/merchants/${id}/photo`, body, options)).data
 }
 
+export async function publishAdminMerchants(items, files, options = {}) {
+  const body = new FormData()
+  body.append('items', new Blob([JSON.stringify(items)], { type: 'application/json' }))
+  for (const file of files) body.append('files', file)
+  return (await http.post('/api/admin/canteens/merchants/publish', body, options)).data
+}
+
 export async function getAdminMerchantReviews(options = {}) {
   return (await http.get('/api/admin/canteens/reviews', options)).data
 }

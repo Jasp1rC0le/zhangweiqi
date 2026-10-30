@@ -310,6 +310,8 @@ components:
 
 <!-- Approved voice/admin scoped merge: 2026-10-30. Sources: HoldToTalk.vue and holdToTalk/voiceConsent; AdminView.vue and TeachingIdentityPanel; admin-workbench.css, admin API/workbench helper and AdminBackgroundJobController. Local gesture/preview/consent, identity-module discovery and runtime-state expression only. Finish ship is file-based synthetic evidence, not physical ASR, reminder, production-release or identity-approval certification. -->
 
+<!-- Approved canteen/community scoped merge: 2026-10-31. Sources: CanteenView, AdminCanteenPanel, MerchantPublisher and merchantPublishing; WallView/AdminWallPanel; canteen/wall services and CommunityTextPolicy. Preserve the incumbent Apple work area. Immediate locally checked social publication supersedes prior pre-moderation only for new reviews, wall posts and replies; it does not change identity or knowledge approval. Source documentation and synthetic finish evidence are not a public-release, physical-device or comprehensive-compliance verdict. -->
+
 ## Overview
 
 **Creative North Star: "Campthink"**
@@ -323,6 +325,8 @@ components:
 后续独立获准的全屏认证以完整窗口呈现品牌和表单，手机将品牌压缩为一行；手机聊天由当前可见视口约束输入区域。以下较早记录中的“登录／注册视觉不变”保留为当时的历史边界，由 2026-10-28 全屏认证／键盘批次的局部授权取代。它不扩展到首页、联系、Pro、角色、法律或产品能力定义。
 
 2026-10-30 的语音与管理操作增量沿用上述工作区视觉，只修正持按目标、转写预览、首次同意记忆、身份审核入口和任务状态表达。录音中不使用会移动持按目标的缩放或内容折叠；暂停、未知、已排队和成功分别表达。它不更新首页、认证面或 Pro，也不把界面复审当成生产启用或真机语音证明。
+
+2026-10-31 的商家与社区增量继续沿用当前工作区：商家图片和文字分区，横图／竖图完整显示；直接录入与批量发布替代主路径的OCR／草稿链，已有高级编辑保留。评价以明确按钮、时间和即时公开状态表达，规则拦截与举报后处理分开。旧的社区先人工审核文案保留为历史边界，仅被本次明确授权的评价／校园墙发布规则取代；身份审核、知识发布、首页和认证面不在此变更中。
 
 ### Approved Apple chat and shared shell — 2026-10-13
 
@@ -576,6 +580,14 @@ sidecar 的八级色阶由这些颜色生成，供面板展示明暗变化；它
 - **Consent / Cancellation:** 首次明确同意后，只在当前浏览器按账号／学校保存版本化布尔选择；无音频、转写正文、凭据或令牌。再次点击语音仅展开待录音控件，持按或键盘手势才启动识别。语音设置可撤销选择；存储不可用／损坏不当作同意。上滑、失焦、页面隐藏、身份／作用域变化及录入上限仍结束本次录入，不自动重启。
 - **Identity Review:** 管理后台桌面提供直接“身份审核”模块，手机复用原模块选择器；`/admin?tool=identity-review` 只表达定位意图，仍经过正常管理身份核验。已打开的审核面在切换模块时保留核验说明与忙碌状态，并提供返回入口；既有离开确认、逐项复核与权限边界保留。
 - **Task Runtime / Attempts:** 失败任务保留记录和原因，用“已尝试 N 次／自动重试已用尽”表达次数。配置明确启用后才允许手动重新排队；暂停或读取未知均禁用动作，后端在暂停时先拒绝再避免队列写入。启用配置不是执行器心跳，重新入队也不代表成功；失败回执不删除记录或自动重试。手机任务动作沿用至少 44px 高度。
+
+### Merchant Publication and Community Feedback — 2026-10-31
+
+- **Media / Scan:** 图片、名称／位置与评分各有独立区域；横竖照片使用 `contain` 保留完整内容，并提供完整照片链接。桌面商家列表采用双列扫描，手机单列；继承现有系统字体、暖色评分动作与蓝色管理动作，不增加全局视觉世界或图标家族。
+- **Direct Publication:** 主入口为选照片、填名称和位置、明确点击发布；每张照片对应一家，1–10家一次提交。单一已发布食堂可默认，多食堂必须明确归属。照片、资料与可见状态同一事务提交；失败／不确定回执保留填写，不自动重复提交。可选文档整理和详细编辑继续保留原草稿与离开保护。
+- **Stable Controls:** 列表刷新保持内容挂载，操作状态在固定工具栏内变化；未保存提示保留固定槽位。星级按钮是非提交动作，只有明确发布才写入。管理资料列和操作组按可用容器换行，单个操作不缩成逐字列；手机重置列基准，触区至少44px，录入字段16px。
+- **Immediate Social State:** 已登录同校账户可评价；新安全评价、动态和回复经本地有限规则检查后直接公开，显示时间。普通差评可保留，公开文本不展示账户名。举报与后续隐藏独立于首次发布；历史待审／隐藏内容不批量重新公开。有限规则不等于全面合规认证，不将社区内容自动加入知识库或交给模型。
+- **Scope:** 上述立即发布只覆盖社区内容。教学身份仍须核验，知识资料仍按原审核发布；正式教学／名单／任务执行开关的边界不变。源码／合成证据与真实发布、学校权限和物理微信键盘验收分开记录。
 
 ### Apple Functional Controls
 

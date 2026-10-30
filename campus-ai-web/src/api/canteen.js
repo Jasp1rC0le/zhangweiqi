@@ -18,6 +18,10 @@ export async function likeCanteenReview(merchantId, reviewId, liked, options = {
   return (await http.put(`/api/canteens/merchants/${merchantId}/reviews/${reviewId}/like`, { liked }, options)).data
 }
 
+export async function reportCanteenReview(merchantId, reviewId, reason, options = {}) {
+  await http.post(`/api/canteens/merchants/${merchantId}/reviews/${reviewId}/report`, { reason }, options)
+}
+
 export function canteenMerchantPhotoUrl(id, version = '') {
   const base = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
   return `${base}/api/canteens/merchants/${id}/photo${version ? `?v=${version}` : ''}`

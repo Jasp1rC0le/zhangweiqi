@@ -24,11 +24,19 @@ class CanteenControllerTest {
         assertThatThrownBy(()->controller.rate(7L,1L,new CanteenService.RatingInput(5,null))).hasMessageContaining("401");
         verifyNoInteractions(service,throttle);
     }
-    @Test void adminDoesNotGetToCastStudentVotes() {
-        user("ADMIN",1);
+    @Test void unknownRolesCannotVote() {
+        user("UNKNOWN",1);
         assertThatThrownBy(()->controller.like(7L,1L,2L,new CanteenService.LikeInput(true))).hasMessageContaining("403");
         assertThatThrownBy(()->controller.rate(7L,1L,new CanteenService.RatingInput(5,null))).hasMessageContaining("403");
         verifyNoInteractions(service,throttle);
+    }
+    @Test void activeCampusRolesMaySubmitButStillUseOwnSchoolAndUser() {
+        for (String role : java.util.List.of("ADMIN", "TEACHER", "COUNSELOR", "SECRETARY")) {
+            user(role,1);
+            controller.rate(7L,1L,new CanteenService.RatingInput(5,"校园用餐体验"));
+        }
+        verify(service,times(4)).rate(12L,7L,1L,5,"校园用餐体验");
+        verify(throttle,times(4)).check(7L);
     }
     @Test void schoolAndVoterAreTakenFromActiveServerAccount() {
         user("STUDENT",1);

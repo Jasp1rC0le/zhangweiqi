@@ -21,11 +21,11 @@ onMounted(load)
 <template>
   <section class="wall-admin">
     <header><h2>待处理内容 <small>{{entries.length}}</small></h2><button :disabled="locked||!owner" @click="load">刷新队列</button></header>
-    <p>先核对隐私、来源与危险操作内容。审核不会将帖子写入知识库。</p>
+    <p>新内容自动检查后公开。这里处理举报与历史待审内容，不进入知识库。</p>
     <p v-if="!owner" role="alert">管理员身份已变化，请重新核验账号后再打开审核。</p>
     <p v-if="error" role="alert">{{error}}</p><p v-if="success" role="status">{{success}}</p>
     <p v-if="busy" role="status">正在处理，请等待结果。离开页面不会撤销已经提交的审核。</p>
-    <p v-if="loading" role="status">正在加载…</p><p v-else-if="owner&&!entries.length&&!error">当前没有待审核内容</p>
+    <p v-if="loading" role="status">正在加载…</p><p v-else-if="owner&&!entries.length&&!error">当前没有举报或历史待审内容</p>
     <p v-if="entries.length===100">当前显示最早100条待处理内容，处理后请刷新查看后续内容。</p>
     <article v-for="entry in entries" :key="entry.id">
       <small>{{entry.parentId?'回复':'主题'}} · {{entry.status}} · v{{entry.revision}}</small>

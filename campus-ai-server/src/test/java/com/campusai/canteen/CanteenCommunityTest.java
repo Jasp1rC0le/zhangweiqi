@@ -39,6 +39,7 @@ class CanteenCommunityTest {
         String segment = schema.substring(schema.indexOf("CREATE TABLE IF NOT EXISTS campus_canteens"),schema.indexOf("CREATE TABLE IF NOT EXISTS knowledge_chunks"));
         // SQL comments contain semicolons in Chinese text; split only statement boundaries.
         for (String sql : segment.split(";\\s*(?=CREATE|$)")) if (!sql.isBlank()) jdbc.execute(sql);
+        jdbc.execute("CREATE TABLE contact_messages(id BIGINT AUTO_INCREMENT PRIMARY KEY,user_id BIGINT,school_id BIGINT,name VARCHAR(80),contact VARCHAR(120),subject VARCHAR(120),message TEXT,status VARCHAR(20) DEFAULT 'NEW')");
         jdbc.update("INSERT INTO campus_canteens(id,school_id,name,status) VALUES(1,1,'本校食堂','PUBLISHED'),(2,2,'外校食堂','PUBLISHED')");
         jdbc.update("INSERT INTO campus_canteen_merchants(id,school_id,canteen_id,name,status) VALUES(1,1,1,'面馆','PUBLISHED'),(2,2,2,'外校商家','PUBLISHED')");
     }
@@ -48,12 +49,12 @@ class CanteenCommunityTest {
         service.reviewStatus(1L,id,"PUBLISHED");
         return id;
     }
-    @Test void pendingReviewsArePrivateAndNotFeatured() {
+    @Test void safeReviewsPublishImmediatelyAndAreFeatured() {
         service.rate(1L,1L,1L,5,"汤热面香");
-        assertThat(service.reviews(1L,2L,1L)).isEmpty();
-        assertThat(service.reviews(1L,1L,1L)).singleElement().satisfies(r -> assertThat(r.status()).isEqualTo("PENDING"));
+        assertThat(service.reviews(1L,2L,1L)).hasSize(1);
+        assertThat(service.reviews(1L,1L,1L)).singleElement().satisfies(r -> assertThat(r.status()).isEqualTo("PUBLISHED"));
         assertThat(service.publishedMerchants(1L,2L)).singleElement().satisfies(m -> {
-            assertThat(m.featuredReview()).isNull(); assertThat(m.ratingCount()).isEqualTo(1);
+            assertThat(m.featuredReview()).isNotNull(); assertThat(m.ratingCount()).isEqualTo(1);
         });
     }
     @Test void likesAreIdempotentReversibleAndCannotBeSelfOrCrossSchool() {
@@ -67,14 +68,15 @@ class CanteenCommunityTest {
         service.like(1L,2L,1L,id,false); service.like(1L,2L,1L,id,false);
         assertThat(service.reviews(1L,2L,1L).get(0).likes()).isZero();
     }
-    @Test void changedTextResetsApprovalAndLikesButScoreOnlyDoesNot() {
+    @Test void changedTextResetsLikesAndPublishesAfterChecksButScoreOnlyDoesNot() {
         long id = approve(); service.like(1L,2L,1L,id,true);
         service.rate(1L,1L,1L,4,null);
         assertThat(service.reviews(1L,2L,1L).get(0).likes()).isEqualTo(1);
         service.rate(1L,1L,1L,4,"这次稍咸");
-        assertThat(service.reviews(1L,2L,1L)).isEmpty();
+        assertThat(service.reviews(1L,2L,1L).get(0).status()).isEqualTo("PUBLISHED");
         assertThat(service.reviews(1L,1L,1L).get(0).likes()).isZero();
-        assertThatThrownBy(() -> service.like(1L,2L,1L,id,true)).hasMessageContaining("404");
+        service.like(1L,2L,1L,id,true);
+        assertThat(service.reviews(1L,2L,1L).get(0).likes()).isEqualTo(1);
         assertThat(service.publishedMerchants(1L,1L).get(0).ratingCount()).isEqualTo(1);
     }
     @Test void hidingRemovesFeaturedAndAccountDeletionCascades() {
@@ -110,7 +112,7 @@ class CanteenCommunityTest {
         long id=approve();
         service.rate(1L,1L,1L,4,"后来修改了内容");
         assertThatThrownBy(() -> service.reviewStatus(1L,id,"PUBLISHED","汤热面香")).hasMessageContaining("409");
-        assertThat(service.reviews(1L,2L,1L)).isEmpty();
+        assertThat(service.reviews(1L,2L,1L).get(0).comment()).isEqualTo("后来修改了内容");
         service.reviewStatus(1L,id,"PUBLISHED","后来修改了内容");
         assertThat(service.reviews(1L,2L,1L).get(0).comment()).isEqualTo("后来修改了内容");
     }
@@ -132,5 +134,16 @@ class CanteenCommunityTest {
         service.rate(1L,1L,1L,4,"面，真香！");
         assertThat(service.reviews(1L,2L,1L).get(0).likes()).isEqualTo(1);
         assertThat(service.reviews(1L,2L,1L).get(0).comment()).isEqualTo("面，真香！");
+    }
+    @Test void reportsAreScopedDeduplicatedAndResolvedWhenHidden() {
+        service.rate(1L,1L,1L,2,"价格偏贵，份量很少，不推荐");
+        long id=service.reviews(1L,2L,1L).get(0).id();
+        service.report(1L,2L,1L,id,"内容不实");service.report(1L,2L,1L,id,"内容不实");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM contact_messages",Integer.class)).isEqualTo(1);
+        assertThat(service.adminReviews(1L).get(0).reportCount()).isEqualTo(1);
+        assertThatThrownBy(()->service.report(2L,2L,1L,id,"其他问题")).hasMessageContaining("404");
+        service.reviewStatus(1L,id,"HIDDEN","价格偏贵，份量很少，不推荐");
+        assertThat(service.reviews(1L,2L,1L)).isEmpty();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM contact_messages WHERE status='NEW'",Integer.class)).isZero();
     }
 }

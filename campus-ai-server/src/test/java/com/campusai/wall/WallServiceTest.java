@@ -36,12 +36,12 @@ class WallServiceTest {
         id=UUID.randomUUID().toString();wall.create(1L,1L,new WallService.Input(id,"experiment","波形不稳定","已经记录了触发设置，想请教怎么理解这个现象"));
     }
     void publish(){wall.review(1L,3L,id,new WallService.ReviewInput(1,"PUBLISHED",""));}
-    @Test void pendingOnlyOwnerAndSchoolIsolation(){
-        assertThat(wall.list(1L,2L,"",false,0).items()).isEmpty();
+    @Test void safePostsAreImmediateButSchoolIsolationRemains(){
+        assertThat(wall.list(1L,2L,"",false,0).items()).hasSize(1);
         assertThat(wall.list(1L,1L,"",true,0).items()).hasSize(1);
-        assertThatThrownBy(()->wall.get(1L,2L,id)).hasMessageContaining("404");
+        assertThat(wall.get(1L,2L,id).status()).isEqualTo("PUBLISHED");
         assertThatThrownBy(()->wall.get(2L,1L,id)).hasMessageContaining("404");
-        assertThat(wall.moderationContext(1L,3L,id).status()).isEqualTo("PENDING");
+        assertThat(wall.moderationContext(1L,3L,id).status()).isEqualTo("PUBLISHED");
         assertThatThrownBy(()->wall.moderationContext(2L,3L,id)).hasMessageContaining("404");
         publish();assertThat(wall.list(1L,2L,"experiment",false,0).items()).hasSize(1);
         assertThat(wall.list(2L,2L,"",false,0).items()).isEmpty();
@@ -53,12 +53,12 @@ class WallServiceTest {
         assertThatThrownBy(()->wall.create(1L,2L,new WallService.Input(id,"course","盗用请求编号","不同内容"))).hasMessageContaining("409");
         assertThatThrownBy(()->wall.create(1L,1L,new WallService.Input(id,"course","不同内容","不同内容"))).hasMessageContaining("409");
     }
-    @Test void repliesModeratedAndParentHidingRevokesVisibility(){
+    @Test void repliesPublishImmediatelyAndParentHidingRevokesVisibility(){
         String c=UUID.randomUUID().toString();
-        assertThatThrownBy(()->wall.comment(1L,2L,id,new WallService.CommentInput(c,"先对照教师实验说明"))).hasMessageContaining("404");
+        assertThatThrownBy(()->wall.comment(2L,2L,id,new WallService.CommentInput(c,"先对照教师实验说明"))).hasMessageContaining("404");
         publish();wall.comment(1L,2L,id,new WallService.CommentInput(c,"先对照教师实验说明"));
         wall.comment(1L,2L,id,new WallService.CommentInput(c,"先对照教师实验说明"));
-        assertThat(wall.comments(1L,1L,id,0).items()).isEmpty();assertThat(wall.comments(1L,2L,id,0).items()).hasSize(1);
+        assertThat(wall.comments(1L,1L,id,0).items()).hasSize(1);assertThat(wall.comments(1L,2L,id,0).items()).hasSize(1);
         wall.review(1L,3L,c,new WallService.ReviewInput(1,"PUBLISHED",""));assertThat(wall.get(1L,1L,id).replies()).isEqualTo(1);
         wall.review(1L,3L,id,new WallService.ReviewInput(2,"HIDDEN","待复核"));
         assertThatThrownBy(()->wall.get(1L,2L,c)).hasMessageContaining("404");

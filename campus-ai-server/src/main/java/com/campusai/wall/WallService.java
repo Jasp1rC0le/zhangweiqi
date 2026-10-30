@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.regex.Pattern;
 
-/** School-scoped, pre-moderated discussion. Never a public knowledge source by default. */
+/** School-scoped discussion with local pre-publication checks and post-publication reports. Never a public knowledge source by default. */
 @Service
 public class WallService {
     public record Input(@NotBlank @Size(max=36) String id,
@@ -39,6 +39,7 @@ public class WallService {
         if(value==null || value.isBlank() || value.length()>max) { bad("内容不能为空或超过长度限制"); }
         String probe=Normalizer.normalize(value,Normalizer.Form.NFKC).replaceAll("[\\p{Z}\\s\\p{Cf}]","");
         if(PRIVATE_DATA.matcher(probe).find()) bad("请移除手机号、邮箱或证件号；不要发布他人的个人信息");
+        com.campusai.community.CommunityTextPolicy.check(value);
         return value.strip();
     }
     private void uuid(String value) { try { if(!UUID.fromString(value).toString().equals(value)) bad("请求编号无效"); } catch(IllegalArgumentException|NullPointerException e) { bad("请求编号无效"); } }
@@ -84,7 +85,7 @@ public class WallService {
             if(((Number)row.get("user_id")).longValue()!=user || row.get("parent_id")!=null || !title.equals(row.get("title")) || !body.equals(row.get("body")) || !input.category().equals(row.get("category"))) throw new ResponseStatusException(HttpStatus.CONFLICT,"提交编号已使用，请刷新后重试");
             return get(school,user,input.id());
         }
-        jdbc.update("INSERT INTO campus_wall_entries(id,school_id,user_id,category,title,body) VALUES(?,?,?,?,?,?)",input.id(),school,user,input.category(),title,body);
+        jdbc.update("INSERT INTO campus_wall_entries(id,school_id,user_id,category,title,body,status) VALUES(?,?,?,?,?,?,'PUBLISHED')",input.id(),school,user,input.category(),title,body);
         return get(school,user,input.id());
     }
     public Page comments(Long school,Long user,String id,int offset) {
@@ -104,7 +105,7 @@ public class WallService {
             if(((Number)old.get("user_id")).longValue()!=user || !parent.equals(old.get("parent_id")) || !body.equals(old.get("body"))) throw new ResponseStatusException(HttpStatus.CONFLICT,"提交编号已使用");
             return get(school,user,input.id());
         }
-        jdbc.update("INSERT INTO campus_wall_entries(id,school_id,user_id,parent_id,category,title,body) VALUES(?,?,?,?,'campus','回复',?)",input.id(),school,user,parent,body);
+        jdbc.update("INSERT INTO campus_wall_entries(id,school_id,user_id,parent_id,category,title,body,status) VALUES(?,?,?,?,'campus','回复',?,'PUBLISHED')",input.id(),school,user,parent,body);
         return get(school,user,input.id());
     }
     @Transactional public void like(Long school,Long user,String id,boolean liked) {
@@ -137,6 +138,11 @@ public class WallService {
         if(!Set.of("PUBLISHED","REJECTED","HIDDEN").contains(input.status())) bad("审核状态无效");
         if(input.note()==null||input.note().length()>300) bad("审核说明过长");
         var row=lock(school,id);
+        if("PUBLISHED".equals(input.status())) {
+            Entry content=moderationContext(school,admin,id);
+            com.campusai.community.CommunityTextPolicy.check(content.title());
+            com.campusai.community.CommunityTextPolicy.check(content.body());
+        }
         if("PUBLISHED".equals(input.status())&&row.get("parent_id")!=null) {
             var p=lock(school,(String)row.get("parent_id"));
             if(!"PUBLISHED".equals(p.get("status"))) throw new ResponseStatusException(HttpStatus.CONFLICT,"主帖未公开，不能公开回复");

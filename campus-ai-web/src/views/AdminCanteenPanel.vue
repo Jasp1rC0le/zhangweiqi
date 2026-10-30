@@ -7,6 +7,8 @@ import { createAdminCatalogScope, createAdminCatalogState, catalogId, sameCatalo
 import { useScopedConfirmation } from '@/utils/useScopedConfirmation'
 import { createCatalogDraftTransition } from '@/utils/catalogDraftTransition'
 import MaterialIntakePanel from '@/components/MaterialIntakePanel.vue'
+import MerchantPublisher from '@/components/MerchantPublisher.vue'
+import { canteenMerchantPhotoUrl } from '@/api/canteen'
 
 const auth = useAdminAuthStore()
 const owner = computed(() => auth.isLoggedIn && auth.user?.schoolId
@@ -15,23 +17,24 @@ const collections = ['canteens', 'merchants', 'reviews']
 const state = reactive(createAdminCatalogState(collections))
 const { canteens, merchants, reviews, loading, error, success, busy, needsReload } = toRefs(state)
 const photoPreviews = reactive({})
+const photoMissing = reactive({}), fastState = reactive({ busy:false, pending:false, revision:0 })
 const canteenId = ref(null)
 const merchantId = ref(null)
 const canteenForm = reactive({ name: '' })
 const merchantForm = reactive({ canteenId: '', name: '', location: '', description: '' })
-const intakeOpen = ref(true), intakeState = reactive({ busy: false, pending: false }), manualEditors = ref()
+const intakeOpen = ref(false), intakeMounted = ref(false), intakeState = reactive({ busy: false, pending: false }), manualEditors = ref()
 const canteenSnapshot = () => JSON.stringify({ id: canteenId.value, ...canteenForm })
 const merchantSnapshot = () => JSON.stringify({ id: merchantId.value, ...merchantForm })
 const savedCanteen = ref(canteenSnapshot()), savedMerchant = ref(merchantSnapshot())
 const canteenDirty = computed(() => canteenSnapshot() !== savedCanteen.value)
 const merchantDirty = computed(() => merchantSnapshot() !== savedMerchant.value)
-const dirty = computed(() => canteenDirty.value || merchantDirty.value || intakeState.pending)
+const dirty = computed(() => canteenDirty.value || merchantDirty.value || intakeState.pending || fastState.pending)
 const canteenNames = computed(() => new Map(canteens.value.map((item) => [item.id, item.name])))
 let canteenGeneration = 0, merchantGeneration = 0, catalog
 const { confirming, confirm } = useScopedConfirmation(() => catalog?.key(), () => Boolean(owner.value))
-const draftKey = () => catalog?.key() ? `${catalog.key()}:${canteenGeneration}:${merchantGeneration}` : null
+const draftKey = () => catalog?.key() ? `${catalog.key()}:${canteenGeneration}:${merchantGeneration}:${fastState.revision}` : null
 const { confirming: draftConfirming, confirm: confirmDraft } = useScopedConfirmation(draftKey, () => Boolean(owner.value))
-const catalogBusy = computed(() => busy.value || confirming.value || draftConfirming.value || intakeState.busy)
+const catalogBusy = computed(() => busy.value || confirming.value || draftConfirming.value || intakeState.busy || fastState.busy)
 const locked = computed(() => loading.value || catalogBusy.value || !owner.value)
 const writeLocked = computed(() => locked.value || needsReload.value)
 const transitions = createCatalogDraftTransition(draftKey, () => locked.value, confirmDraft)
@@ -176,6 +179,7 @@ async function uploadPhoto(item, event) {
       const preview = URL.createObjectURL(file)
       if (photoPreviews[snapshot.id]) URL.revokeObjectURL(photoPreviews[snapshot.id])
       photoPreviews[snapshot.id] = preview
+      delete photoMissing[snapshot.id]
     },
     success: '照片已提交，服务端压缩并移除元数据；本页预览是刚选择的原文件。',
   })
@@ -196,21 +200,13 @@ async function moderate(review, status) {
 <template>
   <section class="canteen-admin" :aria-busy="locked">
     <p v-if="!owner" role="alert">管理员身份已变化，请重新核验后打开管理。</p>
-    <p v-if="success" role="status">{{ success }}</p>
-    <p v-if="dirty" class="panel-message" role="status">有未保存的填写，仅保留在当前页面；切换后台栏目不会丢失。</p>
-    <p v-if="busy" role="status">正在处理。离开页面不会撤销已提交的操作。</p>
-    <button class="catalog-refresh" type="button" :disabled="locked" @click="reload">刷新本校资料</button>
-    <div class="panel-intro">
-      <p>发来店名和所属食堂，程序先整理成草稿；核对后再保存、发布。照片选填，保存后在下方对应商家上传。学生短评仍单独审核，不进入 AI 知识库。</p>
-    </div>
-    <p v-if="loading" class="panel-message">正在加载本校食堂资料…</p>
-    <div v-else-if="error" class="panel-message error" role="alert">
+    <div class="catalog-toolbar"><span role="status">{{loading?'正在刷新商家资料…':busy?'正在处理…':success || (dirty?'有未保存的填写':'')}}</span><button class="catalog-refresh" type="button" :disabled="locked" @click="reload">刷新商家</button></div>
+    <div v-if="error" class="panel-message error" role="alert">
       <span>{{ error }}</span><button type="button" :disabled="locked" @click="reload">重试</button>
     </div>
-    <template v-else>
-      <MaterialIntakePanel v-if="intakeOpen && owner" :scope="owner" :user="auth.user" :seed="{mode:'merchant'}" :active="Boolean(owner)" embedded @state="intakeChanged" @done="finishIntake" />
-      <button v-else type="button" class="catalog-refresh" :disabled="writeLocked" @click="intakeOpen=true">新增商家：发资料自动整理</button>
-      <details ref="manualEditors" class="manual-editors"><summary>手动新增食堂 / 填写商家 / 编辑已选条目</summary>
+    <template v-if="owner">
+      <MerchantPublisher :scope="owner" :canteens="canteens" :disabled="loading || busy || confirming || draftConfirming || intakeState.busy || needsReload" @state="Object.assign(fastState,$event)" @published="reload" />
+      <details ref="manualEditors" class="manual-editors"><summary>食堂设置与详细编辑</summary>
       <div class="editor-grid">
         <form class="editor" @submit.prevent="submitCanteen">
           <h3>{{ canteenId ? '编辑食堂' : '新增食堂' }}</h3>
@@ -237,9 +233,11 @@ async function moderate(review, status) {
       </div>
       </details>
 
+      <details class="merchant-intake-option"  :open="intakeOpen" @toggle="intakeOpen=$event.target.open;if(intakeOpen)intakeMounted=true"><summary>从文档整理商家（可选）</summary><MaterialIntakePanel v-if="intakeMounted && owner" v-show="intakeOpen" :scope="owner" :user="auth.user" :seed="{mode:'merchant'}" :active="Boolean(owner)" embedded @state="intakeChanged" @done="finishIntake" /></details>
+
       <div class="list-section">
-        <h3>食堂 <span>{{ canteens.length }}</span></h3>
-        <p v-if="!canteens.length" class="no-data">还没有食堂。请先填写上面的真实名称。</p>
+        <h3>食堂 <span>{{loading && !canteens.length ? "—" : canteens.length}}</span></h3>
+        <p v-if="!loading && !canteens.length" class="no-data">还没有食堂。请先填写上面的真实名称。</p>
         <article v-for="item in canteens" :key="item.id" class="admin-row">
           <div><strong>{{ item.name }}</strong><small>{{ item.status === 'PUBLISHED' ? '已发布' : item.status === 'DRAFT' ? '草稿' : '已下架' }}</small></div>
           <div class="row-actions"><button type="button" :disabled="locked" @click="editCanteen(item)">编辑</button>
@@ -248,10 +246,10 @@ async function moderate(review, status) {
       </div>
 
       <div class="list-section">
-        <h3>商家 <span>{{ merchants.length }}</span></h3>
-        <p v-if="!merchants.length" class="no-data">还没有商家。商家发布后才会出现在学生页面。</p>
+        <h3>商家 <span>{{loading && !merchants.length ? "—" : merchants.length}}</span></h3>
+        <p v-if="!loading && !merchants.length" class="no-data">还没有商家。商家发布后才会出现在学生页面。</p>
         <article v-for="item in merchants" :key="item.id" class="admin-row">
-          <div><strong>{{ item.name }}</strong><small>{{ canteenNames.get(item.canteenId) || '未知食堂' }} / {{ item.status === 'PUBLISHED' ? '已发布' : item.status === 'DRAFT' ? '草稿' : '已下架' }}</small><img v-if="photoPreviews[item.id]" class="admin-photo-preview" :src="photoPreviews[item.id]" :alt="`${item.name}刚上传的照片预览`" /></div>
+          <div><strong>{{ item.name }}</strong><small>{{ canteenNames.get(item.canteenId) || '未知食堂' }} · {{item.location || '位置未填写'}} / {{ item.status === 'PUBLISHED' ? '已发布' : item.status === 'DRAFT' ? '草稿' : '已下架' }}</small><img v-if="photoPreviews[item.id] || (item.status==='PUBLISHED' && !photoMissing[item.id])" class="admin-photo-preview" :src="photoPreviews[item.id] || canteenMerchantPhotoUrl(item.id)" :alt="`${item.name}照片`" @error="photoMissing[item.id]=true" /></div>
           <div class="row-actions">
             <label class="photo-upload">上传商家照片<input type="file" accept="image/jpeg,image/png" :disabled="writeLocked" @change="uploadPhoto(item, $event)" /></label>
             <label class="operating-label">营业状态
@@ -265,11 +263,11 @@ async function moderate(review, status) {
         </article>
       </div>
       <div class="list-section">
-        <h3>学生短评 <span>{{ reviews.length }}</span></h3>
-        <p v-if="!reviews.length" class="no-data">暂无需要审核的短评。</p>
+        <h3>用户评价 <span>{{loading && !reviews.length ? "—" : reviews.length}}</span></h3>
+        <p v-if="!loading && !reviews.length" class="no-data">还没有用户评价。</p>
         <article v-for="review in reviews" :key="review.id" class="admin-row review-admin-row">
-          <div><strong>{{ review.merchantName }} · {{ review.score }} 分</strong><small>{{ review.comment }} · {{ review.status === 'PENDING' ? '待审核' : review.status === 'PUBLISHED' ? '已公开' : '已隐藏' }}</small></div>
-          <div class="row-actions"><button v-if="review.status !== 'PUBLISHED'" type="button" :disabled="writeLocked" @click="moderate(review, 'PUBLISHED')">通过</button><button v-if="review.status !== 'HIDDEN'" type="button" :disabled="writeLocked" @click="moderate(review, 'HIDDEN')">隐藏</button></div>
+          <div><strong>{{ review.merchantName }} · {{ review.score }} 分</strong><b v-if="review.reportCount" class="merchant-report-count">{{review.reportCount}}条待处理举报</b><small>{{ review.comment }} · {{ review.status === 'PENDING' ? '待审核' : review.status === 'PUBLISHED' ? '已公开' : '已隐藏' }}</small></div>
+          <div class="row-actions"><button v-if="review.status !== 'PUBLISHED'" type="button" :disabled="writeLocked" @click="moderate(review, 'PUBLISHED')">公开</button><button v-if="review.status !== 'HIDDEN'" type="button" :disabled="writeLocked" @click="moderate(review, 'HIDDEN')">隐藏</button></div>
         </article>
       </div>
     </template>
@@ -277,6 +275,7 @@ async function moderate(review, status) {
 </template>
 
 <style scoped>
+.catalog-toolbar{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;height:64px}.catalog-toolbar>span{max-height:60px;overflow:auto;color:#5d6876;font-size:14px;line-height:1.6}.merchant-report-count{color:#a34c1f;font-size:14px;font-weight:500}
 .canteen-admin { display: grid; gap: 28px; color: #252a31; }
 .panel-intro p { max-width: 70ch; margin: 0; color: #6b7480; font-size: 14px; line-height: 1.7; }
 .manual-editors summary { min-height:44px;display:flex;align-items:center;cursor:pointer;color:#31526d;font-size:16px;text-decoration:underline;text-underline-offset:4px;margin-bottom:12px; }
@@ -295,19 +294,21 @@ async function moderate(review, status) {
 .list-section { padding: 23px 25px; background: #fff; border: 1px solid #e2e6eb; border-radius: 16px; }
 .list-section h3 { margin: 0 0 11px; font-size: 17px; }
 .list-section h3 span { color: #84929e; font-size: 12px; }
-.admin-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 14px 0; border-top: 1px solid #edf0f3; }
-.admin-row > div:first-child { display: grid; gap: 5px; min-width: 0; }
+.admin-row { display: flex; flex-wrap:wrap; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 14px 0; border-top: 1px solid #edf0f3; }
+.admin-row > div:first-child { display: grid; flex:1 1 200px; gap: 5px; min-width: 0; }
 .admin-row strong { overflow-wrap: anywhere; font-size: 16px; }
 .admin-row small, .no-data { color: #65727d; font-size: 14px; }
-.row-actions { display: flex; align-items: center; gap: 7px; }
+.row-actions { display: flex; flex:1 1 280px; flex-wrap:wrap; min-width:0; max-width:100%; align-items: center; gap: 8px; }
+.row-actions button,.photo-upload { flex:0 0 auto; white-space:nowrap; }
 .operating-label { display: flex; align-items: center; gap: 7px; color: #5d6872; font-size: 14px; white-space: nowrap; }
 .operating-label select { min-width: 100px; }
 .photo-upload { position:relative; display:inline-flex; align-items:center; min-height:44px; box-sizing:border-box; overflow:hidden; padding:9px 14px; border-radius:14px; background:#ecf2f6; color:#31526d; cursor:pointer; white-space:nowrap; font-size:14px; font-weight:700; }
 .photo-upload input { position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; }
 .photo-upload:focus-within { outline:2px solid #286caa; outline-offset:2px; }
 .review-admin-row small { max-width:70ch; overflow-wrap:anywhere; line-height:1.6; }
-.admin-photo-preview { width:90px; height:68px; border-radius:7px; object-fit:cover; }
+.admin-photo-preview { display:block; width:min(240px,100%); height:140px; border-radius:10px; object-fit:contain; background:#f5f7fb; }
+.merchant-intake-option>summary{min-height:44px;align-content:center;font-size:14px;cursor:pointer;color:#5d6876}
 .panel-message { padding: 26px; background: #fff; border-radius: 14px; color: #65727d; }
 .panel-message.error { display: flex; align-items: center; justify-content: space-between; }
-@media (max-width: 800px) { .editor-grid { grid-template-columns: 1fr; } .admin-row { align-items: flex-start; flex-direction: column; } .row-actions { flex-wrap: wrap; } }
+@media (max-width: 800px) { .editor-grid { grid-template-columns: 1fr; } .admin-row { align-items: flex-start; flex-direction: column; } .admin-row > div:first-child,.row-actions { flex:initial; width:100%; } }
 </style>

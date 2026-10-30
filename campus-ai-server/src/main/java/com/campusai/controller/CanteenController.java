@@ -46,8 +46,8 @@ public class CanteenController {
     public List<CanteenService.PublicMerchant> rate(@RequestAttribute("currentUserId") Long userId,
             @PathVariable Long id, @Valid @RequestBody CanteenService.RatingInput input) {
         User user = currentUser(userId);
-        if (!"STUDENT".equals(user.getRole())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "仅学生账户可以评分");
+        if (List.of("STUDENT", "TEACHER", "COUNSELOR", "SECRETARY", "ADMIN").stream().noneMatch(role -> role.equals(user.getRole()))) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "当前账户不能参与评分");
         }
         throttle.check(userId);
         canteens.rate(user.getSchoolId(), userId, id, input.score(), input.comment());
@@ -60,13 +60,21 @@ public class CanteenController {
         return canteens.reviews(currentUser(userId).getSchoolId(), userId, id);
     }
 
+    @PostMapping("/merchants/{id}/reviews/{reviewId}/report")
+    public void report(@RequestAttribute("currentUserId") Long userId, @PathVariable Long id,
+                       @PathVariable Long reviewId, @Valid @RequestBody ReportInput input) {
+        User user=currentUser(userId);throttle.check(userId);
+        canteens.report(user.getSchoolId(),userId,id,reviewId,input.reason());
+    }
+    public record ReportInput(@jakarta.validation.constraints.NotBlank String reason) {}
+
     @PutMapping("/merchants/{id}/reviews/{reviewId}/like")
     public List<CanteenService.PublicReview> like(@RequestAttribute("currentUserId") Long userId,
             @PathVariable Long id, @PathVariable Long reviewId,
             @Valid @RequestBody CanteenService.LikeInput input) {
         User user = currentUser(userId);
-        if (!"STUDENT".equals(user.getRole())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "仅学生账户可以参与评价");
+        if (List.of("STUDENT", "TEACHER", "COUNSELOR", "SECRETARY", "ADMIN").stream().noneMatch(role -> role.equals(user.getRole()))) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "当前账户不能参与评价");
         }
         throttle.check(userId);
         canteens.like(user.getSchoolId(), userId, id, reviewId, input.liked());

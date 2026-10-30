@@ -95,6 +95,14 @@ public class AdminCanteenController {
         photos.save(school(userId, role), id, file);
     }
 
+    @PostMapping(value = "/merchants/publish", consumes = "multipart/form-data")
+    public List<CanteenService.Merchant> publish(@RequestAttribute("currentUserId") Long userId,
+            @RequestAttribute("currentUserRole") String role,
+            @RequestPart("items") List<CanteenPhotoService.PublishInput> items,
+            @RequestPart("files") List<MultipartFile> files) {
+        return photos.publish(school(userId, role), items, files);
+    }
+
     @GetMapping("/reviews")
     public List<CanteenService.AdminReview> reviews(@RequestAttribute("currentUserId") Long userId,
             @RequestAttribute("currentUserRole") String role) {

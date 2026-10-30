@@ -41,7 +41,9 @@ public class CanteenService {
                                boolean mine, String status, long likes, boolean liked) {}
     public record LikeInput(@NotNull Boolean liked) {}
     public record AdminReview(Long id, Long merchantId, String merchantName, int score,
-                              String comment, String status, LocalDateTime updatedAt) {}
+                              String comment, String status, LocalDateTime updatedAt, long reportCount) {
+        public AdminReview(Long id, Long merchantId, String merchantName, int score, String comment, String status, LocalDateTime updatedAt) { this(id,merchantId,merchantName,score,comment,status,updatedAt,0); }
+    }
     public record CanteenInput(@NotBlank @Size(max = 120) String name) {}
     public record MerchantInput(@NotNull @Positive Long canteenId,
                                 @NotBlank @Size(max = 120) String name,
@@ -143,11 +145,11 @@ public class CanteenService {
                         (rs, n) -> Map.entry(rs.getLong("id"), rs.getString("comment_text")), merchantId, schoolId, userId);
                 for (var old : previous) if (!old.getValue().equals(normalized)) {
                     jdbc.update("DELETE FROM campus_review_likes WHERE review_id=?", old.getKey());
-                    jdbc.update("UPDATE campus_merchant_reviews SET comment_text=?, status='PENDING' WHERE id=?",
+                    jdbc.update("UPDATE campus_merchant_reviews SET comment_text=?, status='PUBLISHED' WHERE id=?",
                             normalized, old.getKey());
                 }
                 if (previous.isEmpty()) jdbc.update("INSERT INTO campus_merchant_reviews "
-                        + "(merchant_id, school_id, user_id, comment_text) VALUES (?, ?, ?, ?)",
+                        + "(merchant_id, school_id, user_id, comment_text, status) VALUES (?, ?, ?, ?, 'PUBLISHED')",
                         merchantId, schoolId, userId, normalized);
             }
         }
@@ -164,7 +166,7 @@ public class CanteenService {
                 + "AND rating.user_id = review.user_id "
                 + "WHERE review.school_id = ? AND review.merchant_id = ? "
                 + "AND (review.status = 'PUBLISHED' OR review.user_id = ?) "
-                + "ORDER BY mine DESC, likes DESC, review.id DESC LIMIT 20",
+                + "ORDER BY mine DESC, review.updated_at DESC, likes DESC, review.id DESC LIMIT 20",
                 (rs, rowNum) -> new PublicReview(rs.getLong("id"), rs.getInt("score"),
                         rs.getString("comment_text"), rs.getTimestamp("updated_at").toLocalDateTime(),
                         rs.getBoolean("mine"), rs.getString("status"), rs.getLong("likes"), rs.getBoolean("liked")),
@@ -184,6 +186,21 @@ public class CanteenService {
         else jdbc.update("DELETE FROM campus_review_likes WHERE review_id=? AND user_id=?", reviewId, userId);
     }
 
+    @Transactional
+    public void report(Long schoolId, Long userId, Long merchantId, Long reviewId, String reason) {
+        if (!List.of("隐私泄露", "辱骂攻击", "广告诈骗", "内容不实", "其他问题").contains(reason))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"请选择举报原因");
+        requirePublishedMerchant(schoolId,merchantId);
+        var owners=jdbc.query("SELECT user_id FROM campus_merchant_reviews WHERE id=? AND merchant_id=? AND school_id=? AND status='PUBLISHED' FOR UPDATE",
+                (rs,n)->rs.getLong(1),reviewId,merchantId,schoolId);
+        if(owners.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND,"评价不存在或未公开");
+        if(owners.get(0).equals(userId)) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"自己的评价可以直接修改或清空");
+        String subject="商家评价举报#"+reviewId;
+        Integer existing=jdbc.queryForObject("SELECT COUNT(*) FROM contact_messages WHERE school_id=? AND user_id=? AND subject=? AND status='NEW'",Integer.class,schoolId,userId,subject);
+        if(existing==null || existing==0) jdbc.update("INSERT INTO contact_messages(user_id,school_id,name,contact,subject,message) VALUES(?,?,'评价举报','',?,?)",
+                userId,schoolId,subject,"商家#"+merchantId+" · 评价#"+reviewId+"\n举报原因："+reason+"\n可在食堂与商家的用户评价中处理，不自动下架。");
+    }
+
     static String normalizeComment(String comment) {
         if (comment == null) return null;
         String text = comment.replaceAll("[\\p{Cf}]", "").replaceAll("\\s+", " ").trim();
@@ -193,22 +210,24 @@ public class CanteenService {
                 .matcher(Normalizer.normalize(text, Normalizer.Form.NFKC)).find()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "请移除手机号、邮箱或身份证号后再提交短评");
         }
+        com.campusai.community.CommunityTextPolicy.check(text);
         return text;
     }
 
     public List<AdminReview> adminReviews(Long schoolId) {
         return jdbc.query("SELECT review.id, review.merchant_id, merchant.name AS merchant_name, "
-                + "rating.score, review.comment_text, review.status, review.updated_at "
+                + "rating.score, review.comment_text, review.status, review.updated_at, "
+                + "(SELECT COUNT(*) FROM contact_messages report WHERE report.school_id=review.school_id AND report.subject=CONCAT('商家评价举报#',review.id) AND report.status='NEW') AS report_count "
                 + "FROM campus_merchant_reviews review "
                 + "JOIN campus_canteen_merchants merchant ON merchant.id = review.merchant_id "
                 + "AND merchant.school_id = review.school_id "
                 + "JOIN campus_merchant_ratings rating ON rating.merchant_id = review.merchant_id "
                 + "AND rating.user_id = review.user_id "
                 + "WHERE review.school_id = ? ORDER BY "
-                + "CASE WHEN review.status = 'PENDING' THEN 0 ELSE 1 END, review.updated_at DESC LIMIT 100",
+                + "CASE WHEN EXISTS(SELECT 1 FROM contact_messages report WHERE report.school_id=review.school_id AND report.subject=CONCAT('商家评价举报#',review.id) AND report.status='NEW') THEN 0 WHEN review.status = 'PENDING' THEN 1 ELSE 2 END, review.updated_at DESC LIMIT 100",
                 (rs, rowNum) -> new AdminReview(rs.getLong("id"), rs.getLong("merchant_id"),
                         rs.getString("merchant_name"), rs.getInt("score"), rs.getString("comment_text"),
-                        rs.getString("status"), rs.getTimestamp("updated_at").toLocalDateTime()), schoolId);
+                        rs.getString("status"), rs.getTimestamp("updated_at").toLocalDateTime(), rs.getLong("report_count")), schoolId);
     }
 
     @Transactional
@@ -219,7 +238,10 @@ public class CanteenService {
         if (!current.get(0).equals(expectedComment)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "短评内容已变更，请刷新并重新审核");
         }
+        if ("PUBLISHED".equals(status)) com.campusai.community.CommunityTextPolicy.check(current.get(0));
         reviewStatus(schoolId, reviewId, status);
+        jdbc.update("UPDATE contact_messages SET status='HANDLED' WHERE school_id=? AND subject=? AND status='NEW'",
+                schoolId,"商家评价举报#"+reviewId);
     }
 
     void reviewStatus(Long schoolId, Long reviewId, String status) {

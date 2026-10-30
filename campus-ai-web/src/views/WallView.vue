@@ -62,13 +62,13 @@ async function publish(){
   const payload=wallPostPayload(form)
   if(payload.body.trim().length<2||payload.body.length>5000){error.value='写两句再发布吧，最多5000字';return}
   busy.value=true;error.value='';status.value=''
-  try{const entry=await api.postWall(payload);if(disposed)return;Object.assign(form,{id:crypto.randomUUID(),category:category.value||'campus',title:'',body:''});composing.value=false;recovery.save();recoveryNotice.value='';status.value='已提交，审核后同校可见';internalNavigation=true;await router.push({path:'/wall',query:{post:entry.id}})}catch(e){if(!disposed)fail(e)}finally{busy.value=false;internalNavigation=false}
+  try{const entry=await api.postWall(payload);if(disposed)return;Object.assign(form,{id:crypto.randomUUID(),category:category.value||'campus',title:'',body:''});composing.value=false;recovery.save();recoveryNotice.value='';status.value=entry.status==='PUBLISHED'?'已发布，同校可见':'内容已保存，当前未公开';internalNavigation=true;await router.push({path:'/wall',query:{post:entry.id}})}catch(e){if(!disposed)fail(e)}finally{busy.value=false;internalNavigation=false}
 }
 async function respond(){
   if(busy.value||loading.value||!detail.value||detail.value.status!=='PUBLISHED'||replyPostId.value!==detail.value.id)return
   if(!reply.value.trim()){error.value='请先填写具体回复，不能只填空格';return}
   busy.value=true;error.value='';status.value=''
-  try{const entry=await api.postComment(detail.value.id,{id:replyId.value,body:reply.value});if(disposed)return;comments.value.push(entry);reply.value='';replyId.value=crypto.randomUUID();recovery.save();recoveryNotice.value='';status.value='回复已提交审核，暂时仅自己可见'}catch(e){if(!disposed)fail(e)}finally{busy.value=false}
+  try{const entry=await api.postComment(detail.value.id,{id:replyId.value,body:reply.value});if(disposed)return;comments.value.push(entry);reply.value='';replyId.value=crypto.randomUUID();recovery.save();recoveryNotice.value='';status.value=entry.status==='PUBLISHED'?'回复已发布':'回复已保存，当前未公开'}catch(e){if(!disposed)fail(e)}finally{busy.value=false}
 }
 async function restoreDraft(){
   if(busy.value)return
@@ -103,13 +103,13 @@ onBeforeUnmount(()=>{disposed=true;sequence++;window.removeEventListener('before
 
 <template>
   <div class="work-page wall-page">
-    <header class="work-heading"><h1>校园墙</h1><div class="wall-heading-actions"><button class="work-button primary wall-create" type="button" :disabled="busy" :aria-expanded="composing" @click="startComposing"><NavigationIcon name="wall" />发布动态</button><details class="wall-settings"><summary aria-label="社区设置" title="社区设置"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg></summary><div class="wall-settings-menu"><p>同校可见，审核后发布。友善交流，不曝光他人隐私，不发广告、危险指导或未获授权的试题。管理员可处理举报，不保证无法追溯；内容不自动进入 AI 知识库。</p><FormDraftRecovery v-if="!pendingDraft" :state="recoveryState" :pending="false" :busy="busy" enabled-allowed scope="校园墙" :notice="recoveryNotice" @toggle="recovery.toggle" @restore="restoreDraft" @discard="recovery.discard" /></div></details></div></header>
+    <header class="work-heading"><h1>校园墙</h1><div class="wall-heading-actions"><button class="work-button primary wall-create" type="button" :disabled="busy" :aria-expanded="composing" @click="startComposing"><NavigationIcon name="wall" />发布动态</button><details class="wall-settings"><summary aria-label="社区设置" title="社区设置"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg></summary><div class="wall-settings-menu"><p>同校可见，自动检查后直接发布。友善交流，不曝光他人隐私，不发广告、危险指导或未获授权的试题。管理员可处理举报，不保证无法追溯；内容不自动进入 AI 知识库。</p><FormDraftRecovery v-if="!pendingDraft" :state="recoveryState" :pending="false" :busy="busy" enabled-allowed scope="校园墙" :notice="recoveryNotice" @toggle="recovery.toggle" @restore="restoreDraft" @discard="recovery.discard" /></div></details></div></header>
     <FormDraftRecovery v-if="pendingDraft" :state="recoveryState" pending :busy="busy" enabled-allowed scope="校园墙" :notice="recoveryNotice" @toggle="recovery.toggle" @restore="restoreDraft" @discard="recovery.discard" />
     <div v-if="error" class="work-error" role="alert">{{ error }} <button class="work-button" :disabled="loading || busy" @click="route.query.post ? open(String(route.query.post)) : load()">重试</button></div>
     <p v-if="status" class="work-status" role="status">{{ status }}</p>
     <Transition name="wall-compose"><form v-if="composing&&!route.query.post" class="wall-composer" :aria-busy="busy" @submit.prevent="publish" @input="status=''">
       <textarea ref="composerInput" v-model="composerText" :disabled="busy" required minlength="2" maxlength="5000" rows="4" aria-label="动态内容" placeholder="分享新鲜事，或者找个搭子……"></textarea>
-      <div class="wall-compose-top"><strong>写点新鲜事</strong><button type="button" class="work-button" :disabled="busy" @click="closeComposing">收起</button></div><div class="wall-publish"><small>{{form.category==='campus'?'审核后同校可见':categoryName(form.category)+' · 审核后同校可见'}}</small><span v-if="composerText.length>4500">{{composerText.length}} / 5000</span><button class="work-button primary" :disabled="busy||composerText.trim().length<2">{{busy?'发布中…':'发布'}}</button></div>
+      <div class="wall-compose-top"><strong>写点新鲜事</strong><button type="button" class="work-button" :disabled="busy" @click="closeComposing">收起</button></div><div class="wall-publish"><small>{{form.category==='campus'?'发布后同校可见':categoryName(form.category)+' · 发布后同校可见'}}</small><span v-if="composerText.length>4500">{{composerText.length}} / 5000</span><button class="work-button primary" :disabled="busy||composerText.trim().length<2">{{busy?'发布中…':'发布'}}</button></div>
     </form></Transition>
     <template v-if="route.query.post">
       <button class="work-button wall-back" :disabled="busy" @click="router.push('/wall')">返回全部主题</button>
@@ -124,7 +124,7 @@ onBeforeUnmount(()=>{disposed=true;sequence++;window.removeEventListener('before
         <p v-if="!comments.length" class="work-help">还没人回复，来接个话吧。</p>
         <div class="wall-comments"><article v-for="comment in comments" :key="comment.id" class="wall-comment"><div class="wall-meta"><span>{{comment.mine?'我的回复':'同校同学'}}</span><time>{{stamp(comment.createdAt)}}</time></div><p class="wall-body">{{comment.body}}</p><p v-if="comment.status!=='PUBLISHED'" class="work-help">{{stateName(comment.status)}} {{comment.reviewNote}}</p><div class="wall-controls"><button v-if="comment.mine" :disabled="busy" @click="remove(comment)">撤回回复</button><template v-else><button :disabled="busy" :aria-pressed="comment.liked" @click="toggleLike(comment)">{{comment.liked?'已赞同':'赞同'}} {{comment.likes}}</button><button :disabled="busy" @click="reporting=comment.id">举报</button></template></div></article></div>
         <button v-if="commentMore" class="work-button" :disabled="busy" @click="moreComments">加载更多回复</button>
-        <form v-if="detail.status==='PUBLISHED'" class="work-form wall-reply" :aria-busy="busy" @submit.prevent="respond" @input="status=''"><label>回复这个主题<textarea v-model="reply" :disabled="busy" required maxlength="2000" rows="3" placeholder="分享思路和依据，不公开个人信息"></textarea></label><div><button class="work-button primary" :disabled="busy">提交回复审核</button></div></form>
+        <form v-if="detail.status==='PUBLISHED'" class="work-form wall-reply" :aria-busy="busy" @submit.prevent="respond" @input="status=''"><label>回复这个主题<textarea v-model="reply" :disabled="busy" required maxlength="2000" rows="3" placeholder="分享思路和依据，不公开个人信息"></textarea></label><div><button class="work-button primary" :disabled="busy">发布回复</button></div></form>
       </article>
     </template>
     <template v-else>

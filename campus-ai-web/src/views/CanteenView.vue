@@ -8,6 +8,7 @@ import {
   getCanteenMerchantReviews,
   rateCanteenMerchant,
   likeCanteenReview,
+  reportCanteenReview,
 } from '@/api/canteen'
 import { useAuthStore } from '@/stores/auth'
 import CanteenFoodArt from '@/components/CanteenFoodArt.vue'
@@ -27,6 +28,7 @@ const loading = ref(true)
 const loadError = ref('')
 const savingId = ref(null)
 const likingId = ref(null)
+const reportingReview = ref(null), reportReason = ref('内容不实'), reportingBusy = ref(false)
 const expandedId = ref(null)
 const reviews = reactive({})
 const reviewErrors = reactive({})
@@ -34,7 +36,7 @@ const reviewLoading = reactive({})
 const comments = reactive({})
 const savedScores = reactive({}), savedComments = reactive({})
 const actionErrors = reactive({}), actionStatus = reactive({})
-const writeBusy = computed(() => savingId.value !== null || likingId.value !== null)
+const writeBusy = computed(() => savingId.value !== null || likingId.value !== null || reportingBusy.value)
 const pendingDraftIds = computed(() => pendingCanteenDraftIds(ratingDrafts, comments, savedScores, savedComments))
 useUnsavedChanges(() => pendingDraftIds.value.length > 0, () => writeBusy.value)
 const scope = computed(() => auth.user ? `${auth.user.id}:${auth.user.schoolId}:${auth.user.role}:${userSessionGeneration.value}` : '')
@@ -42,7 +44,7 @@ let disposed = false, lifetime = new AbortController()
 const reviewRequests = new Map()
 const searchQuery = ref('')
 const sortBy = ref('default')
-const canRate = computed(() => auth.user?.role === 'STUDENT')
+const canRate = computed(() => ['STUDENT','TEACHER','COUNSELOR','SECRETARY','ADMIN'].includes(auth.user?.role))
 const visibleMerchants = computed(() =>
   selectMerchants(merchants.value, {
     canteen: selectedCanteen.value,
@@ -50,6 +52,10 @@ const visibleMerchants = computed(() =>
     sort: sortBy.value,
   }),
 )
+function reviewTime(value) {
+  const date=new Date(/(Z|[+-]\d{2}:?\d{2})$/.test(value)?value:value+'+08:00')
+  return Number.isFinite(date.getTime())?new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}).format(date):'时间未知'
+}
 const scoreLabel = ['选一个星级', '不太满意', '有待改进', '还不错', '值得再来', '特别推荐']
 
 function resetFilters() {
@@ -103,6 +109,10 @@ function toggleReviews(merchant) {
   expandedId.value = merchant.id
   readReviews(merchant)
 }
+function writeReview(merchant) {
+  expandedId.value = merchant.id
+  readReviews(merchant)
+}
 
 async function submitRating(merchant, includeComment = false) {
   if (!canRate.value || !ratingDrafts[merchant.id] || writeBusy.value || loading.value || disposed) return
@@ -118,8 +128,12 @@ async function submitRating(merchant, includeComment = false) {
     if (!current()) return
     applyMerchants(rows)
     if (includeComment) { comments[merchant.id] = comment; savedComments[merchant.id] = comment }
-    actionStatus[merchant.id] = includeComment ? comment ? '已保存，短评审核后公开' : '评分已保存，短评已清空' : '评分已保存'
-    if (expandedId.value === merchant.id) await reviewRequest(merchant.id).run()
+    actionStatus[merchant.id] = includeComment ? comment ? '评价已保存' : '评分已保存，短评已清空' : '评分已保存'
+    if (expandedId.value === merchant.id) {
+      await reviewRequest(merchant.id).run()
+      const mine=reviews[merchant.id]?.find(item=>item.mine)
+      if (current() && includeComment && comment && mine && !reviewErrors[merchant.id]) actionStatus[merchant.id]=mine.status==='PUBLISHED'?'评价已发布':'评价已保存，当前未公开'
+    }
   } catch (error) {
     if (current()) actionErrors[merchant.id] = error.response?.data?.message || '未能确认保存成功，评分与短评仍保留在本页，请重试'
   } finally {
@@ -153,6 +167,17 @@ async function likeReview(merchant, review) {
   }
 }
 
+async function reportReview(merchant, review) {
+  if (writeBusy.value || disposed || !scope.value) return
+  const owner=scope.value; reportingBusy.value=true; actionErrors[merchant.id]=''
+  try {
+    await reportCanteenReview(merchant.id,review.id,reportReason.value,{signal:lifetime.signal})
+    if (disposed || owner!==scope.value) return
+    reportingReview.value=null;actionStatus[merchant.id]='举报已提交，管理员可核实并下架'
+  } catch(e) { if (!disposed && owner===scope.value) actionErrors[merchant.id]=e.response?.data?.message || '举报未确认成功，请稍后核对' }
+  finally { if (!disposed && owner===scope.value) reportingBusy.value=false }
+}
+
 watch(scope, (next, previous) => {
   if (!previous) return
   lifetime.abort(); lifetime = new AbortController(); listRequest.cancel()
@@ -163,6 +188,7 @@ watch(scope, (next, previous) => {
   }
   merchants.value = []; canteens.value = []; expandedId.value = null
   savingId.value = null; likingId.value = null
+  reportingReview.value=null;reportingBusy.value=false
   if (next) load()
 }, { flush: 'sync' })
 onBeforeUnmount(() => {
@@ -204,10 +230,10 @@ onMounted(async () => {
         <button @click="load">重新加载</button>
       </div>
       <template v-else>
-        <p v-if="pendingDraftIds.length" class="table-draft-notice" role="status">
-          {{ pendingDraftIds.length }} 家商家有未保存的填写，切换筛选不会丢失；关闭页面前请先保存。
-          <button v-if="searchQuery || selectedCanteen !== 'all'" class="table-text-button" @click="resetFilters">显示全部商家</button>
-        </p>
+        <div class="table-draft-notice" role="status">
+          <span v-if="pendingDraftIds.length">{{ pendingDraftIds.length }} 家评价尚未发布</span>
+          <button v-if="pendingDraftIds.length && (searchQuery || selectedCanteen !== 'all')" type="button" class="table-text-button" @click="resetFilters">显示全部商家</button>
+        </div>
         <div v-if="merchants.length" class="table-tools">
           <label class="table-search"
             ><el-icon><Search /></el-icon
@@ -245,7 +271,7 @@ onMounted(async () => {
           <h2>
             店铺 <span>{{ visibleMerchants.length }} 家</span>
           </h2>
-          <span>同学评分</span>
+          <span>校园评价</span>
         </div>
         <section v-if="!visibleMerchants.length" class="table-empty">
           <el-icon><Food /></el-icon>
@@ -258,15 +284,15 @@ onMounted(async () => {
             查看全部商家
           </button>
         </section>
-        <section v-else class="table-list" aria-label="商家口碑列表">
+        <section v-else class="table-list merchant-catalog" aria-label="商家口碑列表">
           <article
             v-for="merchant in visibleMerchants"
             :key="merchant.id"
             class="table-card"
             :aria-label="merchant.name"
           >
-            <div class="table-shop-top">
-              <div class="table-photo">
+            <div class="merchant-overview">
+              <a class="merchant-media" :href="merchant.hasPhoto ? canteenMerchantPhotoUrl(merchant.id) : undefined" :target="merchant.hasPhoto ? '_blank' : undefined" rel="noopener" :aria-label="merchant.hasPhoto ? `查看${merchant.name}完整照片` : `${merchant.name}暂无照片`">
                 <CanteenFoodArt v-if="demo && merchant.demoArt" :kind="merchant.demoArt" />
                 <img
                   v-else-if="merchant.hasPhoto"
@@ -277,8 +303,8 @@ onMounted(async () => {
                 <span v-else class="table-no-photo" aria-label="暂无店铺照片"
                   ><el-icon><Food /></el-icon></span
                 >
-              </div>
-              <div class="table-shop-info">
+              </a>
+              <div class="merchant-details">
                 <p class="table-location">
                   {{ merchant.canteenName }} · {{ merchant.location || '位置待补充' }}
                 </p>
@@ -288,14 +314,14 @@ onMounted(async () => {
                   >暂停营业</span
                 >
               </div>
-              <div class="table-score">
+              <div class="merchant-score">
                 <strong>{{
                   merchant.ratingCount ? Number(merchant.averageScore).toFixed(1) : '—'
                 }}</strong
                 ><span>{{
                   merchant.ratingCount ? merchant.ratingCount + ' 人评分' : '等你首评'
                 }}</span
-                ><small>满分 5 分</small>
+                >
               </div>
             </div>
             <div v-if="merchant.featuredReview" class="table-featured">
@@ -314,27 +340,10 @@ onMounted(async () => {
                 <el-icon><Pointer /></el-icon><span>{{ merchant.featuredReview.likes }}</span>
               </button>
             </div>
-            <div v-else class="table-first-review">还缺一句有意思的真实体验</div>
+            <div v-else class="table-first-review">还没有公开评价</div>
             <div class="table-card-actions">
-              <div
-                v-if="canRate"
-                class="table-stars"
-                role="group"
-                :aria-label="'给' + merchant.name + '评分'"
-              >
-                <span>{{ merchant.myScore ? '我的评分' : '我来打分' }}</span
-                ><button
-                  v-for="score in 5"
-                  :key="score"
-                  :class="{ filled: score <= ratingDrafts[merchant.id] }"
-                  :aria-label="score + '分'"
-                  :aria-pressed="ratingDrafts[merchant.id] === score"
-                  :disabled="writeBusy"
-                  @click="ratingDrafts[merchant.id] = score; actionStatus[merchant.id] = ''; actionErrors[merchant.id] = ''"
-                >
-                  <el-icon><StarFilled /></el-icon>
-                </button>
-              </div>
+              <button class="merchant-write-review" type="button" @click="writeReview(merchant)">写评价</button>
+
               <button
                 class="table-review-toggle"
                 :aria-expanded="expandedId === merchant.id"
@@ -344,20 +353,7 @@ onMounted(async () => {
                 {{ expandedId === merchant.id ? '收起短评' : '短评 ' + (merchant.reviewCount || 0)
                 }}<el-icon><ArrowRight /></el-icon>
               </button>
-              <button
-                v-if="
-                  canRate &&
-                  ratingDrafts[merchant.id] &&
-                  ratingDrafts[merchant.id] !== merchant.myScore
-                "
-                class="table-save-score"
-                :disabled="writeBusy"
-                @click="submitRating(merchant)"
-              >
-                {{
-                  savingId === merchant.id ? '保存中…' : '保存 ' + ratingDrafts[merchant.id] + ' 分'
-                }}
-              </button>
+
             </div>
             <p v-if="actionErrors[merchant.id]" class="table-action-feedback is-error" role="alert">{{ actionErrors[merchant.id] }}</p>
             <p v-else-if="actionStatus[merchant.id]" class="table-action-feedback" role="status">{{ actionStatus[merchant.id] }}</p>
@@ -374,36 +370,31 @@ onMounted(async () => {
                   <button class="table-text-button" @click="readReviews(merchant)">重试</button>
                 </div>
                 <template v-else>
-                  <div v-for="review in reviews[merchant.id]" :key="review.id" class="table-review">
-                    <div>
-                      <strong
-                        >{{ review.mine ? '我' : '一位同学'
-                        }}<span>{{ review.score }} 分</span></strong
-                      >
-                      <p>{{ review.comment }}</p>
-                      <small v-if="review.status !== 'PUBLISHED'">{{
-                        review.status === 'PENDING' ? '待审核，仅你可见' : '未公开，仅你可见'
-                      }}</small>
-                    </div>
-                    <button
-                      v-if="review.status === 'PUBLISHED' && !review.mine && canRate"
-                      :disabled="writeBusy"
-                      :aria-pressed="review.liked"
-                      :aria-label="(review.liked ? '取消点赞' : '点赞') + '短评：' + review.comment"
-                      @click="likeReview(merchant, review)"
-                    >
-                      <el-icon><Pointer /></el-icon>{{ review.likes }}
-                    </button>
-                  </div>
-                  <p v-if="!reviews[merchant.id]?.length">暂时没有公开短评，你可以写下第一条</p>
-                  <small v-else class="table-review-limit"
-                    >最多展示 20 条 · 我的短评优先，其余按点赞排序</small
-                  >
                   <form
                     v-if="canRate"
                     class="table-comment-form"
                     @submit.prevent="submitRating(merchant, true)"
                   >
+              <div
+                v-if="canRate"
+                class="table-stars"
+                role="group"
+                :aria-label="'给' + merchant.name + '评分'"
+              >
+                <span>{{ merchant.myScore ? '我的评分' : '我来打分' }}</span
+                ><button
+                  v-for="score in 5"
+                  type="button"
+                  :key="score"
+                  :class="{ filled: score <= ratingDrafts[merchant.id] }"
+                  :aria-label="score + '分'"
+                  :aria-pressed="ratingDrafts[merchant.id] === score"
+                  :disabled="writeBusy"
+                  @click="ratingDrafts[merchant.id] = score; actionStatus[merchant.id] = ''; actionErrors[merchant.id] = ''"
+                >
+                  <el-icon><StarFilled /></el-icon>
+                </button>
+              </div>
                     <label :for="'comment-' + merchant.id"
                       >写一句你的真实体验 <span>选填</span></label
                     ><textarea
@@ -417,16 +408,45 @@ onMounted(async () => {
                     />
                     <div class="table-comment-meta">
                       <span
-                        >不写姓名、电话等隐私；修改后重新审核，旧点赞清零<br />清空并保存会删除自己的短评</span
+                        >自动检查后公开。修改文字会清空旧点赞。</span
                       ><span>{{ (comments[merchant.id] || '').length }}/500</span>
                     </div>
                     <div class="table-comment-footer">
                       <span>{{ scoreLabel[ratingDrafts[merchant.id] || 0] }}</span
-                      ><button :disabled="!ratingDrafts[merchant.id] || writeBusy">
-                        {{ savingId === merchant.id ? '保存中…' : '保存评分与短评' }}
+                      ><button type="submit" :disabled="!ratingDrafts[merchant.id] || writeBusy">
+                        {{ savingId === merchant.id ? '发布中…' : '发布评价' }}
                       </button>
                     </div>
                   </form>
+                  <div v-for="review in reviews[merchant.id]" :key="review.id" class="table-review">
+                    <div>
+                      <strong
+                        >{{ review.mine ? '我' : '一位校园用户'
+                        }}<span>{{ review.score }} 分</span></strong
+                      >
+                      <p>{{ review.comment }}</p><time v-if="review.updatedAt" class="merchant-review-time">{{reviewTime(review.updatedAt)}}</time>
+                      <small v-if="review.status !== 'PUBLISHED'">{{
+                        review.status === 'PENDING' ? '待审核，仅你可见' : '未公开，仅你可见'
+                      }}</small>
+                    </div>
+                    <div v-if="!review.mine" class="merchant-review-actions"><button type="button" :disabled="writeBusy" @click="reportingReview=review.id">举报</button>
+                    <button
+                      v-if="review.status === 'PUBLISHED' && !review.mine && canRate"
+                      :disabled="writeBusy"
+                      :aria-pressed="review.liked"
+                      :aria-label="(review.liked ? '取消点赞' : '点赞') + '短评：' + review.comment"
+                      @click="likeReview(merchant, review)"
+                    >
+                      <el-icon><Pointer /></el-icon>{{ review.likes }}
+                    </button></div>
+                    <form v-if="reportingReview===review.id" class="merchant-report-form" @submit.prevent="reportReview(merchant,review)"><label>举报原因<select v-model="reportReason" :disabled="writeBusy"><option v-for="reason in ['隐私泄露','辱骂攻击','广告诈骗','内容不实','其他问题']" :key="reason">{{reason}}</option></select></label><button type="submit" :disabled="writeBusy">提交举报</button><button type="button" :disabled="writeBusy" @click="reportingReview=null">取消</button></form>
+                  </div>
+                  <p v-if="!reviews[merchant.id]?.length">暂时没有公开短评，你可以写下第一条</p>
+                  <small v-else class="table-review-limit"
+                    >最近20条 · 我的评价优先</small
+                  >
+                  <p v-if="!canRate" class="review-account-note">当前账号仅可查看评价。</p>
+
                 </template>
               </section>
             </Transition>
@@ -435,11 +455,11 @@ onMounted(async () => {
         <details class="table-rules">
           <summary>评分规则</summary>
           <p>
-            每个学生账号对一家商家只计一条评分，可以修改。综合推荐使用 5 票、3.5
-            分的先验平滑，降低少量评分冲榜的影响；展示分数仍是真实评分均值。神评仅从审核通过的短评中按点赞数选出，同赞时展示较新的一条，无赞时显示“同学说”。点赞不影响商家星级。
+            每个本校账号对一家商家只计一条评分，可以修改。综合推荐使用 5 票、3.5
+            分的先验平滑，降低少量评分冲榜的影响；展示分数仍是真实评分均值。神评仅从公开的短评中按点赞数选出，同赞时展示较新的一条，无赞时显示“同学说”。点赞不影响商家星级。
           </p>
           <p>
-            短评不公开账号和姓名；管理员可审核、隐藏不当内容。发现隐私泄露或不当内容，请通过站内提交意见提供商家及短评内容。手机号等明显敏感信息会被拦截，但规则无法识别所有隐私，发布前请自行核对。
+            短评不公开账号和姓名；自动检查通过直接公开，管理员可根据举报下架。点击评价旁的“举报”可提交问题。手机号等明显敏感信息会被拦截，但规则无法识别所有隐私，发布前请自行核对。
           </p>
         </details>
       </template>
@@ -448,6 +468,20 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.table-draft-notice{display:flex;align-items:center;gap:12px;height:44px;box-sizing:border-box;overflow:auto;color:#5d6876;font-size:14px;line-height:1.5}
+.merchant-review-time{display:block;margin-top:8px;color:#5d6876;font-size:12px}.table-review{flex-wrap:wrap}.table-review .merchant-review-actions{display:flex;gap:12px;flex:0 0 auto}.merchant-review-actions button,.merchant-report-form button{min-height:44px;padding:8px 12px;border:0;background:#f2f5fa;color:#5d6876;border-radius:10px;font:inherit;cursor:pointer}.merchant-report-form{flex-basis:100%;display:flex;gap:12px;align-items:end;flex-wrap:wrap}.merchant-report-form label{display:grid;gap:6px}.merchant-report-form select{font:inherit;font-size:16px;min-height:44px;max-width:100%;padding:8px;border:1px solid #d6dde5;border-radius:10px}
+@media(min-width:1100px){.merchant-catalog{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}.merchant-catalog .merchant-overview{grid-template-columns:minmax(0,1fr) auto;gap:16px}.merchant-catalog .merchant-media{grid-column:1/-1}.merchant-catalog .merchant-media img{height:180px}}
+.merchant-overview{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:20px 16px}
+.merchant-media{grid-column:1/-1;display:block;min-width:0;overflow:hidden;border-radius:12px;background:#f6f3ef;text-decoration:none}
+.merchant-media img{display:block;width:100%;height:190px;object-fit:contain}
+.merchant-media :deep(svg){display:block;width:100%;height:220px}
+.merchant-details{min-width:0}.merchant-details h3{margin:6px 0 0;font-size:24px;line-height:1.35;letter-spacing:-.025em;overflow-wrap:anywhere}
+.merchant-details .table-location{font-size:14px;line-height:1.6;margin:0;color:#6f5948}.merchant-details .table-description{font-size:14px;line-height:1.6;margin:8px 0 0;color:#5d6876;overflow-wrap:anywhere}
+.merchant-score{display:grid;gap:6px;justify-items:end;min-width:68px;padding-top:4px;font-variant-numeric:tabular-nums}.merchant-score strong{font-size:32px;line-height:1.15;color:#a34c1f;font-weight:600}.merchant-score span{font-size:12px;color:#6f5948;white-space:nowrap}
+.table-card-actions .merchant-write-review{min-height:44px;padding:10px 18px;border:0;border-radius:12px;background:#a34c1f;color:#fff;font:inherit;font-size:15px;cursor:pointer}
+.merchant-media:focus-visible,.merchant-write-review:focus-visible{outline:2px solid #a34c1f;outline-offset:3px}
+.table-card .table-stars{width:100%;margin:0 0 16px;flex-wrap:wrap}.table-card .table-stars button{width:44px;height:44px}.review-account-note{font-size:14px;line-height:1.6;color:#5d6876}
+@media(min-width:900px){.merchant-overview{grid-template-columns:200px minmax(0,1fr) auto;gap:24px}.merchant-media{grid-column:auto}.merchant-media img,.merchant-media :deep(svg){height:160px}.table-card :is(.table-featured,.table-first-review,.table-card-actions,.table-reviews,.table-action-feedback){margin-left:0;padding-left:0}}
 .table-draft-notice,
 .table-action-feedback {
   color: var(--assistant-muted, #5d6876);
