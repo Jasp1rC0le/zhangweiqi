@@ -14,12 +14,14 @@ export async function loadAdminSections(loaders) {
   return Object.fromEntries(await Promise.all(Object.entries(loaders).map(async ([key, load]) => {
     try {
       const data = await load()
-      const valid = key === 'overview'
+      const valid = key === 'jobRuntime'
+        ? data && typeof data.enabled === 'boolean' && !Array.isArray(data)
+        : key === 'overview'
         ? data && typeof data === 'object' && !Array.isArray(data)
         : Array.isArray(data)
       if (!valid) throw new Error('后台数据格式异常')
       return [key, { data, error: null }]
-    } catch (error) { return [key, { data: key === 'overview' ? null : [], error }] }
+    } catch (error) { return [key, { data: ['overview', 'jobRuntime'].includes(key) ? null : [], error }] }
   })))
 }
 

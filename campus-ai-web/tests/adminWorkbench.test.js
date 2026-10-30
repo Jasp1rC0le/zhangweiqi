@@ -59,6 +59,17 @@ test('admin panels reject malformed payloads rather than showing missing data as
   const loaded = await loadAdminSections({ documents: async () => ({}), contacts: async () => null, overview: async () => [] })
   for (const value of Object.values(loaded)) assert.ok(value.error)
 })
+test('disabled task execution is a successful state while missing flags fail closed', async () => {
+  for (const enabled of [false, true]) {
+    const { jobRuntime } = await loadAdminSections({ jobRuntime: async () => ({ enabled }) })
+    assert.deepEqual(jobRuntime, { data: { enabled }, error: null })
+  }
+  for (const value of [null, {}, [], {enabled:'false'}, {enabled:0}]) {
+    const { jobRuntime } = await loadAdminSections({ jobRuntime: async () => value })
+    assert.equal(jobRuntime.data, null)
+    assert.ok(jobRuntime.error)
+  }
+})
 test('document search combines title department category id and exact publication state', () => {
   const rows = [{ id: 1, title: '图书馆开放时间', category: '校园事务', sourceDepartment: '图书馆', status: 'PUBLISHED' }, { id: 2, title: '旧版指南', category: 'PDF资料', status: 'ARCHIVED' }]
   assert.deepEqual(filterAdminDocuments(rows, ' 图书馆 ', 'PUBLISHED'), [rows[0]])

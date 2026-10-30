@@ -80,6 +80,7 @@ export function createHoldToTalk({
           y,
           start: now(),
           text: '',
+          preview: '',
           started: false,
           ended: false,
           released: false,
@@ -87,7 +88,7 @@ export function createHoldToTalk({
         }
       run = current
       const valid = () => run === current && !disposed && owner() === current.owner
-      recognition.onstart=()=>{if(valid()){current.started=true;update({phase:current.cancelled?'cancel':current.released?'finishing':'listening',text:current.text,message:current.cancelled?'松开取消，不发送':current.released?'正在完成识别…':'正在听，松开发送，上滑取消'})}}
+      recognition.onstart=()=>{if(valid()){current.started=true;update({phase:current.cancelled?'cancel':current.released?'finishing':'listening',text:current.preview,message:current.cancelled?'松开取消，不发送':current.released?'正在完成识别…':'正在听，松开发送，上滑取消'})}}
       recognition.onresult = (event) => {
         if (!valid()) return
         let final = '',
@@ -102,10 +103,11 @@ export function createHoldToTalk({
           return
         }
         current.text = final
+        current.preview = final + interim
         current.started = true
         update({
           phase: current.cancelled ? 'cancel' : current.released ? 'finishing' : current.ended ? 'ready' : 'listening',
-          text: final + interim,
+          text: current.preview,
           message: current.cancelled ? '松开取消，不发送' : '松开发送，上滑取消',
         })
       }
@@ -126,7 +128,7 @@ export function createHoldToTalk({
         if (!valid()) return
         current.ended = true
         if (current.released) deliver(current)
-        else update({phase:current.cancelled?'cancel':'ready',text:current.text,message:current.cancelled?'松开取消，不发送':'识别已结束，松开发送或上滑取消'})
+        else update({phase:current.cancelled?'cancel':'ready',text:current.preview,message:current.cancelled?'松开取消，不发送':'识别已结束，松开发送或上滑取消'})
       }
       current.limit = timer(() => {
         if (valid()) end('已达到60秒录入上限，没有自动发送。请分次提问。')
@@ -145,7 +147,7 @@ export function createHoldToTalk({
       run.cancelled = run.y - y > 70
       update({
         phase: run.cancelled ? 'cancel' : run.ended ? 'ready' : run.started ? 'listening' : 'starting',
-        text: run.text,
+        text: run.preview,
         message: run.cancelled ? '松开取消，不发送' : run.ended ? '识别已结束，松开发送或上滑取消' : run.started ? '松开发送，上滑取消' : '正在请求麦克风；未开始识别前不会发送。',
       })
     },
@@ -161,7 +163,7 @@ export function createHoldToTalk({
         deliver(current)
         return
       }
-      update({ phase: 'finishing', text: current.text, message: '正在完成识别…' })
+      update({ phase: 'finishing', text: current.preview, message: '正在完成识别…' })
       current.finish = timer(() => {
         if (run === current) end('语音转写超时，没有发送。请重试或使用键盘。')
       }, 5000)

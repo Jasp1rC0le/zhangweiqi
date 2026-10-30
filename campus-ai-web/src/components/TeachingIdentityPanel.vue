@@ -19,6 +19,7 @@ const resource = createIdentityResource({ state, owner: () => owner.value, userI
 const { confirm, confirming } = useScopedConfirmation(() => `${owner.value}:${selected.value?.id || ''}:${selected.value?.revision || ''}`, () => !disposed)
 const ownRole = computed(() => state.items.find(i => i.requestedRole === role.value))
 const busy = computed(() => state.busy || confirming.value)
+defineExpose({ dirty: computed(() => !!selected.value && !!reason.value.trim()), busy })
 useUnsavedChanges(() => !!selected.value && !!reason.value.trim(), () => busy.value)
 const canApply = computed(() => state.loaded && state.enabled && !busy.value && (!ownRole.value || ownRole.value.status === 'REJECTED'))
 const stateClass = status => ({ PENDING: 'pending', APPROVED: 'approved', REJECTED: 'rejected', REVOKED: 'rejected' })[status]

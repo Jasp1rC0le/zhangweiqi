@@ -58,3 +58,11 @@ test('permission errors and stream finalization timeout stop capture truthfully'
   const f=voiceFixture();f.talk.start();f.fail('not-allowed');assert.match(f.state().message,/权限/)
   f.talk.start();f.time(600);f.result('未最终结束');f.talk.release();f.timeout();assert.match(f.state().message,/超时/);assert.equal(f.sent.length,0)
 })
+
+test('interim preview survives pointer jitter and remains preview-only until final',()=>{
+ const f=voiceFixture();f.talk.start(100);f.result('正在预览',false);assert.equal(f.state().text,'正在预览');f.talk.move(99);assert.equal(f.state().text,'正在预览')
+ f.time(600);f.talk.release();assert.equal(f.state().text,'正在预览');assert.equal(f.sent.length,0);f.result('完整句子');f.end();assert.deepEqual(f.sent,[{text:'完整句子',owner:'a'}])
+})
+test('ended interim speech remains visible while held but is never submitted as final',()=>{
+ const f=voiceFixture();f.talk.start(100);f.result('还未定稿',false);f.end();assert.equal(f.state().text,'还未定稿');f.talk.move(99);assert.equal(f.state().text,'还未定稿');f.time(600);f.talk.release();assert.equal(f.sent.length,0);assert.match(f.state().message,/完整语音/)
+})

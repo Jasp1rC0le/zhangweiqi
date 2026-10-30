@@ -1,13 +1,18 @@
 <script setup>
-import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { Microphone } from '@element-plus/icons-vue'
 import { createHoldToTalk, voiceCapability } from '@/utils/holdToTalk'
+import { voiceConsentOwner, readVoiceConsent, storeVoiceConsent } from '@/utils/voiceConsent'
 const props = defineProps({ scope: String, disabled: Boolean, compactEntry: Boolean })
 const emit = defineEmits(['question', 'mode', 'keyboard'])
 const enabled = ref(false),
   consent = ref(false),
   showSetup = ref(false),
   state = reactive({ phase: 'idle', text: '', message: '' })
+let consentStorage
+try { consentStorage = window.localStorage } catch { /* A blocked store never means consent. */ }
+const consentOwner = computed(() => voiceConsentOwner(props.scope))
+const previewElement = ref()
 const active = computed(() => ['starting', 'listening', 'ready', 'cancel', 'finishing'].includes(state.phase))
 function currentCapability(){
   try{
@@ -31,7 +36,7 @@ function down(event) {
   event.preventDefault()
   if (resource.start(event.clientY)) {
     pointer = event.pointerId
-    event.currentTarget.setPointerCapture?.(pointer)
+    try { event.currentTarget.setPointerCapture?.(pointer) } catch { /* Window release/cancel listeners remain the fallback. */ }
   }
 }
 function up(event) {
@@ -39,6 +44,8 @@ function up(event) {
   pointer = null
   resource.release()
 }
+function move(event) { if (pointer === event.pointerId) resource.move(event.clientY) }
+function pointerCancel(event) { if (pointer === event.pointerId) cancel() }
 function cancel() {
   pointer = null
   resource.cancel()
@@ -46,13 +53,18 @@ function cancel() {
 function enableVoice() {
   capability.value=currentCapability()
   if(props.disabled||!consent.value||!capability.value.available)return
+  const saved = storeVoiceConsent(consentStorage, consentOwner.value, true)
   enabled.value = true
   showSetup.value = false
+  if (!saved) state.message = '当前浏览器未保存此选择，下次仍会询问。'
 }
 function toggleSetup(){
   capability.value=currentCapability()
+  if (consent.value && capability.value.available) { enableVoice(); return }
   showSetup.value=!showSetup.value
 }
+function voiceSettings() { cancel(); enabled.value=false; showSetup.value=true; capability.value=currentCapability() }
+function forgetConsent() { if (!consent.value) storeVoiceConsent(consentStorage, consentOwner.value, false) }
 function keyboard() {
   enabled.value = false
   showSetup.value=false
@@ -79,9 +91,10 @@ watch(
   () => props.scope,
   () => {
     cancel()
-    enabled.value = consent.value = showSetup.value = false
+    enabled.value = showSetup.value = false
+    consent.value = readVoiceConsent(consentStorage, consentOwner.value)
   },
-  { flush: 'sync' },
+  { flush: 'sync', immediate: true },
 )
 watch(
   () => props.disabled,
@@ -89,10 +102,17 @@ watch(
     if (value) cancel()
   },
 )
+watch(() => state.text, () => { if (active.value) nextTick(() => { if (previewElement.value) previewElement.value.scrollTop=previewElement.value.scrollHeight }) })
+window.addEventListener('pointerup', up)
+window.addEventListener('pointermove', move, { passive: true })
+window.addEventListener('pointercancel', pointerCancel)
 window.addEventListener('blur', cancel)
 document.addEventListener('visibilitychange', visibility)
 onBeforeUnmount(() => {
   emit('mode', false)
+  window.removeEventListener('pointerup', up)
+  window.removeEventListener('pointermove', move)
+  window.removeEventListener('pointercancel', pointerCancel)
   window.removeEventListener('blur', cancel)
   document.removeEventListener('visibilitychange', visibility)
   resource.dispose()
@@ -115,7 +135,7 @@ onBeforeUnmount(() => {
       <template v-else><p>
         使用浏览器的语音转写服务，可能把音频交给浏览器提供商处理。本站不保存录音。不要朗读私人名册或考勤。
       </p>
-      <label><input v-model="consent" type="checkbox" />我同意使用浏览器语音服务</label
+      <label><input v-model="consent" type="checkbox" @change="forgetConsent" />我同意使用浏览器语音服务</label
       ><button type="button" :disabled="disabled || !consent" @click="enableVoice">
         启用按住说话
       </button></template>
@@ -129,10 +149,8 @@ onBeforeUnmount(() => {
         :disabled="disabled || state.phase === 'finishing'"
         aria-label="按住说话，松开发送，上滑取消"
         @pointerdown="down"
-        @pointermove="pointer === $event.pointerId && resource.move($event.clientY)"
         @pointerup="up"
-        @pointercancel="cancel"
-        @lostpointercapture="pointer !== null && cancel()"
+        @pointercancel="pointerCancel"
         @keydown="keydown"
         @keyup="keyup"
         @contextmenu.prevent
@@ -149,18 +167,19 @@ onBeforeUnmount(() => {
                 ? '松开发送 · 上滑取消'
                 : '按住说话'
         }}</button
-      ><button v-if="!active" type="button" class="voice-keyboard" @click="keyboard">
-        键盘输入
-      </button></template
+      ><div class="voice-readout" :aria-live="active ? 'off' : 'polite'">
+        <p ref="previewElement" class="transcript">{{ state.text || (active ? '等待浏览器返回文字…' : '识别文字会显示在这里') }}</p>
+        <p v-if="state.message" class="voice-message" :class="{ error: state.phase === 'error' }" :role="state.phase === 'error' ? 'alert' : 'status'">{{ state.message }}</p>
+      </div><div class="voice-actions"><button type="button" class="voice-keyboard" :disabled="active" @click="keyboard">键盘输入</button><button type="button" class="voice-settings" :disabled="active" @click="voiceSettings">语音设置</button></div></template
     >
     <p
-      v-if="state.message"
+      v-if="state.message && !enabled"
       :role="state.phase === 'error' ? 'alert' : 'status'"
       :class="{ error: state.phase === 'error' }"
     >
       {{ state.message }}
     </p>
-    <p v-if="state.text" class="transcript">{{ state.text }}</p>
+
   </div>
 </template>
 <style scoped>
@@ -229,7 +248,7 @@ onBeforeUnmount(() => {
   height: 20px;
   accent-color: var(--assistant-accent, #0b62db);
 }
-.hold-talk .voice-keyboard {
+.hold-talk .voice-keyboard, .hold-talk .voice-settings {
   border: 0;
   margin-top: 4px;
   background: transparent;
@@ -247,8 +266,13 @@ onBeforeUnmount(() => {
 .hold-talk p {
   margin: 8px 0;
 }
+.voice-readout { height: 112px; box-sizing: border-box; margin-top: 8px; padding: 12px; border-radius: 12px; background: var(--assistant-panel, #f2f5fa); overflow: auto; }
+.voice-actions { display: flex; gap: 16px; min-height: 48px; align-items: center; }
+.hold-talk .voice-readout p { margin: 0; }
+.hold-talk .voice-message { margin-top: 6px; font-size: 12px; }
+.hold-talk .hold-button:is(:hover, :active) { transform: none; translate: none; scale: 1; }
 .transcript {
-  max-height: 120px;
+  max-height: 52px;
   overflow: auto;
   white-space: pre-wrap;
   overflow-wrap: anywhere;

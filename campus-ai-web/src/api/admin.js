@@ -61,6 +61,10 @@ export async function getFailedBackgroundJobs() {
   return response.data
 }
 
+export async function getBackgroundJobRuntime(options = {}) {
+  return (await http.get('/api/admin/background-jobs/runtime', options)).data
+}
+
 export async function retryBackgroundJob(id, options = {}) {
   await http.post(`/api/admin/background-jobs/${id}/retry`, undefined, options)
 }

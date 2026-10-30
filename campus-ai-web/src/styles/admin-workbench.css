@@ -20,10 +20,21 @@ html:root body .admin-page .editor-fields :is(input,textarea,select) { font-size
 .admin-page :is(button,input,textarea,select):focus-visible { outline:2px solid #3548da; outline-offset:3px; }
 .admin-page button:disabled { cursor:not-allowed; opacity:.55; }
 .admin-page .review-card h2 { overflow-wrap:anywhere; }
+.admin-page .job-runtime { padding:12px 16px; border-radius:12px; background:#eef2f8; color:#3e506b; font-size:15px; line-height:1.6; }
+.admin-page .job-runtime.paused { background:#fcf1e8; color:#874624; }
+.admin-page .failed-job-row > span { display:grid; gap:6px; min-width:0; }
+.admin-page .failed-job-row b { font-size:16px; font-weight:600; }
+.admin-page .failed-job-row small { display:block; font-size:14px; line-height:1.6; overflow-wrap:anywhere; }
+.admin-page .job-attempts { display:grid; gap:4px; flex-shrink:0; font-variant-numeric:tabular-nums; }
+.admin-page .job-attempts strong { font-size:15px; white-space:nowrap; }
+.admin-page .job-attempts small { color:#874624; }
 .admin-page .editor-meta { margin:8px 0 0; }
 .admin-identity-error { max-width:660px; margin:48px auto; padding:28px; line-height:1.8; color:#38472f; }
 .admin-identity-error h1 { font-size:28px; }.admin-identity-error button,.admin-identity-error a { display:inline-flex; min-height:44px; align-items:center; margin:10px 14px 0 0; padding:8px 16px; border-radius:14px; border:1px solid #cbd3c3; color:#3548da; background:#fffefa; text-decoration:none; font:inherit; cursor:pointer; }
 @media(max-width:760px) {
+  .admin-page .failed-job-row { grid-template-columns:minmax(0,1fr) auto; gap:12px; }
+  .admin-page .failed-job-row > span { grid-column:1 / -1; }
+  .admin-page .failed-job-row button { justify-self:end; }
   .admin-page .document-toolbar { grid-template-columns:minmax(0,1fr); gap:12px; }
   .admin-page .document-toolbar button { width:100%; }
   html:root body .admin-page > main > header h1 { font-size:1.8rem; }

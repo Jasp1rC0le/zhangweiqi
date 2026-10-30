@@ -308,6 +308,8 @@ components:
 
 <!-- Approved auth/viewport scoped merge: 2026-10-30, for the user's fullscreen-auth-keyboard-20261028 batch. Sources: LoginView.vue authentication helpers and Teleport only; ChatView.vue visible-viewport hookup; utils/visualViewport.js; styles/auth-fullscreen.css and chat-viewport.css. Earlier dated statements that auth remained unchanged are historical scope boundaries, superseded only by this separately authorized auth/viewport exception. This source documentation is not a fresh finish verdict, physical iOS/WeChat keyboard certification or deployment claim. -->
 
+<!-- Approved voice/admin scoped merge: 2026-10-30. Sources: HoldToTalk.vue and holdToTalk/voiceConsent; AdminView.vue and TeachingIdentityPanel; admin-workbench.css, admin API/workbench helper and AdminBackgroundJobController. Local gesture/preview/consent, identity-module discovery and runtime-state expression only. Finish ship is file-based synthetic evidence, not physical ASR, reminder, production-release or identity-approval certification. -->
+
 ## Overview
 
 **Creative North Star: "Campthink"**
@@ -319,6 +321,8 @@ components:
 聊天页先作为用户确认的局部试点，2026-10-12 获准扩展到功能工作区。当前 Apple 覆盖以 `apple-workspace.css` 为最终来源，作用域仅为 `.workspace:is(.chat-focused,.calm-workspace)`：聊天采用开放回答、统一几何头像和单行浮动输入框，共享外壳采用同一配色与柔和桌面内框。其他模块的数据、内容语义、布局和交互沿用现有实现；首页不受工作区覆盖，而由下述独立批准范围约束，登录弹窗、注册和 Pro 继续受保护。
 
 后续独立获准的全屏认证以完整窗口呈现品牌和表单，手机将品牌压缩为一行；手机聊天由当前可见视口约束输入区域。以下较早记录中的“登录／注册视觉不变”保留为当时的历史边界，由 2026-10-28 全屏认证／键盘批次的局部授权取代。它不扩展到首页、联系、Pro、角色、法律或产品能力定义。
+
+2026-10-30 的语音与管理操作增量沿用上述工作区视觉，只修正持按目标、转写预览、首次同意记忆、身份审核入口和任务状态表达。录音中不使用会移动持按目标的缩放或内容折叠；暂停、未知、已排队和成功分别表达。它不更新首页、认证面或 Pro，也不把界面复审当成生产启用或真机语音证明。
 
 ### Approved Apple chat and shared shell — 2026-10-13
 
@@ -565,6 +569,13 @@ sidecar 的八级色阶由这些颜色生成，供面板展示明暗变化；它
 - **Focus / Retention:** 桌面进入后聚焦当前认证模式首个输入；手机进入后只聚焦关闭按钮并阻止由聚焦引起的文档滚动。保留 Tab 约束、标签页键盘操作、关闭时返回入口焦点、忙碌关闭锁、失败草稿与原有认证行为。手机聚焦输入越出可见区域时仅滚动内部表单；提交动作能与输入同时容纳时才尝试一并露出。
 - **Entry / Exit:** Vue 认证生命周期等待进入 520ms、退出 260ms；CSS 容器位移分别为 480ms、240ms，进入从下移 28px 到原位，退出下移 16px。外层与透明度过渡按 sidecar 独立记录，不套用联系窗口的时长。减少动态效果使 Vue 等待为 0，取消此认证过渡与位移。
 - **Chat Textarea:** 保留现有多行测高、可见高度上限、超限内部滚动和草稿语义；只在聊天作用域解除继承的 flex 拉伸／压缩，让输入实测高度生效。手机聊天的固定根与独立消息滚动遵守 Layout 中的视口所有权；后续语音、身份或后台工作不由本记录声明已交付。
+
+### Voice and Administrative Operation State — 2026-10-30
+
+- **Stable Hold / Preview:** `HoldToTalk` 沿用 `assistant-*`、原有麦克风图标与正常／取消语义色。录音目标不随 hover／active 缩放；固定读出区及始终保留的次级动作行避免开始录音时的几何跳动。预览保存定稿与临时文字并在内层滚动，发送仍只取浏览器定稿文字；浏览器未返回临时结果时不伪造文字。
+- **Consent / Cancellation:** 首次明确同意后，只在当前浏览器按账号／学校保存版本化布尔选择；无音频、转写正文、凭据或令牌。再次点击语音仅展开待录音控件，持按或键盘手势才启动识别。语音设置可撤销选择；存储不可用／损坏不当作同意。上滑、失焦、页面隐藏、身份／作用域变化及录入上限仍结束本次录入，不自动重启。
+- **Identity Review:** 管理后台桌面提供直接“身份审核”模块，手机复用原模块选择器；`/admin?tool=identity-review` 只表达定位意图，仍经过正常管理身份核验。已打开的审核面在切换模块时保留核验说明与忙碌状态，并提供返回入口；既有离开确认、逐项复核与权限边界保留。
+- **Task Runtime / Attempts:** 失败任务保留记录和原因，用“已尝试 N 次／自动重试已用尽”表达次数。配置明确启用后才允许手动重新排队；暂停或读取未知均禁用动作，后端在暂停时先拒绝再避免队列写入。启用配置不是执行器心跳，重新入队也不代表成功；失败回执不删除记录或自动重试。手机任务动作沿用至少 44px 高度。
 
 ### Apple Functional Controls
 

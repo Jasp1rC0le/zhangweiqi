@@ -15,6 +15,7 @@ import {
   Food,
   Message,
   Upload,
+  User,
 } from '@element-plus/icons-vue'
 import {
   approveKnowledgeSubmission,
@@ -26,6 +27,7 @@ import {
   getContactMessages,
   getAdminOverview,
   getFailedBackgroundJobs,
+  getBackgroundJobRuntime,
   getKnowledgeDocuments,
   getKnowledgeUpdateCandidates,
   getKnowledgeDocument,
@@ -65,7 +67,7 @@ import '@/styles/admin-workbench.css'
 import {focusWorkflowElement} from '@/utils/teachingWorkflows'
 
 const router = useRouter()
-const route = useRoute(),identityReviewElement=ref()
+const route = useRoute(),identityReviewElement=ref(),identityPanel=ref()
 const adminAuth = useAdminAuthStore()
 const activeTab = ref('overview')
 const loading = ref(true)
@@ -92,6 +94,8 @@ const overview = ref(null)
 const overviewLoadFailed = ref(false)
 const overviewUpdatedAt = ref(null)
 const failedBackgroundJobs = ref([])
+const jobRuntime = ref(null)
+const jobTypeLabel = type => ({ KNOWLEDGE_REFRESH: '官网资料更新', KNOWLEDGE_INDEX: '资料索引' })[type] || '后台任务'
 const documents = ref([])
 const updateCandidates = ref([])
 const sourceReviewIsEmpty = computed(() => canShowEmptySourceReview({
@@ -129,6 +133,7 @@ let lastIdentityWorkflow=''
 async function focusIdentityWorkflow(){
   const owner=editorOwner.value,key=`${owner}:${route.query.tool}`
   if(!owner||route.query.tool!=='identity-review'||identityError.value||loading.value||key===lastIdentityWorkflow)return
+  activeTab.value = 'identities'
   await nextTick();if(disposed||owner!==editorOwner.value||route.query.tool!=='identity-review'||loading.value)return
   if(focusWorkflowElement(identityReviewElement.value,()=>!disposed&&owner===editorOwner.value&&route.query.tool==='identity-review'&&!loading.value))lastIdentityWorkflow=key
 }
@@ -158,7 +163,7 @@ watch(editorOwner, () => {
   importLoading.value = false; previewLoading.value = false; editorLoading.value = false
   for (const target of [submissions, contacts, feedback, modelUsage, failedBackgroundJobs,
     documents, updateCandidates, evaluationCases]) target.value = []
-  overview.value = null; evaluationReport.value = null; overviewUpdatedAt.value = null
+  overview.value = null; jobRuntime.value = null; evaluationReport.value = null; overviewUpdatedAt.value = null
   for (const state of [sectionErrors, versionHistories, resolutionDrafts, rejectionNotes, sourceComparisons]) {
     for (const key of Object.keys(state)) delete state[key]
   }
@@ -167,7 +172,7 @@ watch(editorOwner, () => {
 }, { flush: 'sync' })
 const batchImport = ref(null)
 const careerPanel = ref(null), canteenPanel = ref(null)
-const catalogMounted = reactive({ career: false, canteens: false })
+const catalogMounted = reactive({ career: false, canteens: false, identities: false })
 watch(activeTab, (tab) => {
   if (Object.hasOwn(catalogMounted, tab)) catalogMounted[tab] = true
 }, { flush: 'sync' })
@@ -192,7 +197,7 @@ useUnsavedChanges(() => importCheckpoint.isDirty() || Boolean(batchImport.value?
     { title: '保留后台填写？', confirmText: '放弃填写并离开', cancelText: '继续编辑' }))
 const filteredDocuments = computed(() => filterAdminDocuments(documents.value, documentQuery.value, documentStatus.value))
 const tabSectionKeys = {
-  overview: ['jobs', 'usage'], knowledge: ['submissions'], contact: ['contacts'],
+  overview: ['jobs', 'jobRuntime', 'usage'], knowledge: ['submissions'], contact: ['contacts'],
   feedback: ['feedback', 'documents'], documents: ['documents', 'updates'],
   evaluation: ['cases', 'documents'], import: ['documents'], usage: ['usage'],
 }
@@ -251,17 +256,18 @@ async function loadInbox() {
   const { current } = editorScope.capture()
   const sequence = ++inboxSequence
   loading.value = true
+  jobRuntime.value = null
   const results = await loadAdminSections({
     submissions: getPendingKnowledgeSubmissions, contacts: getContactMessages,
     feedback: getMessageFeedback, usage: getModelUsage, documents: getKnowledgeDocuments,
     cases: getKnowledgeEvaluationCases, overview: getAdminOverview,
-    jobs: getFailedBackgroundJobs, updates: getKnowledgeUpdateCandidates,
+    jobs: getFailedBackgroundJobs, jobRuntime: getBackgroundJobRuntime, updates: getKnowledgeUpdateCandidates,
   })
   if (disposed || sequence !== inboxSequence || !current()) return
   const targets = { submissions, contacts, feedback, usage: modelUsage, documents,
-    cases: evaluationCases, overview, jobs: failedBackgroundJobs, updates: updateCandidates }
+    cases: evaluationCases, overview, jobs: failedBackgroundJobs, jobRuntime, updates: updateCandidates }
   const labels = { submissions: '待审核资料', contacts: '意见收件箱', feedback: '回答反馈', usage: '模型用量',
-    documents: '资料列表', cases: '检索题集', overview: '运营统计', jobs: '后台任务', updates: '官网更新' }
+    documents: '资料列表', cases: '检索题集', overview: '运营统计', jobs: '后台任务', jobRuntime: '任务执行状态', updates: '官网更新' }
   for (const [key, result] of Object.entries(results)) {
     targets[key].value = result.data
     sectionErrors[key] = result.error ? `${labels[key]}读取失败，请重试；未将失败当作空数据` : ''
@@ -284,11 +290,12 @@ async function runInboxAction(key, execute, committed, { refresh = refreshOvervi
 }
 
 async function retryJob(item) {
+  if (jobRuntime.value?.enabled !== true) return
   const id = item.id
   await runInboxAction(`retry-job-${id}`, signal => retryBackgroundJob(id, { signal }), () => {
     failedBackgroundJobs.value = failedBackgroundJobs.value.filter(job => job.id !== id)
     ElMessage.success('任务已重新进入队列')
-  }, { label: '任务重试', targetCurrent: () => failedBackgroundJobs.value.some(job => job.id === id) })
+  }, { label: '任务重试', targetCurrent: () => jobRuntime.value?.enabled === true && failedBackgroundJobs.value.some(job => job.id === id) })
 }
 
 async function refreshOverview(current = editorScope.capture().current) {
@@ -820,6 +827,7 @@ async function exitAdmin() {
       <label class="admin-mobile-section">工作区
         <select v-model="activeTab" aria-label="选择后台模块">
           <option value="overview">运营总览</option><option value="knowledge">知识审核</option>
+          <option value="identities">身份审核</option>
           <option value="contact">意见收件箱</option><option value="feedback">回答反馈</option>
           <option value="import">导入资料</option><option value="documents">资料管理</option>
           <option value="evaluation">检索评测</option><option value="career">企业与招聘</option>
@@ -827,6 +835,7 @@ async function exitAdmin() {
         </select>
       </label>
       <nav aria-label="后台模块">
+        <button type="button" :class="{ active: activeTab === 'identities' }" @click="activeTab = 'identities'"><el-icon><User /></el-icon><span>身份审核</span></button>
         <button type="button" :class="{ active: activeTab === 'overview' }" @click="activeTab = 'overview'">
           <el-icon><DataAnalysis /></el-icon><span>运营总览</span><i>↗</i>
         </button>
@@ -891,7 +900,7 @@ async function exitAdmin() {
       <header>
         <h1>
           {{
-            activeTab === 'wall' ? '校园墙审核' : activeTab === 'overview'
+            activeTab === 'identities' ? '身份审核' : activeTab === 'wall' ? '校园墙审核' : activeTab === 'overview'
               ? '运营总览'
               : activeTab === 'knowledge'
               ? '知识审核'
@@ -914,7 +923,7 @@ async function exitAdmin() {
         </h1>
         <span>
           {{
-            activeTab === 'wall' ? '发布前审核、举报处理与隐藏记录，仅管理本校内容' : activeTab === 'overview'
+            activeTab === 'identities' ? '注册后的教师、辅导员和书记申请，在这里核实。' : activeTab === 'wall' ? '发布前审核、举报处理与隐藏记录，仅管理本校内容' : activeTab === 'overview'
               ? '待办、资料与模型用量'
               : activeTab === 'knowledge'
               ? '用户在聊天中补充的校园信息，通过审核后才会进入正式知识库。'
@@ -937,8 +946,6 @@ async function exitAdmin() {
         </span>
       </header>
 
-      <details ref="identityReviewElement" class="identity-review-disclosure"><summary>教学身份审核</summary><TeachingIdentityPanel admin /></details>
-
       <div v-if="!loading && visibleLoadErrors.length" class="admin-load-error" role="alert">
         <div><p v-for="message in visibleLoadErrors" :key="message">{{ message }}</p></div>
         <button type="button" :disabled="actionBusy" @click="loadInbox">重新读取</button>
@@ -952,6 +959,7 @@ async function exitAdmin() {
         <span>{{ item.panel.busy ? `${item.label}仍在处理中，可返回查看结果` : `${item.label}有未保存的填写，仅保留在当前页面` }}</span>
         <button type="button" @click="activeTab = item.tab">返回{{ item.label }}</button>
       </div>
+      <div v-if="activeTab !== 'identities' && (identityPanel?.dirty || identityPanel?.busy)" class="editor-return" role="status"><span>{{ identityPanel?.busy ? '身份审核仍在处理中' : '身份审核有未保存的核验说明' }}</span><button type="button" @click="activeTab = 'identities'">返回身份审核</button></div>
 
       <section v-if="loading" class="empty-state loading-state">
         <i></i><strong>正在读取审核任务</strong>
@@ -970,16 +978,18 @@ async function exitAdmin() {
         <template v-else>
           <OperationsCockpit :overview="overview" :actions="overviewActions" :usage="modelUsage"
             :usage-unavailable="usageLoadFailed" :failed-details-available="!sectionErrors.jobs && failedBackgroundJobs.length > 0" @navigate="activeTab = $event" />
-          <section v-if="failedBackgroundJobs.length" class="overview-section failed-jobs" aria-labelledby="failed-jobs-title">
+          <section class="overview-section failed-jobs" aria-labelledby="failed-jobs-title">
             <div class="overview-section-heading">
               <div><h2 id="failed-jobs-title">失败任务</h2></div>
-              <small>错误仅显示类型，不包含密钥或请求正文</small>
+              <small>{{ failedBackgroundJobs.length }} 项历史记录</small>
             </div>
+            <p class="job-runtime" :class="{ paused: jobRuntime?.enabled === false }" role="status">{{ jobRuntime?.enabled === false ? '后台执行已暂停，任务保留，未重新排队。' : jobRuntime?.enabled === true ? '可手动重新排队；入队不代表执行成功。' : '执行状态未确认，暂不能重新排队。' }}</p>
             <div v-for="item in failedBackgroundJobs" :key="item.id" class="overview-queue-row failed-job-row">
-              <span>{{ item.type }} · 资料 #{{ item.refId || '—' }} · {{ item.lastError || '未知错误' }}</span>
-              <strong>{{ item.attemptCount }}/{{ item.maxAttempts }}</strong>
-              <button type="button" :disabled="processingKey || actionBusy" @click="retryJob(item)">{{ processingKey === `retry-job-${item.id}` ? '重试中…' : '重新执行' }}</button>
+              <span><b>{{ jobTypeLabel(item.type) }} · 资料 #{{ item.refId || '—' }}</b><small>{{ item.lastError || '错误原因未返回' }}</small></span>
+              <div class="job-attempts"><strong>已尝试 {{ item.attemptCount }} 次</strong><small v-if="item.attemptCount >= item.maxAttempts">自动重试已用尽</small></div>
+              <button type="button" :disabled="processingKey || actionBusy || jobRuntime?.enabled !== true" @click="retryJob(item)">{{ processingKey === `retry-job-${item.id}` ? '入队中…' : jobRuntime?.enabled === false ? '已暂停' : '重新排队' }}</button>
             </div>
+            <p v-if="!failedBackgroundJobs.length && !sectionErrors.jobs">本次没有失败记录。</p>
           </section>
         </template>
       </section>
@@ -1381,6 +1391,7 @@ async function exitAdmin() {
         </article>
       </section>
       <!-- Keep this in-memory editor mounted across admin module switches. -->
+      <section v-if="adminAuth.user && catalogMounted.identities" v-show="!loading && activeTab === 'identities'" ref="identityReviewElement" class="identity-review-workspace"><TeachingIdentityPanel ref="identityPanel" admin /></section>
       <AdminBatchImportPanel v-if="adminAuth.user" v-show="!loading && activeTab === 'import'"
         ref="batchImport" :school-id="adminAuth.user.schoolId" @published="refreshDocumentsAfterImport" />
       <AdminCareerPanel v-if="adminAuth.user && catalogMounted.career" v-show="!loading && activeTab === 'career'" ref="careerPanel" />
@@ -1391,7 +1402,7 @@ async function exitAdmin() {
 </template>
 
 <style scoped>
-.identity-review-disclosure{margin:18px 0 28px;border-bottom:1px solid var(--assistant-line,#e2e7ec)}.identity-review-disclosure>summary{min-height:44px;align-content:center;cursor:pointer;font-size:15px;color:var(--assistant-ink,#29323c)}.identity-review-disclosure>summary:focus-visible{outline:2px solid var(--assistant-accent,#2b63cf);outline-offset:3px}
+.identity-review-workspace:focus-visible{outline:2px solid var(--assistant-accent,#2b63cf);outline-offset:4px}
 .resolution-note {
   padding: 12px 14px;
   color: #27623c;
@@ -1653,7 +1664,7 @@ header > span {
 .overview-queue-row span { color: #484a51; font-size: 13px; }
 .overview-queue-row strong { font-size: 14px; font-variant-numeric: tabular-nums; }
 .overview-queue-row i { color: #a0a2a8; font-size: 14px; font-style: normal; }
-.failed-jobs { margin-top: 14px; }.failed-job-row { grid-template-columns: minmax(0,1fr) auto auto; }.failed-job-row button { min-height: 38px; padding: 0 12px; color: #8a3f13; font-size: 12px; font-weight: 650; background: #fff1e8; border-radius: 9px; }.failed-job-row button:disabled { opacity: .55; cursor: wait; }
+.failed-jobs { margin-top: 14px; }.failed-job-row { grid-template-columns: minmax(0,1fr) auto auto; }.failed-job-row button { min-height: 44px; padding: 0 12px; color: #8a3f13; font-size: 14px; font-weight: 650; background: #fff1e8; border-radius: 9px; }.failed-job-row button:disabled { opacity: .55; cursor: not-allowed; }
 @media (max-width: 760px) {
   .failed-jobs .overview-section-heading { flex-direction: column; align-items: flex-start; gap: 8px; }
   .failed-jobs .overview-section-heading > div { flex-shrink: 0; }

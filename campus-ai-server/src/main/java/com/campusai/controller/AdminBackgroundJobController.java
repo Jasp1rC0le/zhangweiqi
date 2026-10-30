@@ -3,7 +3,10 @@ package com.campusai.controller;
 import com.campusai.jobs.BackgroundJobRepository;
 import com.campusai.service.UserService;
 import com.campusai.user.entity.User;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -24,11 +27,22 @@ public class AdminBackgroundJobController {
     private final JdbcTemplate jdbc;
     private final BackgroundJobRepository jobs;
     private final UserService users;
+    private final boolean enabled;
 
-    public AdminBackgroundJobController(JdbcTemplate jdbc, BackgroundJobRepository jobs, UserService users) {
+    public AdminBackgroundJobController(JdbcTemplate jdbc, BackgroundJobRepository jobs, UserService users,
+                                        @Value("${app.jobs.enabled:true}") boolean enabled) {
         this.jdbc = jdbc;
         this.jobs = jobs;
         this.users = users;
+        this.enabled = enabled;
+    }
+
+    @GetMapping("/runtime")
+    public ResponseEntity<RuntimeState> runtime(@RequestAttribute("currentUserId") Long userId,
+                                                @RequestAttribute("currentUserRole") String role) {
+        school(userId, role);
+        // Configuration only: this does not claim a worker heartbeat or successful execution.
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(new RuntimeState(enabled));
     }
 
     @GetMapping
@@ -54,7 +68,11 @@ public class AdminBackgroundJobController {
     public void retry(@RequestAttribute("currentUserId") Long userId,
                       @RequestAttribute("currentUserRole") String role,
                       @PathVariable Long id) {
-        if (!jobs.retryFailed(school(userId, role), id)) {
+        Long schoolId = school(userId, role);
+        if (!enabled) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "后台任务执行已暂停，未重新排队");
+        }
+        if (!jobs.retryFailed(schoolId, id)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "任务不存在或当前不可重试");
         }
     }
@@ -76,4 +94,5 @@ public class AdminBackgroundJobController {
     public record JobView(Long id, String type, Long refId, String status, int attemptCount,
                           int maxAttempts, LocalDateTime availableAt, String lastError,
                           LocalDateTime updatedAt) {}
+    public record RuntimeState(boolean enabled) {}
 }
