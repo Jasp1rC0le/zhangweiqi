@@ -7,25 +7,25 @@ html:root body .workspace[data-section='admin']{--assistant-accent:#6850a5;--ass
 html:root body .workspace[data-section='study']{--assistant-accent:#126e89;--assistant-accent-hover:#0d5267;--assistant-soft:#e9f5f8;--assistant-hover:#dceef3}
 html:root body .workspace .primary-navigation .nav-item.active{color:var(--assistant-accent);background:var(--assistant-soft)}
 html:root body .workspace.calm-workspace .table-page{background:transparent}
-html:root body .workspace.calm-workspace .table-main{padding-top:36px;max-width:1180px}
-html:root body .workspace.calm-workspace .table-intro{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:0 0 26px;border-bottom:0;margin-bottom:0}
-html:root body .workspace.calm-workspace .table-intro h1{font-size:clamp(30px,3vw,40px);line-height:1.25;margin:0;letter-spacing:-.03em}
+html:root body .workspace.calm-workspace .table-main{padding-top:24px;max-width:1180px}
+html:root body .workspace.calm-workspace .table-intro{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:0 0 20px;border-bottom:0;margin-bottom:0}
+html:root body .workspace.calm-workspace .table-intro h1{font-size:clamp(26px,2.6vw,34px);line-height:1.25;margin:0;letter-spacing:-.03em}
 html:root body .workspace.calm-workspace .table-intro h1 span{color:var(--assistant-accent)}
 html:root body .workspace.calm-workspace .table-intro-note{padding:0;border:0}
 .table-rating-key{display:inline-flex;align-items:center;gap:4px;padding:10px 14px;border-radius:12px;background:#fff0df;color:#ad4c1c;font-size:12px}
 .table-rating-key .el-icon{width:14px;height:14px}.table-rating-key b{margin-left:6px;font-weight:500;white-space:nowrap}
-html:root body .workspace.calm-workspace .table-tools{margin-block:0 18px;gap:12px}
+html:root body .workspace.calm-workspace .table-tools{margin-block:0 12px;gap:12px}
 html:root body .workspace.calm-workspace .table-search{background:#fffaf5;border-color:#edddd0}
 html:root body .workspace.calm-workspace .table-search .el-icon{color:#ad4c1c}
 html:root body .workspace.calm-workspace .table-filters{width:fit-content;max-width:100%;background:#fff5e9;margin-bottom:24px;overflow:auto}
 html:root body .workspace.calm-workspace .table-filters button.active{color:#ad4c1c;background:#ffe5c9}
-html:root body .workspace.calm-workspace .table-list-heading{margin:24px 0 16px}
+html:root body .workspace.calm-workspace .table-list-heading{margin:12px 0}
 html:root body .workspace.calm-workspace .table-list-heading h2{font-size:18px}
 html:root body .workspace.calm-workspace .table-empty{min-height:42vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 20px;gap:14px;background:#fff8ef;border-radius:18px;color:#785f4b}
 html:root body .workspace.calm-workspace .table-empty>.el-icon{display:grid;place-items:center;width:64px;height:64px;border-radius:18px;background:#ffe8cd;color:#ad4c1c;margin:0;font-size:30px}
 html:root body .workspace.calm-workspace .table-empty h2{color:#493b32;font-size:24px;font-weight:500;margin:0;letter-spacing:-.02em}
 html:root body .workspace.calm-workspace .table-empty p{font-size:14px;line-height:1.7;margin:0;color:#785f4b}
-html:root body .workspace.calm-workspace .table-card{border-color:#efdfd2;padding:24px;background:#fff}
+html:root body .workspace.calm-workspace .table-card{border-color:#efdfd2;padding:16px;border-radius:16px;background:#fff}
 html:root body .workspace.calm-workspace .table-photo{background:#fff3e7}
 html:root body .workspace.calm-workspace .table-score strong{color:#a34c1f}
 html:root body .workspace.calm-workspace .table-score{padding:12px 16px;border-radius:12px;background:#fff4e7}

@@ -13,8 +13,8 @@ html:root body .workspace.calm-workspace {
   --work-blue: var(--assistant-accent);
   --work-panel-radius: 16px;
   --work-space: 24px;
-  --work-enter-duration: 160ms;
-  --work-leave-duration: 60ms;
+  --work-enter-duration: 280ms;
+  --work-leave-duration: 160ms;
   display: grid;
   grid-template-columns: 244px minmax(0, 1fr);
   height: 100dvh;
@@ -244,10 +244,10 @@ html:root body .calm-workspace .workspace-content-enter-active {
     transform var(--work-enter-duration) var(--assistant-ease);
 }
 html:root body .calm-workspace .workspace-content-leave-active {
-  transition: none;
+  transition: opacity 160ms ease;
 }
 html:root body .calm-workspace .workspace-content-enter-from {
-  transform: translateX(6px);
+  transform: translateX(12px);
 }
 html:root body .calm-workspace .workspace-content-leave-to {
   transform: none;

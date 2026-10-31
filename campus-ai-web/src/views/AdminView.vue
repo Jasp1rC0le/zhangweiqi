@@ -65,6 +65,7 @@ import { createScopedAdminActions } from '@/utils/scopedAdminActions'
 import { evaluationTargetLabel } from '@/utils/evaluationTarget'
 import '@/styles/admin-workbench.css'
 import {focusWorkflowElement} from '@/utils/teachingWorkflows'
+import { groupFailedKnowledgeJobs, failedKnowledgeReason } from '@/utils/failedKnowledgeJobs'
 
 const router = useRouter()
 const route = useRoute(),identityReviewElement=ref(),identityPanel=ref()
@@ -94,9 +95,12 @@ const overview = ref(null)
 const overviewLoadFailed = ref(false)
 const overviewUpdatedAt = ref(null)
 const failedBackgroundJobs = ref([])
+const showAllFailedJobs = ref(false)
 const jobRuntime = ref(null)
 const jobTypeLabel = type => ({ KNOWLEDGE_REFRESH: '官网资料更新', KNOWLEDGE_INDEX: '资料索引' })[type] || '后台任务'
 const documents = ref([])
+const failedJobGroups = computed(() => groupFailedKnowledgeJobs(failedBackgroundJobs.value, documents.value))
+const visibleFailedJobs = computed(() => showAllFailedJobs.value ? failedJobGroups.value : failedJobGroups.value.slice(0, 5))
 const updateCandidates = ref([])
 const sourceReviewIsEmpty = computed(() => canShowEmptySourceReview({
   loading: loading.value, identityError: identityError.value,
@@ -163,7 +167,7 @@ watch(editorOwner, () => {
   importLoading.value = false; previewLoading.value = false; editorLoading.value = false
   for (const target of [submissions, contacts, feedback, modelUsage, failedBackgroundJobs,
     documents, updateCandidates, evaluationCases]) target.value = []
-  overview.value = null; jobRuntime.value = null; evaluationReport.value = null; overviewUpdatedAt.value = null
+  overview.value = null; jobRuntime.value = null; showAllFailedJobs.value = false; evaluationReport.value = null; overviewUpdatedAt.value = null
   for (const state of [sectionErrors, versionHistories, resolutionDrafts, rejectionNotes, sourceComparisons]) {
     for (const key of Object.keys(state)) delete state[key]
   }
@@ -980,15 +984,30 @@ async function exitAdmin() {
             :usage-unavailable="usageLoadFailed" :failed-details-available="!sectionErrors.jobs && failedBackgroundJobs.length > 0" @navigate="activeTab = $event" />
           <section class="overview-section failed-jobs" aria-labelledby="failed-jobs-title">
             <div class="overview-section-heading">
-              <div><h2 id="failed-jobs-title">失败任务</h2></div>
-              <small>{{ failedBackgroundJobs.length }} 项历史记录</small>
+              <div><h2 id="failed-jobs-title">资料同步历史</h2></div>
+              <small>{{ failedJobGroups.length }} 组来源 · {{ failedBackgroundJobs.length }} 条失败历史</small>
             </div>
-            <p class="job-runtime" :class="{ paused: jobRuntime?.enabled === false }" role="status">{{ jobRuntime?.enabled === false ? '后台执行已暂停，任务保留，未重新排队。' : jobRuntime?.enabled === true ? '可手动重新排队；入队不代表执行成功。' : '执行状态未确认，暂不能重新排队。' }}</p>
-            <div v-for="item in failedBackgroundJobs" :key="item.id" class="overview-queue-row failed-job-row">
-              <span><b>{{ jobTypeLabel(item.type) }} · 资料 #{{ item.refId || '—' }}</b><small>{{ item.lastError || '错误原因未返回' }}</small></span>
-              <div class="job-attempts"><strong>已尝试 {{ item.attemptCount }} 次</strong><small v-if="item.attemptCount >= item.maxAttempts">自动重试已用尽</small></div>
-              <button type="button" :disabled="processingKey || actionBusy || jobRuntime?.enabled !== true" @click="retryJob(item)">{{ processingKey === `retry-job-${item.id}` ? '入队中…' : jobRuntime?.enabled === false ? '已暂停' : '重新排队' }}</button>
+            <p class="job-runtime" :class="{ paused: jobRuntime?.enabled === false }" role="status">{{ jobRuntime?.enabled === false ? '自动执行已暂停，需核对来源或补传文件。' : jobRuntime?.enabled === true ? '先处理来源，再手动重试。' : '执行状态未确认，暂不可重试。' }}</p>
+            <div id="failed-job-history">
+              <div v-for="item in visibleFailedJobs" :key="item.key" class="overview-queue-row failed-job-row">
+                <details class="failed-job-details">
+                  <summary>
+                    <span class="failed-job-heading"><b>{{ item.document?.title || `${jobTypeLabel(item.type)} #${item.refId || '—'}` }}</b><small>{{ item.records.length }} 条历史</small></span>
+                    <span class="failed-job-reason">{{ failedKnowledgeReason(item.records[0]) }}</span>
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m7 5 5 5-5 5" /></svg>
+                  </summary>
+                  <p>最后失败：{{ formatAdminDate(item.records[0].updatedAt) }}</p>
+                  <p v-if="item.document">当前资料：{{ ({PUBLISHED:'已发布',ARCHIVED:'已归档',DRAFT:'草稿',PENDING:'待审核'})[item.document.status] || item.document.status }}。此状态不代表失败的更新内容已经补齐。</p>
+                  <button v-if="item.document" type="button" :disabled="actionBusy || editorLoading" @click="editDocument(item.document)">核对 / 补充原文</button>
+                  <p v-else>原资料未在当前列表中，需先在资料列表核对。</p>
+                  <div v-for="record in item.records" :key="record.id" class="failed-job-record">
+                    <p>#{{ record.id }} · {{ record.attemptCount }}/{{ record.maxAttempts }} 次 · {{ record.lastError || '未返回错误原因' }}</p>
+                    <button v-if="jobRuntime?.enabled === true" type="button" :disabled="processingKey || actionBusy || jobRuntime?.enabled !== true" @click="retryJob(record)">{{ processingKey === `retry-job-${record.id}` ? '入队中…' : '重试该记录' }}</button>
+                  </div>
+                </details>
+              </div>
             </div>
+            <button v-if="failedJobGroups.length > 5" type="button" class="failed-jobs-more" :aria-expanded="showAllFailedJobs" aria-controls="failed-job-history" @click="showAllFailedJobs = !showAllFailedJobs">{{ showAllFailedJobs ? '收起' : `查看全部 ${failedJobGroups.length} 组` }}</button>
             <p v-if="!failedBackgroundJobs.length && !sectionErrors.jobs">本次没有失败记录。</p>
           </section>
         </template>
@@ -1664,7 +1683,8 @@ header > span {
 .overview-queue-row span { color: #484a51; font-size: 13px; }
 .overview-queue-row strong { font-size: 14px; font-variant-numeric: tabular-nums; }
 .overview-queue-row i { color: #a0a2a8; font-size: 14px; font-style: normal; }
-.failed-jobs { margin-top: 14px; }.failed-job-row { grid-template-columns: minmax(0,1fr) auto auto; }.failed-job-row button { min-height: 44px; padding: 0 12px; color: #8a3f13; font-size: 14px; font-weight: 650; background: #fff1e8; border-radius: 9px; }.failed-job-row button:disabled { opacity: .55; cursor: not-allowed; }
+.failed-jobs { margin-top: 14px; }.failed-job-row { grid-template-columns: minmax(0,1fr) auto; }.failed-job-row button { min-height: 44px; padding: 0 12px; color: #8a3f13; font-size: 14px; font-weight: 500; background: #fff1e8; border-radius: 9px; }.failed-job-row button:disabled { opacity: .55; cursor: not-allowed; }
+.failed-job-details { min-width: 0; }.failed-job-details summary { display: grid; grid-template-columns: minmax(0,1fr) 16px; gap: 4px 12px; min-height: 44px; cursor: pointer; list-style: none; }.failed-job-details summary::-webkit-details-marker { display: none; }.failed-job-heading { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; }.failed-job-reason { grid-column: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }.failed-job-details summary svg { grid-column: 2; grid-row: 1 / span 2; width: 16px; height: 16px; align-self: center; color: #596550; }.failed-job-details[open] summary svg { transform: rotate(90deg); }.failed-job-details p { margin: 12px 0 0; color: #596550; font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }.failed-jobs-more { min-height: 44px; padding: 8px 0; border: 0; background: transparent; color: var(--assistant-accent-hover, #4e387f); font: inherit; font-size: 14px; cursor: pointer; }
 @media (max-width: 760px) {
   .failed-jobs .overview-section-heading { flex-direction: column; align-items: flex-start; gap: 8px; }
   .failed-jobs .overview-section-heading > div { flex-shrink: 0; }

@@ -163,14 +163,16 @@ test('an unconfirmed chat operation blocks conversation replacement before readi
   await actualFunction('selectConversation',state)(901)
   assert.equal(state.mobileSidebarOpen.value,true)
 })
-test('scroll resets only before the new view enters, never during leave or after user interaction', () => {
+test('route scroll resets before entry while routine motion has bounded arrival and faster exit', () => {
   assert.ok(view.includes('@click="navigatePrimary(item.path)"'))
   assert.ok(view.includes('@before-enter="resetWorkspaceScroll"'))
   assert.ok(!view.includes('@after-enter="resetWorkspaceScroll"'))
   const routeWatcher = script.slice(script.indexOf('watch(() => route.name'), script.indexOf('const authStore'))
   assert.ok(!routeWatcher.includes('resetWorkspaceScroll()'))
-  assert.ok(calm.includes('--work-enter-duration: 160ms'))
-  assert.ok(calm.includes('--work-leave-duration: 60ms'))
+  const enter = Number(/--work-enter-duration:\s*(\d+)ms/.exec(calm)?.[1])
+  const leave = Number(/--work-leave-duration:\s*(\d+)ms/.exec(calm)?.[1])
+  assert.ok(enter >= 150 && enter <= 400)
+  assert.ok(leave > 0 && leave < enter)
 })
 test('page roots do not repaint a short square canvas and compound fields retain one focus owner', () => {
   assert.match(calm, /:is\(\.table-page, \.account-page, \.project-studio, \.admin-page\)\s*\{\s*background: transparent;/)

@@ -4,7 +4,6 @@ import { useRoute,useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import http,{userSessionGeneration} from '@/api/http'
 import { useAuthStore } from '@/stores/auth'
-import CampMark from '@/components/CampMark.vue'
 import TokenActivityPanel from '@/components/TokenActivityPanel.vue'
 import AccountIdentityPanel from '@/components/AccountIdentityPanel.vue'
 import TeachingIdentityPanel from '@/components/TeachingIdentityPanel.vue'
@@ -18,7 +17,7 @@ import { createAccountLifecycle } from '@/utils/accountLifecycle'
 import { createLatestRequest } from '@/utils/latestRequest'
 
 const router = useRouter()
-const route=useRoute(),identityPanel=ref(),updatesPanel=ref()
+const route=useRoute(),identityPanel=ref(),updatesPanel=ref(),accountRoot=ref()
 let focusDisposed=false
 const auth = useAuthStore()
 const owner = computed(() => auth.user ? `${auth.user.id}:${auth.user.schoolId}:${userSessionGeneration.value}` : '')
@@ -171,7 +170,24 @@ async function deleteAccount() {
   } finally { if (ticket.current()) deleteBusy.value = false }
 }
 
-async function focusAccountWorkflow(){const principal=()=>auth.user?`${auth.user.id}:${auth.user.schoolId}:${userSessionGeneration.value}`:'',owner=principal(),hash=route.hash;if(!owner||!['#teaching-identity','#product-updates'].includes(hash))return;await nextTick();const target=hash==='#product-updates'?updatesPanel:identityPanel;if(!focusDisposed&&owner===principal()&&route.hash===hash)focusWorkflowElement(target.value?.$el,()=>!focusDisposed&&owner===principal()&&route.hash===hash)}
+async function focusAccountWorkflow() {
+  const current = owner.value, hash = route.hash
+  if (!current || focusDisposed) return
+  if (hash === '#invoice-info') {
+    try { await router.replace('/campus#invoice-info') }
+    catch (error) { if (!wasRouteFailureHandled(error)) ElMessage.error('校园资料暂未打开，请重试') }
+    return
+  }
+  if (!['#personal','#security','#sessions','#my-data','#close-account','#token-activity','#teaching-identity','#product-updates'].includes(hash)) return
+  await nextTick()
+  if (focusDisposed || owner.value !== current || route.hash !== hash) return
+  const target = accountRoot.value?.querySelector(hash)
+  let disclosure = target?.closest('details')
+  while (disclosure) { disclosure.open = true; disclosure = disclosure.parentElement?.closest('details') }
+  await nextTick()
+  if (!focusDisposed && owner.value === current && route.hash === hash)
+    focusWorkflowElement(target, () => !focusDisposed && owner.value === current && route.hash === hash)
+}
 async function openProductFeature(item) { if(accountBusy.value||focusDisposed)return;try{await router.push(item.route)}catch(error){if(!wasRouteFailureHandled(error))ElMessage.error('页面暂时没能打开，请再试一次')} }
 watch(()=>route.hash,focusAccountWorkflow,{flush:'post'})
 watch(owner, () => {
@@ -188,118 +204,160 @@ onMounted(focusAccountWorkflow)
 </script>
 
 <template>
-  <main class="account-page">
-    <header class="account-header">
-      <RouterLink to="/chat" class="back-link">← 返回对话</RouterLink>
-      <span class="brand"><CampMark /> Campthink.</span>
-    </header>
+  <main ref="accountRoot" class="account-page account-page--profile">
     <div class="account-content">
-      <div class="account-intro">
-      <h1>账户与设置</h1>
-      <p class="lede">管理偏好、安全和个人数据。</p>
-      <nav class="account-nav" aria-label="账户设置目录"><a href="#product-updates">产品更新</a><a href="#teaching-identity">教学身份</a><a href="#personal">个人信息</a><a href="#security">找回邮箱</a><a href="#token-activity">额度记录</a><a href="#my-data">我的数据</a><a href="#sessions">登录会话</a><a href="#close-account">注销账户</a></nav></div>
+      <header class="account-intro">
+        <h1>个人信息</h1>
+        <RouterLink to="/privacy" class="privacy-link">隐私说明</RouterLink>
+      </header>
 
-      <div class="account-sections"><ProductUpdates id="product-updates" ref="updatesPanel" :disabled="accountBusy" @activate="openProductFeature" /><AccountIdentityPanel /><TeachingIdentityPanel ref="identityPanel" tabindex="-1" /><section id="personal" class="account-card">
-        <h2>个人信息</h2>
-        <p>选填，用于个性化建议，不作为校园事实来源。</p>
-        <p v-if="profileLoading" role="status">正在读取个人信息…</p>
+      <AccountIdentityPanel />
+
+      <section id="personal" class="account-card account-profile" aria-labelledby="personal-title">
+        <div class="account-section-heading"><h2 id="personal-title">个人资料</h2><span>选填</span></div>
+        <p v-if="profileLoading" class="form-status" role="status">正在读取资料…</p>
         <p v-if="profileError" class="form-error" role="alert">{{ profileError }}</p>
         <button v-if="!profileLoaded && !profileLoading" class="secondary" type="button" @click="loadProfile">重新读取</button>
         <form :aria-busy="profileLoading || profileBusy" @submit.prevent="saveProfile" @input="profileStatus = ''">
           <fieldset class="account-form profile-form" :disabled="profileLoading || accountBusy || !profileLoaded">
-          <legend class="sr-only">个人信息</legend>
-          <div class="form-pair">
-            <label for="profile-major">专业<input id="profile-major" v-model.trim="profile.major" maxlength="100" placeholder="例如：软件工程" /></label>
-            <label for="profile-grade">年级<input id="profile-grade" v-model.trim="profile.grade" maxlength="50" placeholder="例如：大二" /></label>
-          </div>
-          <label for="profile-skills">技能标签<input id="profile-skills" v-model="profile.skillsText" maxlength="819" placeholder="Java、Vue、机械制图，用顿号分隔" /></label>
-          <label for="profile-direction">发展方向<input id="profile-direction" v-model.trim="profile.careerDirection" maxlength="200" placeholder="例如：后端开发、考研、智能制造" /></label>
-          <label for="profile-bio">补充说明<textarea id="profile-bio" v-model.trim="profile.bio" maxlength="500" rows="3" placeholder="可选，不要填写身份证号、密码等敏感信息"></textarea></label>
-          <p v-if="profileStatus && !checkpoint.isDirty()" role="status">{{ profileStatus }}</p>
-          <small v-else-if="profileLoaded && checkpoint.isDirty()">有未保存的修改</small>
-          <button type="submit" :disabled="accountBusy || !profileLoaded || !checkpoint.isDirty()">{{ profileBusy ? '正在保存…' : '保存个性化资料' }}</button>
+            <legend class="sr-only">个人资料</legend>
+            <div class="form-pair">
+              <label for="profile-major">专业<input id="profile-major" v-model.trim="profile.major" maxlength="100" placeholder="你的专业" /></label>
+              <label for="profile-grade">年级<input id="profile-grade" v-model.trim="profile.grade" maxlength="50" placeholder="例如：大二" /></label>
+            </div>
+            <div class="form-pair profile-interests">
+              <label for="profile-skills">擅长什么<input id="profile-skills" v-model="profile.skillsText" maxlength="819" placeholder="Java、摄影、机械制图" /></label>
+              <label for="profile-direction">发展方向<input id="profile-direction" v-model.trim="profile.careerDirection" maxlength="200" placeholder="就业、考研，或正在探索" /></label>
+            </div>
+            <label for="profile-bio">关于我<textarea id="profile-bio" v-model.trim="profile.bio" maxlength="500" rows="2" placeholder="简单介绍自己，请勿填写敏感信息"></textarea></label>
+            <div class="profile-save-row">
+              <span class="profile-save-status" aria-live="polite"><template v-if="profileStatus && !checkpoint.isDirty()">{{ profileStatus }}</template><template v-else-if="profileLoaded && checkpoint.isDirty()">尚未保存</template></span>
+              <button type="submit" :disabled="accountBusy || !profileLoaded || !checkpoint.isDirty()">{{ profileBusy ? '保存中…' : '保存资料' }}</button>
+            </div>
           </fieldset>
         </form>
       </section>
 
-      <section id="security" class="account-card">
-        <h2>找回邮箱</h2>
-        <p v-if="emailLoading" role="status">正在读取邮箱状态…</p>
-        <p v-else-if="emailError" role="alert">{{ emailError }} <button class="secondary" type="button" @click="loadEmail">重试</button></p>
-        <p v-else-if="verifiedEmail">已验证：{{ verifiedEmail }}</p>
-        <p v-else>尚未绑定邮箱。绑定后，忘记密码时才能通过邮件找回。</p>
-        <form class="account-form" :aria-busy="busy" @submit.prevent="requestVerification" @input="emailStatus = ''; emailSubmitError = ''">
-          <label for="account-email">邮箱地址</label>
-          <input id="account-email" v-model.trim="emailForm.email" :disabled="accountBusy" type="email" autocomplete="email" required maxlength="254" placeholder="name@example.com" />
-          <label for="account-current-password">当前密码</label>
-          <input id="account-current-password" v-model="emailForm.password" :disabled="accountBusy" type="password" autocomplete="current-password" required />
-          <p v-if="emailSubmitError" class="form-error" role="alert">{{ emailSubmitError }}</p>
-          <p v-if="emailStatus" role="status">{{ emailStatus }}</p>
-          <button type="submit" :disabled="accountBusy">{{ busy ? '正在发送…' : verifiedEmail ? '更换验证邮箱' : '发送验证邮件' }}</button>
-        </form>
-      </section>
+      <section class="account-settings" aria-labelledby="account-settings-title">
+        <h2 id="account-settings-title">账户与安全</h2>
+        <details id="security" class="account-card account-setting">
+          <summary><span class="setting-label">找回邮箱</span><span class="setting-value" :class="{ 'setting-warning': !emailLoading && !verifiedEmail }" :title="verifiedEmail || undefined">{{ emailLoading ? '读取中' : emailError ? '待核对' : verifiedEmail || '未绑定' }}</span><span class="setting-chevron" aria-hidden="true"></span></summary>
+          <div class="setting-body">
+            <p v-if="emailLoading" role="status">正在读取邮箱…</p>
+            <p v-else-if="emailError" class="form-error" role="alert">{{ emailError }} <button class="secondary" type="button" @click="loadEmail">重试</button></p>
+            <p v-else-if="!verifiedEmail" class="form-hint">绑定验证邮箱后可找回密码。</p>
+            <form class="account-form" :aria-busy="busy" @submit.prevent="requestVerification" @input="emailStatus = ''; emailSubmitError = ''">
+              <label for="account-email">邮箱地址<input id="account-email" v-model.trim="emailForm.email" :disabled="accountBusy" type="email" autocomplete="email" required maxlength="254" placeholder="name@example.com" /></label>
+              <label for="account-current-password">当前密码<input id="account-current-password" v-model="emailForm.password" :disabled="accountBusy" type="password" autocomplete="current-password" required /></label>
+              <p v-if="emailSubmitError" class="form-error" role="alert">{{ emailSubmitError }}</p>
+              <p v-if="emailStatus" role="status">{{ emailStatus }}</p>
+              <button type="submit" :disabled="accountBusy">{{ busy ? '发送中…' : verifiedEmail ? '更换验证邮箱' : '发送验证邮件' }}</button>
+            </form>
+          </div>
+        </details>
 
-      <section id="my-data" class="account-card">
-        <h2>下载我的数据</h2>
-        <p>导出个人资料、对话、反馈、评分、私有项目及保留版本。下载文件包含你的原文，请勿转发给不可信对象。</p>
-        <button class="secondary" type="button" :disabled="exportBusy || accountBusy" @click="exportData">{{ exportBusy ? '正在准备下载…' : '下载 JSON 文件' }}</button>
-      </section>
+        <details id="sessions" class="account-card account-setting" aria-labelledby="sessions-title">
+          <summary id="sessions-title"><span class="setting-label">登录会话</span><span class="setting-value">{{ sessionsError ? '待核对' : sessionsLoading ? '读取中' : sessions.length ? `${sessions.length} 条记录` : '暂无记录' }}</span><span class="setting-chevron" aria-hidden="true"></span></summary>
+          <div class="setting-body">
+            <p v-if="sessionsStatus" role="status">{{ sessionsStatus }}</p>
+            <p v-if="sessionsError" class="form-error" role="alert">{{ sessionsError }}</p>
+            <p v-else-if="sessionsBusy" role="status">正在更新会话…</p>
+            <ul class="session-list"><li v-for="(session, index) in sessions" :key="index"><strong>{{ session.current ? '当前会话' : '其他会话' }}</strong><span>登录于 {{ sessionDate(session.createdAt) }}</span><small>到期 {{ sessionDate(session.expiresAt) }}</small></li></ul>
+            <div class="session-actions"><button class="secondary" :disabled="sessionsBusy" @click="loadSessions">刷新记录</button><button :disabled="sessionsBusy || Boolean(sessionsError) || !sessions.some(s => !s.current)" @click="revokeOthers">{{ revokeBusy ? '退出中…' : '退出其他会话' }}</button></div>
+          </div>
+        </details>
 
-      <section id="sessions" class="account-card" aria-labelledby="sessions-title">
-        <h2 id="sessions-title">管理登录会话</h2>
-        <p>查看最近100个有效会话。不采集设备指纹，因此不推测设备名称或位置。</p>
-        <p v-if="sessionsStatus" role="status">{{ sessionsStatus }}</p>
-        <p v-if="sessionsError" class="form-error" role="alert">{{ sessionsError }}</p>
-        <p v-else-if="sessionsBusy" role="status">正在更新会话…</p>
-        <ul class="session-list"><li v-for="(session, index) in sessions" :key="index"><strong>{{ session.current ? '当前会话' : '其他会话' }}</strong><span>登录于 {{ sessionDate(session.createdAt) }}</span><small>到期 {{ sessionDate(session.expiresAt) }}</small></li></ul>
-        <div class="session-actions"><button class="secondary" :disabled="sessionsBusy" @click="loadSessions">刷新记录</button><button :disabled="sessionsBusy || Boolean(sessionsError) || !sessions.some(s => !s.current)" @click="revokeOthers">{{ revokeBusy ? '正在退出…' : '退出其他会话' }}</button></div>
+        <details class="account-card account-setting"><summary><span class="setting-label">教学身份</span><span class="setting-chevron" aria-hidden="true"></span></summary><div class="setting-body"><TeachingIdentityPanel ref="identityPanel" tabindex="-1" /></div></details>
+        <details class="account-card account-setting"><summary><span class="setting-label">额度记录</span><span class="setting-chevron" aria-hidden="true"></span></summary><div class="setting-body"><TokenActivityPanel /></div></details>
+        <section id="my-data" class="account-card account-data-row" aria-labelledby="account-data-title">
+          <div><h3 id="account-data-title">我的数据</h3><p>含个人资料与原文，请妥善保管。</p></div>
+          <button class="secondary" type="button" :disabled="exportBusy || accountBusy" @click="exportData">{{ exportBusy ? '准备中…' : '下载数据' }}</button>
+        </section>
+        <ProductUpdates id="product-updates" ref="updatesPanel" :disabled="accountBusy" @activate="openProductFeature" />
+        <details id="close-account" class="account-card account-setting danger-card">
+          <summary><span class="setting-label">删除账户</span><span class="setting-chevron" aria-hidden="true"></span></summary>
+          <div class="setting-body">
+            <p>永久删除无法撤销。已发布的公共校园资料可能仍保留，详见隐私说明。</p>
+            <form class="account-form" :aria-busy="deleteBusy" @submit.prevent="deleteAccount" @input="deletionError = ''">
+              <label for="account-delete-password">当前密码<input id="account-delete-password" v-model="deletion.password" :disabled="accountBusy" type="password" autocomplete="current-password" required /></label>
+              <p v-if="deletionError" class="form-error" role="alert">{{ deletionError }}</p>
+              <button class="danger" type="submit" :disabled="accountBusy">{{ deleteBusy ? '处理中…' : '永久删除账户' }}</button>
+            </form>
+          </div>
+        </details>
       </section>
-
-      <TokenActivityPanel />
-      <section id="close-account" class="account-card danger-card">
-        <h2>永久删除账户</h2>
-        <p>此操作不可撤销。已发布的公共校园资料可能仍保留，详见隐私说明。</p>
-        <form class="account-form" :aria-busy="deleteBusy" @submit.prevent="deleteAccount" @input="deletionError = ''">
-          <label for="account-delete-password">输入当前密码确认身份</label>
-          <input id="account-delete-password" v-model="deletion.password" :disabled="accountBusy" type="password" autocomplete="current-password" required />
-          <p v-if="deletionError" class="form-error" role="alert">{{ deletionError }}</p>
-          <button class="danger" type="submit" :disabled="accountBusy">{{ deleteBusy ? '正在处理…' : '删除我的账户' }}</button>
-        </form>
-      </section>
-      <RouterLink to="/privacy" class="privacy-link">查看隐私说明 →</RouterLink>
-      </div>
     </div>
   </main>
 </template>
 
 <style scoped>
-fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
-.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-.account-card .form-error { color: #a43434; }
-.account-page { min-height: 100svh; background: #f7f8fa; color: #1d1d1f; }
-.session-list { padding:0; list-style:none; }.session-list li { display:grid; gap:6px; padding:16px 0; border-bottom:1px solid #dce1d4; }.session-list span,.session-list small { color:#525e64; font-size:14px; }.session-actions { display:flex; flex-wrap:wrap; gap:12px; }
-.account-header { height: 72px; padding: 0 max(24px, calc((100vw - 960px)/2)); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e5e7eb; background: #fff; }
-.back-link, .privacy-link { color: #3565ae; text-decoration: none; font-size: 14px; }
-.brand { font-weight: 700; letter-spacing: -.03em; }
-.account-content { max-width: 720px; padding: 68px 24px 100px; margin: auto; }
-.eyebrow, .card-index { color: #78808c; font-size: 12px; font-weight: 700; letter-spacing: .15em; }
-h1 { font-size: clamp(40px, 7vw, 64px); letter-spacing: -.07em; margin: 12px 0; }
-.lede { color: #6e7580; font-size: 18px; margin: 0 0 38px; }
-.account-card { padding: clamp(24px, 4vw, 38px); background: #fff; border: 1px solid #e7e9ec; border-radius: 28px; margin-bottom: 18px; box-shadow: 0 12px 32px rgba(30, 40, 60, .035); }
-h2 { font-size: 25px; margin: 12px 0 8px; letter-spacing: -.035em; }
-.account-card p { color: #69717c; line-height: 1.65; margin: 0 0 22px; }
-.account-form { display: grid; gap: 10px; max-width: 390px; }.profile-form { max-width: none; }.form-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-label { font-size: 13px; color: #555e6b; font-weight: 600; }
-input,textarea { box-sizing: border-box; display: block; width: 100%; min-height: 48px; padding: 0 15px; margin-top: 8px; border-radius: 13px; border: 1px solid #d9dde4; background: #fbfcfe; color: #1d1d1f; font: inherit; outline: 0; }textarea { min-height: 90px; padding-top: 13px; resize: vertical; }
-input:focus-visible,textarea:focus-visible { border-color: #4079d5; box-shadow: 0 0 0 3px #4079d522; }
-button { border: 0; cursor: pointer; border-radius: 13px; background: #1967d2; color: #fff; font-weight: 600; min-height: 46px; padding: 0 22px; margin-top: 10px; transition: transform .2s ease, background .2s ease; }
-button:hover:not(:disabled) { transform: translateY(-2px); background: #0f55b6; }
-button:disabled { opacity: .55; cursor: wait; }
-button.secondary { background: #edf3fc; color: #245da6; }
-.danger-card { border-color: #f0dfdf; }
-button.danger { background: #ae313a; }
-button.danger:hover:not(:disabled) { background: #92242c; }
-.privacy-link { display: inline-block; margin-top: 10px; }
-@media (prefers-reduced-motion: reduce) { button { transition: none; } }
-@media (max-width: 560px) { .form-pair { grid-template-columns: 1fr; } input,textarea { font-size: 16px; } }
+fieldset { border:0; padding:0; margin:0; min-width:0; }
+.sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+.account-page { color:var(--assistant-ink,#29323c); }
+:global(html:root body .workspace-page .account-page--profile .account-content) { box-sizing:border-box; width:100%; max-width:840px; margin:auto; padding:32px 32px 64px; }
+:global(html:root body .workspace-page .account-page--profile .account-intro) { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:0; margin:0 0 16px; border:0; }
+:global(html:root body .workspace-page .account-page--profile .account-intro h1) { margin:0; font-size:28px; font-weight:600; line-height:1.3; letter-spacing:-.025em; }
+.privacy-link { flex:none; color:#526984; font-size:13px; text-decoration:none; }
+.privacy-link:hover { color:#165dc4; text-decoration:underline; text-underline-offset:4px; }
+:global(html:root body .workspace-page .account-page--profile .identity-panel) { padding:16px 0 28px; margin:0; border:0; border-bottom:1px solid var(--assistant-line,#e2e7ec); border-radius:0; box-shadow:none; background:transparent; }
+:global(html:root body .workspace-page .account-page--profile .identity-copy h2) { margin:0 0 4px; font-size:24px; font-weight:600; letter-spacing:-.02em; }
+:global(html:root body .workspace-page .account-page--profile .identity-copy p) { display:inline; margin:0; font-size:13px; color:#5d6876; }
+:global(html:root body .workspace-page .account-page--profile .identity-actions button),
+:global(html:root body .workspace-page .account-page--profile .identity-admin-link) { min-height:44px; margin:0; padding:8px 12px; border:0; border-radius:10px; font-size:13px; background:#e8f0fd; color:#245b9e; }
+:global(html:root body .workspace-page .account-page--profile .account-card) { min-width:0; padding:0; margin:0; border:0; border-bottom:1px solid var(--assistant-line,#e2e7ec); border-radius:0; box-shadow:none; background:transparent; }
+:global(html:root body .workspace-page .account-page--profile .account-profile) { padding:28px 0; }
+.account-section-heading { display:flex; align-items:baseline; gap:10px; margin-bottom:20px; }
+:global(html:root body .workspace-page .account-page--profile .account-section-heading h2),
+:global(html:root body .workspace-page .account-page--profile .account-settings > h2) { margin:0; font-size:16px; line-height:1.4; font-weight:600; }
+.account-section-heading > span { color:#5d6876; font-size:12px; }
+.account-form { display:grid; gap:16px; max-width:440px; }
+.profile-form { max-width:none; }
+.form-pair { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:16px; }
+label { display:block; min-width:0; font-size:13px; line-height:1.5; color:#4b5b6e; font-weight:500; }
+input,textarea { box-sizing:border-box; display:block; width:100%; min-width:0; min-height:46px; margin-top:7px; padding:10px 12px; border:1px solid #dbe3ec; border-radius:10px; background:#f8fafc; color:var(--assistant-ink,#29323c); font:inherit; font-size:16px; line-height:1.5; caret-color:#165dc4; }
+textarea { min-height:84px; resize:vertical; }
+input::placeholder,textarea::placeholder { color:#657286; }
+input:focus-visible,textarea:focus-visible { outline:2px solid #0b62db; outline-offset:1px; border-color:transparent; background:#fff; }
+.profile-save-row { display:flex; align-items:center; justify-content:space-between; gap:16px; min-height:44px; }
+.profile-save-status { color:#48647f; font-size:13px; line-height:1.5; }
+:global(html:root body .workspace-page .account-page--profile .account-card p) { margin:0 0 14px; color:#5d6876; font-size:13px; line-height:1.6; }
+:global(html:root body .workspace-page .account-page--profile .account-card p.form-error) { color:#a43434; }
+:global(html:root body .workspace-page .account-page--profile .account-card button) { display:inline-flex; align-items:center; justify-content:center; flex:none; min-height:44px; margin:0; padding:10px 16px; border:0; border-radius:10px; background:#0b62db; color:#fff; font:inherit; font-size:14px; font-weight:500; cursor:pointer; transition:background-color 160ms ease,color 160ms ease,box-shadow 160ms ease,scale 180ms cubic-bezier(.22,.8,.24,1); }
+:global(html:root body .workspace-page .account-page--profile .account-card button.secondary) { background:#e8f0fd; color:#245b9e; }
+:global(html:root body .workspace-page .account-page--profile .account-card button.danger) { background:#b33440; color:#fff; }
+button:disabled { opacity:.55; cursor:not-allowed; }
+button:focus-visible,.privacy-link:focus-visible { outline:2px solid #0b62db; outline-offset:3px; }
+.account-settings { padding-top:28px; }
+:global(html:root body .workspace-page .account-page--profile .account-settings > h2) { margin-bottom:8px; }
+.account-setting > summary { display:flex; align-items:center; gap:12px; min-height:64px; list-style:none; cursor:pointer; }
+.account-setting > summary::-webkit-details-marker { display:none; }
+.setting-label { flex:none; font-size:14px; font-weight:500; }
+.setting-value { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-left:auto; color:#5d6876; font-size:13px; }
+.setting-warning { color:#805617; }
+.setting-chevron { flex:none; width:7px; height:7px; margin-left:auto; margin-right:3px; border-top:1.5px solid #708096; border-right:1.5px solid #708096; transform:rotate(45deg); transition:transform 220ms cubic-bezier(.22,.8,.24,1); }
+.setting-value + .setting-chevron { margin-left:0; }
+.account-setting[open] > summary .setting-chevron { transform:rotate(135deg); }
+.account-setting > summary:focus-visible { outline:2px solid #0b62db; outline-offset:-2px; border-radius:8px; }
+.setting-body { padding-bottom:22px; }
+.setting-body :deep(#token-activity.account-card) { padding:0; margin:0; border:0; }
+.setting-body :deep(.teaching-identity) { padding:0; }
+.session-list { list-style:none; margin:0 0 16px; padding:0; }
+.session-list li { display:grid; gap:4px; padding:12px 0; border-bottom:1px solid var(--assistant-line,#e2e7ec); font-size:13px; }
+.session-list span,.session-list small { color:#5d6876; font-size:12px; }
+.session-actions { display:flex; flex-wrap:wrap; gap:8px; }
+:global(html:root body .workspace-page .account-page--profile .account-data-row) { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:18px 0; }
+.account-data-row > div { min-width:0; }
+.account-data-row h3 { margin:0 0 4px; font-size:14px; font-weight:500; }
+:global(html:root body .workspace-page .account-page--profile .account-data-row p) { margin:0; font-size:12px; }
+.danger-card > summary { color:#a43434; }
+@media(max-width:600px) {
+  :global(html:root body .workspace-page .account-page--profile .account-content) { padding:24px 20px 48px; }
+  :global(html:root body .workspace-page .account-page--profile .account-intro h1) { font-size:26px; }
+  :global(html:root body .workspace-page .account-page--profile .identity-copy h2) { font-size:22px; }
+  .profile-interests { grid-template-columns:minmax(0,1fr); }
+  .account-form { gap:14px; }
+  .form-pair { gap:12px; }
+}
+@media(max-width:359px) { .form-pair { grid-template-columns:minmax(0,1fr); }.account-data-row{align-items:flex-start;flex-direction:column} }
+@media(prefers-reduced-motion:reduce) { .setting-chevron { transition:none; } :global(html:root body .workspace-page .account-page--profile .account-card button) { transition:none; } }
 </style>

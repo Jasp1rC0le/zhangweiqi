@@ -47,6 +47,7 @@ const router = createRouter({
       children: [
         { path: '', name: 'chat', component: { render: () => null } },
         { path: '/canteens', name: 'canteens', component: CanteenView },
+        { path: '/campus', name: 'campus', component: () => import('@/views/CampusView.vue') },
         { path: '/projects/:id?', name: 'projects', component: ProjectStudioView },
         { path: '/reviews/:id?', name: 'reviews', component: () => import('@/views/ProjectReviewsView.vue') },
         { path: '/account', name: 'account', component: AccountView },

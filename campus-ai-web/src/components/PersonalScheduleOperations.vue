@@ -354,10 +354,10 @@ onBeforeUnmount(() => {
       :aria-expanded="open"
       @click="toggle"
     >
-      {{ open ? '收起个人课表操作' : '单日改课、批量操作与历史恢复' }}
+      {{ open ? '收起' : '修改安排与历史' }}
     </button>
     <div v-if="open">
-      <p>仅修改本人保存的副本。先选学期和具体安排，再预览；原版本保留，不改正式教学。</p>
+      <p>仅修改个人副本，原版本保留。</p>
       <p v-if="busy" role="status">正在核对本人课表…</p>
       <p v-if="error" ref="errorTarget" class="failure" role="alert" tabindex="-1">{{ error }} <button v-if="sourceIntent" type="button" :disabled="locked" @click="retrySourceIntent">重试当前学期核对</button></p>
       <p v-if="notice" role="status">{{ notice }}</p>

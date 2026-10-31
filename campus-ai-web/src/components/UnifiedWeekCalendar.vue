@@ -1,5 +1,7 @@
 <script setup>
 import NavigationIcon from './NavigationIcon.vue'
+import MotionSelection from './MotionSelection.vue'
+import { animateContentChange, stopContentMotion } from '@/utils/interactionMotion'
 import DateField from '@/components/DateField.vue'
 import { computed, onBeforeUnmount, onMounted, reactive, ref, useId, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
@@ -45,6 +47,12 @@ const monday = ref(mondayOf(chinaDate())),
   selectedDay = ref(chinaDate()),
   showWeek = ref(false)
 const dateDraft = ref(selectedDay.value), dateError = ref(''), dateHintId = useId()
+const dayList = ref(), emptyDay = ref()
+watch([selectedDay, () => state.week?.monday, () => state.pagination?.page], () => {
+  if (!state.loading && !state.stale && !state.error && state.week)
+    animateContentChange(displayed.value.length ? dayList.value : emptyDay.value, window, { duration: 260, distance: 8, opacity: .5 })
+}, { flush: 'post' })
+onBeforeUnmount(() => { stopContentMotion(dayList.value); stopContentMotion(emptyDay.value) })
 watch(selectedDay, value => { dateDraft.value = value; dateError.value = '' }, { flush: 'sync' })
 const dateHint = computed(() => {
   if (dateDraft.value !== selectedDay.value) return `日期尚未应用，当前仍查看${selectedDay.value}所在周。点“查看”后切换。`
@@ -432,6 +440,7 @@ onBeforeUnmount(() => {
       </div>
       <h2 v-if="leadership" class="leadership-records-heading">课程明细</h2>
       <div v-if="!state.pagination || state.pagination.totalPages <= 1" class="calendar-day-tabs" role="group" aria-label="选择上课日期">
+        <MotionSelection :active-key="selectedDay" />
         <button
           v-for="(day, i) in days"
           :key="day"
@@ -443,7 +452,7 @@ onBeforeUnmount(() => {
           ><span>{{ addDays(monday, i).slice(5).replace('-', '/') }}</span>
         </button>
       </div>
-      <ul class="calendar-day-list">
+      <ul ref="dayList" class="calendar-day-list">
         <li v-for="entry in displayed" :key="entry.id" :class="{ cancelled: entry.cancelled }">
           <time><small v-if="state.pagination?.totalPages > 1">{{ entry.date.slice(5).replace('-', '/') }} · 周{{ days[entry.weekday - 1] }}</small>{{ entry.timeLabel }}<small v-if="entry.startPeriod && entry.endPeriod" class="calendar-period">第{{ entry.startPeriod }}{{ entry.startPeriod===entry.endPeriod?'':'—'+entry.endPeriod }}节</small></time>
           <div>
@@ -474,7 +483,7 @@ onBeforeUnmount(() => {
           </button>
         </li>
       </ul>
-      <section v-if="!displayed.length" class="calendar-empty"><NavigationIcon name="timetable" /><h2>当天暂无已保存课程</h2><p>切换日期，或导入课表</p></section>
+      <section v-if="!displayed.length" ref="emptyDay" class="calendar-empty"><NavigationIcon name="timetable" /><h2>当天暂无已保存课程</h2><p>切换日期，或导入课表</p></section>
       <button
         v-if="state.week.gridSafe"
         type="button"

@@ -37,8 +37,11 @@ const loginPresent = ref(false)
 const contactPresent = ref(false)
 const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)')
 const reducedMotion = ref(motionPreference.matches)
+const authLayoutPreference = window.matchMedia('(max-width: 760px)')
+const mobileAuth = ref(authLayoutPreference.matches)
+const updateAuthLayout = event => { mobileAuth.value = event.matches }
 const modalDuration = computed(() => reducedMotion.value ? 0 : { enter: 700, leave: 340 })
-const authModalDuration = computed(() => reducedMotion.value ? 0 : { enter: 520, leave: 260 })
+const authModalDuration = computed(() => reducedMotion.value ? 0 : mobileAuth.value ? { enter: 720, leave: 180 } : { enter: 700, leave: 340 })
 const modalOrigin = ref({})
 const authViewport = ref({ height: window.innerHeight, top: 0, keyboardOpen: false })
 let authViewportObserver
@@ -56,7 +59,6 @@ function keepAuthInputVisible() {
   else if (canShowAction && actionBox.bottom > bottom) action.scrollIntoView({ block: 'nearest', behavior: 'instant' })
 }
 const destination = ref('/chat')
-const destinationLabel = computed(() => ({ '/canteens': '食堂评分', '/study': '实验与作业', '/projects': '我的项目', '/wall': '校园墙', '/timetable': '课表' })[destination.value] || `${heroExample.value.label}工作台`)
 const documentHidden = ref(document.hidden)
 const authBusy = computed(() => loading.value || registerLoading.value)
 let previousBodyOverflow = ''
@@ -68,9 +70,9 @@ const authDirection = ref(1)
 let pendingRecovery = false
 let disposed = false
 let authFormObserver
-watch([loginVisible, authMode], async ([visible]) => {
+watch([loginVisible, authMode, mobileAuth], async ([visible, , phone]) => {
   authFormObserver?.disconnect()
-  if (!visible) return
+  if (!visible || phone) { authStageHeight.value = null; return }
   await nextTick()
   if (disposed || !loginVisible.value) return
   const formElement = document.getElementById(authMode.value === 'login' ? 'login-title' : 'register-title')?.closest('.auth-form')
@@ -187,7 +189,12 @@ async function openLogin(mode = 'login', event, target = '/chat') {
 
 function focusLogin() {
   if (!loginVisible.value) return
-  if (window.matchMedia('(max-width: 760px)').matches) { document.querySelector('.auth-fullscreen .dialog-close')?.focus({ preventScroll: true }); return }
+  if (window.matchMedia('(max-width: 760px)').matches) {
+    const active = document.activeElement
+    if (active?.closest('.auth-dialog') && active.matches('input, textarea, select')) return
+    document.querySelector('.auth-fullscreen .dialog-close')?.focus({ preventScroll: true })
+    return
+  }
   if (authMode.value === 'register') registerUsernameInput.value?.focus({ preventScroll: true })
   else usernameInput.value?.focus({ preventScroll: true })
 }
@@ -208,6 +215,7 @@ async function finishLoginClose() {
   authStageHeight.value = null
   document.body.style.overflow = previousBodyOverflow
   await nextTick()
+  if (mobileAuth.value) measureChapters()
   if (pendingRecovery) {
     pendingRecovery = false
     await router.push('/forgot-password')
@@ -401,9 +409,11 @@ function goToPage(index) {
 }
 
 function trackChapter() {
+  if (disposed || (mobileAuth.value && loginPresent.value)) return
   if (pageScrollFrame != null) return
   pageScrollFrame = requestAnimationFrame(() => {
     pageScrollFrame = null
+    if (disposed || (mobileAuth.value && loginPresent.value)) return
     let current = 0
     pages.forEach((page, index) => {
       if (document.getElementById(`chapter-${page.id}`)?.getBoundingClientRect().top <= innerHeight * .35) current = index
@@ -418,6 +428,7 @@ function trackChapter() {
 }
 
 function measureChapters() {
+  if (disposed || (mobileAuth.value && loginPresent.value)) return
   // Sticky chapters must fit the viewport, otherwise their lower controls are
   // covered by the next chapter before the reader can reach them.
   tallPages.value = [...document.querySelectorAll('.landing .story-page')]
@@ -448,6 +459,7 @@ onMounted(() => {
   demoVisibilityObserver = new IntersectionObserver(entries => { demoInView.value = entries.some(entry => entry.isIntersecting && entry.intersectionRatio >= .2) }, { threshold: [0, .2] })
   if (heroDemo.value) demoVisibilityObserver.observe(heroDemo.value)
   motionPreference.addEventListener('change', updateMotionPreference)
+  authLayoutPreference.addEventListener('change', updateAuthLayout)
   document.addEventListener('visibilitychange', updateVisibility)
   window.addEventListener('keydown', handleEscape)
   preparePage()
@@ -464,6 +476,7 @@ onBeforeUnmount(() => {
   disposed = true
   document.removeEventListener('visibilitychange', updateVisibility)
   motionPreference.removeEventListener('change', updateMotionPreference)
+  authLayoutPreference.removeEventListener('change', updateAuthLayout)
   authFormObserver?.disconnect()
   chapterObserver?.disconnect()
   window.removeEventListener('keydown', handleEscape)
@@ -516,14 +529,14 @@ onBeforeUnmount(() => {
         <div class="hero-copy">
           <div class="hero-intro">
           <h1 id="hero-title">把好奇心，<br /><em>变成下一步。</em></h1>
-          <p class="hero-subtitle">校园问答、论文思路、代码灵感。<br />一个入口，陪你把问题往前推进。</p>
+          <p class="hero-subtitle">校园问答 · 论文 · 代码</p>
           </div>
           <div class="hero-actions">
             <button class="hero-cta" type="button" @click="openLogin('login', $event)">
               开始体验 <span class="action-circle"><ArrowRight aria-hidden="true" /></span>
             </button>
             <button class="explore-cue" type="button" @click="goToPage(1)">
-              <span>探索更多 <small>看看它能帮你做什么</small></span>
+              <span>探索更多</span>
               <span class="explore-cue-arrow" aria-hidden="true"><ArrowRight /></span>
             </button>
           </div>
@@ -552,8 +565,6 @@ onBeforeUnmount(() => {
             <div class="hero-demo-stage"><Transition name="hero-example">
               <div :key="heroExample.key" class="hero-demo-content">
                 <strong class="hero-demo-result">{{ heroExample.output }}</strong>
-                <ul class="hero-demo-details"><li v-for="detail in heroExample.details" :key="detail"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 8 3 3 7-7" /></svg>{{ detail }}</li></ul>
-                <p class="hero-demo-hint">{{ heroExample.hint }}</p>
               </div>
             </Transition></div>
             </div>
@@ -566,7 +577,6 @@ onBeforeUnmount(() => {
     <section id="experience" class="experience story-page" :class="{ 'is-current': activePage === 1, 'is-tall': tallPages.includes('experience') }" aria-labelledby="experience-title">
       <div class="section-intro">
         <h2 id="experience-title">不止一个答案。<br />是让想法向前的工作台。</h2>
-        <p>从零散的问题，到清楚的思路。<br />选一个入口，开始你的下一步。</p>
       </div>
       <div class="capability-grid">
         <article v-for="item in capabilities" :key="item.number" class="capability-card" :data-kind="item.number">
@@ -590,15 +600,13 @@ onBeforeUnmount(() => {
             </template>
           </div>
           <div class="capability-caption"><h3>{{ item.title }}</h3><button type="button" :aria-label="`登录后使用${item.title}功能`" @click="openWorkspace(item.number === '01' ? 'standard' : item.number === '02' ? 'kimi' : 'glm', $event)"><ArrowRight aria-hidden="true" /></button></div>
-          <p>{{ item.description }}</p>
         </article>
       </div>
       <p class="showcase-note">功能示意 · 不会自动发送问题</p>
       <div class="campus-tools" aria-label="更多校园工具">
-        <p>学习之外，也照顾你的校园日常。</p>
         <div class="campus-tool-links">
           <button v-for="tool in campusTools" :key="tool.route" type="button" @click="openLogin('login', $event, tool.route)">
-            <NavigationIcon :name="tool.icon" /><span><strong>{{ tool.title }}</strong><small>{{ tool.description }}</small></span><ArrowRight aria-hidden="true" />
+            <NavigationIcon :name="tool.icon" /><span><strong>{{ tool.title }}</strong></span><ArrowRight aria-hidden="true" />
           </button>
         </div>
       </div>
@@ -609,12 +617,6 @@ onBeforeUnmount(() => {
       <HomeLifeScene />
       <div class="life-content">
         <h2 id="life-title">认真学习。<br /><i>也好好生活。</i></h2>
-        <p>
-          选一顿合心意的饭，分享新鲜事，认识同校搭子。
-        </p>
-        <div class="life-status">
-          <span class="status-light"></span> 商家资料由本校管理员审核发布
-        </div>
         <button type="button" @click="openLogin('login', $event, '/canteens')">
           看看食堂 <ArrowRight aria-hidden="true" />
         </button>
@@ -659,6 +661,7 @@ onBeforeUnmount(() => {
             >
               <Close />
             </button>
+            <span class="auth-entry-curtain" aria-hidden="true"></span>
             <div class="auth-art" aria-hidden="true">
               <span class="art-brand"><CampMark /> Campthink.</span>
               <span class="auth-mini-orb"></span>
@@ -693,10 +696,9 @@ onBeforeUnmount(() => {
                   创建账户
                 </button>
               </div>
-              <div class="auth-stage" :class="{ 'is-register': authMode === 'register' }" :style="authStageHeight ? { height: `${authStageHeight}px` } : undefined"><Transition name="auth-step" @before-leave="deactivateAuthForm" @before-enter="activateAuthForm">
+              <div class="auth-stage" :class="{ 'is-register': authMode === 'register' }" :style="!mobileAuth && authStageHeight ? { height: `${authStageHeight}px` } : undefined"><Transition name="auth-step" @before-leave="deactivateAuthForm" @before-enter="activateAuthForm">
                 <div v-if="authMode === 'login'" id="auth-panel-login" key="login" class="auth-form" role="tabpanel" aria-labelledby="auth-tab-login">
                   <h2 id="login-title">欢迎回来</h2>
-                  <p class="form-lead">登录后进入{{ destinationLabel }}，随时可以切换功能</p>
                   <el-form :model="form" :disabled="loading" :aria-busy="loading" @submit.prevent="submitLogin">
                     <label for="login-username">用户名</label>
                     <el-form-item
@@ -722,9 +724,9 @@ onBeforeUnmount(() => {
                         show-password
                     /></el-form-item>
                     <p v-if="loginError" id="login-error" class="login-error" role="alert">{{ loginError }}</p>
-                    <button class="form-submit" type="submit" :disabled="loading">
+                    <button class="form-submit login-submit" :class="{ 'is-loading': loading }" type="submit" :disabled="loading" :aria-label="loading ? '正在登录' : '登录'" :aria-busy="loading">
                       <span>{{ loading ? '正在登录…' : '登录' }}</span
-                      ><ArrowRight aria-hidden="true" />
+                      ><span v-if="loading" class="auth-submit-spinner" aria-hidden="true"></span><ArrowRight v-else aria-hidden="true" />
                     </button>
                   </el-form>
                   <button
@@ -738,7 +740,6 @@ onBeforeUnmount(() => {
                 </div>
                 <div v-else id="auth-panel-register" key="register" class="auth-form" role="tabpanel" aria-labelledby="auth-tab-register">
                   <h2 id="register-title">创建账户</h2>
-                  <p class="form-lead">用真实的校园身份，开始你的探索。</p>
                   <el-form :model="registerForm" :disabled="registerLoading" :aria-busy="registerLoading" @submit.prevent="submitRegistration">
                     <label for="register-school">学校</label>
                     <el-form-item
@@ -763,7 +764,7 @@ onBeforeUnmount(() => {
                     </div>
                     <label for="register-identity">你的身份</label>
                     <el-form-item><el-select id="register-identity" v-model="registerForm.teachingIdentity" size="large" :teleported="false" aria-describedby="register-identity-help"><el-option v-for="(label, value) in IDENTITY_ROLES" :key="value" :label="label" :value="value" /></el-select></el-form-item>
-                    <p id="register-identity-help" class="identity-registration-help">{{ registerForm.teachingIdentity === 'STUDENT' ? '学生可直接使用基础功能；教学课表由管理员绑定本人账号。' : '此项为身份申请。管理员审核后，仍需单独配置课程、班级或学院范围。' }}</p>
+                    <p id="register-identity-help" class="identity-registration-help">{{ registerForm.teachingIdentity === 'STUDENT' ? '基础功能可用；教学课表需另行绑定。' : '身份需审核；课程与管理范围另行授权。' }}</p>
                     <div class="form-columns">
                       <div>
                         <label for="register-username">用户名</label
@@ -832,7 +833,7 @@ onBeforeUnmount(() => {
                   </el-form>
                 </div>
               </Transition></div>
-              <p class="auth-note">账户信息仅用于提供校园智能服务，不向其他用户展示。</p>
+              <p class="auth-note"><RouterLink to="/privacy">隐私说明</RouterLink></p>
             </div>
           </section>
         </div>

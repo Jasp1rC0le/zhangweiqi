@@ -112,7 +112,7 @@ test('actual chapter tracker activates the visible last chapter at the real bott
   const activePage = {value:-1}
   const scroller = {scrollTop:2261,scrollHeight:3277,clientHeight:1016}
   const tops = {top:-2261,experience:-1393,canteen:-362.5,closing:356.6875}
-  const context = {pages,activePage,pageScrollFrame:null,innerHeight:1016,requestAnimationFrame:fn=>{fn();return 1},document:{scrollingElement:scroller,documentElement:scroller,getElementById:id=>({getBoundingClientRect:()=>({top:tops[id.replace('chapter-','')]})})}}
+  const context = {pages,activePage,pageScrollFrame:null,disposed:false,mobileAuth:{value:false},loginPresent:{value:false},innerHeight:1016,requestAnimationFrame:fn=>{fn();return 1},document:{scrollingElement:scroller,documentElement:scroller,getElementById:id=>({getBoundingClientRect:()=>({top:tops[id.replace('chapter-','')]})})}}
   actualFunction('trackChapter',context)()
   assert.equal(activePage.value,3)
   context.pageScrollFrame=null;scroller.clientHeight=1185;scroller.scrollTop=2092;tops.closing=525.6875

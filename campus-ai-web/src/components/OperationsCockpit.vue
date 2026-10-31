@@ -32,7 +32,7 @@ const providerName = provider => ({ deepseek: 'DeepSeek', kimi: 'Kimi', glm: 'GL
           <header><h2>资料与索引</h2></header>
           <dl class="operations-facts">
             <div><dt>可检索资料</dt><dd>{{ cockpitCount(overview.searchableDocuments) }} <small>份</small></dd><p>已发布且在有效期内</p></div>
-            <div><dt>索引队列</dt><dd>{{ cockpitCount(overview.pendingBackgroundJobs) }} <small>项待处理</small></dd><p :class="{ 'operation-warning': overview.failedBackgroundJobs > 0 }">失败 {{ cockpitCount(overview.failedBackgroundJobs) }} 项<span v-if="overview.failedBackgroundJobs > 0">{{ failedDetailsAvailable ? ' · 在下方核对' : ' · 明细暂不可用，请刷新核对' }}</span></p></div>
+            <div><dt>索引队列</dt><dd>{{ cockpitCount(overview.pendingBackgroundJobs) }} <small>项待处理</small></dd><p :class="{ 'operation-warning': overview.failedBackgroundJobs > 0 }">历史失败 {{ cockpitCount(overview.failedBackgroundJobs) }} 条<span v-if="overview.failedBackgroundJobs > 0">{{ failedDetailsAvailable ? ' · 在下方核对' : ' · 明细暂不可用，请刷新核对' }}</span></p></div>
           </dl>
         </section>
         <section class="operations-usage" aria-label="最近24小时模型使用">

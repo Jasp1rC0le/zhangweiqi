@@ -41,7 +41,8 @@ test('task shortcuts remain semantic, touch-sized and draft-only', () => {
   assert.match(start, /route: '\/timetable'/)
   assert.match(start, /v-for="item in suggestions"/)
   assert.match(start, /aria-controls="item.action === 'campus'/)
-  assert.match(start, /min-height: 44px/)
+  const heights = [...start.matchAll(/min-height:\s*(\d+)px/g)].map(match => Number(match[1]))
+  assert.ok(heights.length && heights.every(height => height >= 44), 'shortcut targets must remain at least 44px')
   assert.doesNotMatch(start, /submitPrompt|fetch\(|axios/)
 })
 

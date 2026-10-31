@@ -312,6 +312,8 @@ components:
 
 <!-- Approved canteen/community scoped merge: 2026-10-31. Sources: CanteenView, AdminCanteenPanel, MerchantPublisher and merchantPublishing; WallView/AdminWallPanel; canteen/wall services and CommunityTextPolicy. Preserve the incumbent Apple work area. Immediate locally checked social publication supersedes prior pre-moderation only for new reviews, wall posts and replies; it does not change identity or knowledge approval. Source documentation and synthetic finish evidence are not a public-release, physical-device or comprehensive-compliance verdict. -->
 
+<!-- Campus-morning source-only merge: 2026-10-31. Sources: CanteenView, MerchantPhotoViewer, merchantCategories, AccountView, SchoolInvoiceInfo, schoolInvoice and workspaceNavigation. Surface: .impeccable/surfaces/campus-morning-20261031.md. Gallery controls, category shortcuts and invoice copy inherit the existing workspace. The 02:40 backend/import receipt keeps frontendChanged=false; Work browser tools remain disabled. No rendered QA, fresh visual ship, physical-device acceptance or new-UI deployment is claimed. No primitive tokens were added. -->
+
 ## Overview
 
 **Creative North Star: "Campthink"**
@@ -589,6 +591,32 @@ sidecar 的八级色阶由这些颜色生成，供面板展示明暗变化；它
 - **Immediate Social State:** 已登录同校账户可评价；新安全评价、动态和回复经本地有限规则检查后直接公开，显示时间。普通差评可保留，公开文本不展示账户名。举报与后续隐藏独立于首次发布；历史待审／隐藏内容不批量重新公开。有限规则不等于全面合规认证，不将社区内容自动加入知识库或交给模型。
 - **Scope:** 上述立即发布只覆盖社区内容。教学身份仍须核验，知识资料仍按原审核发布；正式教学／名单／任务执行开关的边界不变。源码／合成证据与真实发布、学校权限和物理微信键盘验收分开记录。
 
+### Merchant Menus and School Invoice — 2026-10-31 morning candidate
+
+- **Photo Access:** 列表以保比例的轻量封面和“查看菜单”按钮进入原生模态查看器；同一家商家的多张菜单仍共用同一评价对象。查看器保留完整图片、页数、上一张／下一张、缩略图选择与新页面放大；加载失败、图片失败及下架回执各有文字反馈。关闭、方向键与可见焦点沿用原生对话框及既有图标，账户／学校切换或卸载时关闭并取消读取。
+- **Quick Filters:** 单一食堂不重复显示食堂选择；“全部／吃饭／面食／热锅／小吃／饮品”使用横向可滚动按钮和明确选中态，可与搜索、排序组合。分类来自名称／说明的有限匹配，允许一店多类，不表示学校官方分类、完整菜单或实时供应。该暖色筛选与图片舞台仅属于食堂面，不提升为全站令牌。
+- **Invoice Entry:** 工作区工具与账户目录定位到“学校开票”。抬头、税号、财务处来源和核对日期分层显示；桌面并列、窄屏上下排列。复制成功给回执；剪贴板不可用时提供只读文本与全选，读取失败给重试，本校未收录给明确空态。账号／学校切换、页面隐藏及卸载清理复制状态，不将另一学校的数据复用为本校信息。
+- **Source / Acceptance:** 控件沿用系统字体、暖色食堂动作及 `assistant-*` 账户语义；候选源码保留至少44px动作高度、16px手动复制字段与减少重复位置文字。数值是本页实现记录，不是新增共享规范。Work浏览器工具禁用，尚无本轮渲染截图、双端几何或视觉ship；生产已导入照片及提供后端API不代表候选界面已部署。策略与待验收状态见 `.impeccable/surfaces/campus-morning-20261031.md`。
+
+### Compact Ratings, Home and Mobile Auth — 2026-10-31 daytime
+
+用户新授权覆盖前述九点候选的列表密度与当前手机认证转场。保留各域配色、系统字体和原有行为；上线版本`ui-density-20261031-v1`，不借用此前视觉ship。
+
+- **Ratings:** 自适应最小300px栏，间距12px，店铺内边距16px；方形/竖向预览80px在左，横图112px置顶并contain。名称18px、真实均分26px；星级触控44px，极窄容器允许换行。选星只改草稿，保存仍显式；短评默认收纳，展开解除精选长文截断。
+- **Home/Copy:** 四个26px图标与主要标签形成入口；来源、时间及非实时同步说明在日程来源披露，设置/产品更新在More。公开首页与认证删重复介绍，不删除示例标识、隐私或授权后果。
+- **Auth Motion:** 手机620ms连续曲面揭示与480ms+100ms表单到达、300ms退出；真实请求中的按钮收拢及加载标志与原生ViewTransition 620ms／元素回退520ms的工作台到达衔接。减弱动态效果取消动画，原键盘/焦点/错误恢复语义保留。不使用参考视频的品牌或配色。
+- **Admin History:** 首5条紧凑失败记录、完整错误/全部历史按需展开；暂停/未知执行状态仍无重试入口，重试次数不作为完成进度。
+- **Evidence:** 独立源码五节复核、1242项最终前端测试、静态/构建及132份公网HTTP指纹通过。新版渲染QA0轮、真机流畅度/CLS未测；用户图片/视频只作参考，没有新增上线位图或视频。范围和回执见 docs/ui-density-2026-10-31.md。
+
+### Minimal Chat and Connected Motion — 2026-10-31 public acceptance
+
+本批用户新要求取代前述Compact段的聊天日程/More展示与相关动效参数。仅主标题、4个图标入口保留在空态；入口名称由aria/title和辅助文本承担。聚焦手机聊天输入框后无记录只标题、有记录保持消息；不隐藏整个welcome，也不丢其他任务的表单状态。
+
+- **Motion:** 手机认证620ms整屏translate3d到达、300ms退出；成功工作台原生新内容到达620ms（既有容器几何组780ms）/元素回退480ms；功能面板280ms到达和160ms退出；公共根页面300ms/160ms，手机16px横移只在no-preference生效。减少动态效果、离场inert及导航失败恢复保持。它们是源参数，不是设备帧率认证。
+- **Voice:** 初次同意与原生系统许可分开；空闲已结束实例可同scope复用，活动录入不因保留缓存而继续。权限框中断手势或启动前松手后不发送迟到文字，正常隐藏/取消/scope变化关闭。浏览器仍决定是否再询问，未设置“永久允许”假状态。
+- **Copy:** 去聊天首页日程/更新/More/欢迎段和通用底部介绍；评分只保留实际输入、发布动作及有后果的条件提示，语音无空闲占位转写大框。错误、权限与真实提交后果仍保持可访问。
+- **Evidence:** 本批1251项前端、严格静态、一次生产构建及132份公网指纹通过；独立源码五节评审完成，渲染QA0，用户公网真机验收尚不由本回执宣告通过。见 docs/chat-minimal-motion-2026-10-31.md。
+
 ### Apple Functional Controls
 
 - **Canvas / Fields:** 页面根透明，白色 pane 是画布；评分搜索外层为白色、1px 浅边线与 12px 圆角，内层输入透明、高 44px。历史搜索保留原有输入密度。历史与评分复合搜索由外层 `:focus-within` 绘制 2px 灰蓝焦点、向外偏移 2px；内层 `input:focus-visible` 无 outline 和 box-shadow，不再套独立字段的背景规则。
@@ -629,3 +657,31 @@ sidecar 的八级色阶由这些颜色生成，供面板展示明暗变化；它
 ### 教学身份扩展
 
 2026-10-15沿用Apple工作区和现有语义色。注册四身份选择只提交申请；账户页直接显示本人状态，后台顶部折叠审核，课程/班级/学院绑定仍分开。审核列表采用细分隔，不新增指标卡或角色装饰；主审核操作蓝色，待审琥珀、通过绿色、拒绝/撤销红色，均保留文字。教学身份动作采用独立`.teaching-identity-actions`，不复用会被旧账户按钮覆盖的`.identity-actions`。仅较长注册表单内部滚动，关闭按钮与原动态彩球留在弹窗边界内，原入场和切换动画保留。双端截图与验证范围见docs/overnight-acceptance-2026-10-15.md，不将其视为真实账号或生产启用证明。
+
+### 2026-10-31 公开准备目录增量
+
+继承既有紧凑评分卡、主标题/图标聊天空态及手机转场，不新增全站视觉规范。食堂筛选按一楼、二楼、小食堂排列，短标签附当前已发布数量，完整名称留在aria/title；餐饮类别由已知菜单名称有限匹配，可重叠。公开隐私面保留必要事实、同意和后果，修正联网搜索启用状态。public-ready-20261031-v1的132文件已做公网字节核对，独立源码评审/静态回归不等于渲染或真机视觉ship；本批新版浏览器QA仍为0。局部范围及证据见`.impeccable/surfaces/public-ready-20261031.md`。
+
+### 2026-10-31 浏览器批注修正
+
+基本功能名常显，不再把首页入口名称仅放到辅助标签。账户采用折叠设置与细分隔，反馈主字段为意见和回复方式；次要字段与暂存按需展开。学校开票归校园资料，不混入个人信息。课表、领导考勤/审查保留状态与主要操作，减少重复说明与嵌套框。用户新指令将全屏认证限定760px及以下，桌面恢复原对话框和到达动画，取代旧全窗口规则的桌面部分。范围见`.impeccable/surfaces/browser-refinements-20261031.md`；源码、detector及公网字节结果不替代新画面/真机验收。
+
+### 手机登录连续衔接 — 20:29增量
+
+仅手机认证消费按钮圆端/中段的transform收拢与网站蓝色色面展开；进入表单为短位移/淡入，成功路由后一次工作台到达。桌面继续原模态框和原生/元素回退动效。手机跳过额外pane入场及整页快照，减少动态效果直接导航。局部50px按钮、240/360/320ms节奏是该认证面的实现，不提升为全站token；范围与验证限制见`.impeccable/surfaces/mobile-login-flow-20261031.md`。
+
+### 手机登录入口 — 21:30范围更正
+
+用户最终明确动效作用于点击登录打开面板，成功后与桌面一致。此条取代前述手机成功圆面方案：720ms淡蓝幕面上揭、品牌从中间归位页头、未缩放表单显现；幕层只在进入阶段显示，默认及减少动态效果时隐藏。手机活动表单必须参与自动高度计算，只有退出表单可绝对定位，避免重现已由用户报告的空白。桌面模态框和共用成功交接保持原方案。局部指引在`.impeccable/surfaces/mobile-login-entry-20261031.md`，不形成全站动画token；新手机效果仍待真实反馈。
+
+### 2026-11-01 手机侧栏与商家切换
+
+手机登录入口已获用户确认，本轮不改该入口。760px及以下抽屉跨聊天/工作页统一宽度、内边距、字号和条目高度，360ms位移衔接320ms遮罩；真实按钮留在布局中，由无交互装饰块跟随当前选中项。导航、食堂和分类消费同一选中组件；手机路由内容进入与抽屉收起衔接，桌面保留原路由效果。筛选不重挂列表、不克隆私有表单，形状缓存仅含公开菜单URL/形状且不持久化。减少动态效果关闭新增位移。数值仅适用于该局部，不升级为全站token。范围见`.impeccable/surfaces/mobile-ui-finish-20261101.md`；自动化及静态交付通过，新版物理手机手感仍待真实验收。
+
+### 2026-11-01 个人信息常显
+
+此条替代个人资料全部折叠的账户展示：昵称/账号/核验身份和五项个人资料直接可见；邮箱及会话行保留状态摘要，低频验证、额度、教学身份和删除明细按需展开，数据下载直接可见。采用留白、细分隔和轻输入背景，不重复套整块卡片；手机保留16px表单字体和44px操作目标。范围见`.impeccable/surfaces/account-profile-20261101.md`；没有改变真实业务动作或身份核验门槛，0轮新渲染QA。
+
+### 2026-11-01 上课提醒与切换补齐
+
+上课提醒设置为课表页一行原生展开项，默认关闭；开启前明确页面内提醒范围，日历下载不冒充已经导入或已授权系统通知。提醒浮层不抢焦点，可关闭并跳到本人对应日期；账号、页面可见性和模态状态变化清除旧展示。只展示已核对的钟点，不猜作息。日期、话题、学习任务和项目步骤继续使用无交互选中背景；内容采用既有可取消短过渡，不克隆私有表单。正文只保留必要状态与动作，长规则范围按需展开。数字参数为局部实现，不升级全站token；系统减少动态效果仍生效。范围见`.impeccable/surfaces/class-reminders-20261101.md`，自动化和公网核验不等于真实手机视觉已验。

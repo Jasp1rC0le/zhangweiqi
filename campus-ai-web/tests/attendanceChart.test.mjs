@@ -49,11 +49,12 @@ test('the ring is code-native, keyboard-readable, and never reads or writes priv
   assert.match(source, /:disabled="!model.total"/); assert.match(source, /暂无占比/)
   assert.doesNotMatch(source, /fetch\(|axios|@\/api|localStorage|canvas|setInterval|requestAnimationFrame/)
 })
-test('compact chat preserves all task actions, helper names and the existing send boundary', () => {
+test('compact chat preserves named task actions and the existing send boundary without extra instructions', () => {
   const source = readFileSync(new URL('../src/components/ChatStart.vue', import.meta.url), 'utf8')
   assert.match(source, /今天想聊什么？/); assert.doesNotMatch(source, /CampMark|chat-start-arrow/)
-  assert.match(source, /今天、下一节、上课地点/); assert.match(source, /item.description/)
-  assert.match(source, /clip-path: inset\(50%\)/)
+  assert.match(source, /<strong[^>]*>我的课表<\/strong>/); assert.match(source, /<strong[^>]*>{{ item.title }}<\/strong>/)
+  assert.match(source, /aria-label="开始校园任务"/)
+  assert.doesNotMatch(source, /chat-start-subtitle|item.description/)
   assert.doesNotMatch(source, /submitPrompt|sendMessage|axios|fetch\(/)
 })
 test('chat keeps one bottom dock across empty, history, operations and voice states', () => {

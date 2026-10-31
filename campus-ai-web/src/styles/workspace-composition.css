@@ -18,8 +18,8 @@ html:root body .workspace.chat-focused .welcome--mode h1{font-size:clamp(30px,3v
 html:root body .workspace.chat-focused .welcome--mode .welcome-subtitle{font-size:15px;max-width:42ch;margin:14px auto 0;color:var(--assistant-muted)}
 html:root body .workspace.chat-focused .welcome--mode .suggestion-grid{justify-content:center;gap:10px;margin-top:28px}
 html:root body .workspace.chat-focused .welcome--mode .suggestion-copy strong{font-size:14px;font-weight:500}
-html:root body .workspace.chat-focused .chat-start-lead{text-align:center;margin-bottom:10px}
-html:root body .workspace.chat-focused .welcome--expressive .chat-start-title{font-size:clamp(28px,2.8vw,38px);font-weight:600;letter-spacing:-.03em}
+html:root body .workspace.chat-focused .chat-start-lead{text-align:center;margin-bottom:0}
+html:root body .workspace.chat-focused .welcome--expressive .chat-start-title{font-size:clamp(24px,2.4vw,30px);font-weight:600;letter-spacing:-.03em}
 html:root body .workspace.chat-focused .chat-start-actions{justify-content:center}
 html:root body .workspace.chat-focused .chat-tools-panel{width:min(390px,calc(100vw - 48px));padding:18px;box-sizing:border-box}
 html:root body .workspace.chat-focused .chat-tools-panel>p{font-size:12px;font-weight:500;margin:16px 0 6px;line-height:1.4}
@@ -33,9 +33,9 @@ html:root body .workspace .primary-navigation .nav-item{transition:background-co
 html:root body .workspace .primary-navigation .nav-item.active{font-weight:600;transform:translateX(3px)}
 html:root body .workspace .primary-navigation .nav-item:hover:not(.active){background:var(--assistant-hover)}
 html:root body .workspace.calm-workspace .workspace-reveal{animation:surface-arrive 320ms cubic-bezier(.22,1,.36,1) both}
-html:root body .workspace.calm-workspace .workspace-content-enter-active{transition:opacity 260ms ease,transform 320ms cubic-bezier(.22,1,.36,1)}
-html:root body .workspace.calm-workspace .workspace-content-leave-active{transition:opacity 140ms ease;position:absolute;inset:0;pointer-events:none}
-html:root body .workspace.calm-workspace .workspace-content-enter-from{opacity:0;transform:translateY(14px)}
+html:root body .workspace.calm-workspace .workspace-content-enter-active{transition:opacity 240ms ease,transform 280ms cubic-bezier(.22,1,.36,1)}
+html:root body .workspace.calm-workspace .workspace-content-leave-active{transition:opacity 160ms ease;position:absolute;inset:0;pointer-events:none}
+html:root body .workspace.calm-workspace .workspace-content-enter-from{opacity:0;transform:translateX(12px)}
 html:root body .workspace.calm-workspace .workspace-content-leave-to{opacity:0;transform:none}
 @keyframes surface-arrive{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 @keyframes mode-arrive{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}

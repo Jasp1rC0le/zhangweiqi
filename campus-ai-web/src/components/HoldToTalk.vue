@@ -45,11 +45,12 @@ function up(event) {
   resource.release()
 }
 function move(event) { if (pointer === event.pointerId) resource.move(event.clientY) }
-function pointerCancel(event) { if (pointer === event.pointerId) cancel() }
-function cancel() {
+function pointerCancel(event) { if (pointer === event.pointerId) { pointer = null; if (!resource.interruptPending()) cancel() } }
+function cancel(options) {
   pointer = null
-  resource.cancel()
+  resource.cancel(options)
 }
+function blurVoice() { pointer = null; if (document.hidden || !resource.interruptPending()) cancel() }
 function enableVoice() {
   capability.value=currentCapability()
   if(props.disabled||!consent.value||!capability.value.available)return
@@ -99,21 +100,21 @@ watch(
 watch(
   () => props.disabled,
   (value) => {
-    if (value) cancel()
+    if (value) cancel({ retainEngine: true })
   },
 )
 watch(() => state.text, () => { if (active.value) nextTick(() => { if (previewElement.value) previewElement.value.scrollTop=previewElement.value.scrollHeight }) })
 window.addEventListener('pointerup', up)
 window.addEventListener('pointermove', move, { passive: true })
 window.addEventListener('pointercancel', pointerCancel)
-window.addEventListener('blur', cancel)
+window.addEventListener('blur', blurVoice)
 document.addEventListener('visibilitychange', visibility)
 onBeforeUnmount(() => {
   emit('mode', false)
   window.removeEventListener('pointerup', up)
   window.removeEventListener('pointermove', move)
   window.removeEventListener('pointercancel', pointerCancel)
-  window.removeEventListener('blur', cancel)
+  window.removeEventListener('blur', blurVoice)
   document.removeEventListener('visibilitychange', visibility)
   resource.dispose()
 })
@@ -128,12 +129,12 @@ onBeforeUnmount(() => {
       :aria-expanded="showSetup"
       @click="toggleSetup"
     >
-      <el-icon><Microphone /></el-icon>语音输入
+      <el-icon><Microphone /></el-icon><span class="voice-entry-label">语音输入</span>
     </button>
     <div v-if="showSetup && !enabled" class="voice-setup">
       <p v-if="!capability.available" role="status">{{ capability.message }}</p>
       <template v-else><p>
-        使用浏览器的语音转写服务，可能把音频交给浏览器提供商处理。本站不保存录音。不要朗读私人名册或考勤。
+        音频可能交浏览器服务商转写；本站不保存录音。
       </p>
       <label><input v-model="consent" type="checkbox" @change="forgetConsent" />我同意使用浏览器语音服务</label
       ><button type="button" :disabled="disabled || !consent" @click="enableVoice">
@@ -167,8 +168,8 @@ onBeforeUnmount(() => {
                 ? '松开发送 · 上滑取消'
                 : '按住说话'
         }}</button
-      ><div class="voice-readout" :aria-live="active ? 'off' : 'polite'">
-        <p ref="previewElement" class="transcript">{{ state.text || (active ? '等待浏览器返回文字…' : '识别文字会显示在这里') }}</p>
+      ><div v-if="state.text || state.message" class="voice-readout" :aria-live="active ? 'off' : 'polite'">
+        <p v-if="state.text" ref="previewElement" class="transcript">{{ state.text }}</p>
         <p v-if="state.message" class="voice-message" :class="{ error: state.phase === 'error' }" :role="state.phase === 'error' ? 'alert' : 'status'">{{ state.message }}</p>
       </div><div class="voice-actions"><button type="button" class="voice-keyboard" :disabled="active" @click="keyboard">键盘输入</button><button type="button" class="voice-settings" :disabled="active" @click="voiceSettings">语音设置</button></div></template
     >
@@ -209,10 +210,12 @@ onBeforeUnmount(() => {
   flex: none;
 }
 .voice-entry {
+  position: relative;
   display: inline-flex;
   gap: 8px;
   align-items: center;
 }
+.voice-entry-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .hold-button {
   width: 100%;
   display: flex;
@@ -266,7 +269,7 @@ onBeforeUnmount(() => {
 .hold-talk p {
   margin: 8px 0;
 }
-.voice-readout { height: 112px; box-sizing: border-box; margin-top: 8px; padding: 12px; border-radius: 12px; background: var(--assistant-panel, #f2f5fa); overflow: auto; }
+.voice-readout { max-height: 112px; box-sizing: border-box; margin-top: 8px; padding: 12px; border-radius: 12px; background: var(--assistant-panel, #f2f5fa); overflow: auto; }
 .voice-actions { display: flex; gap: 16px; min-height: 48px; align-items: center; }
 .hold-talk .voice-readout p { margin: 0; }
 .hold-talk .voice-message { margin-top: 6px; font-size: 12px; }

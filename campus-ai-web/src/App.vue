@@ -141,31 +141,31 @@ body,
 @keyframes arrival-out { to { opacity:0; } }
 @keyframes form-departure { to { opacity:0; transform:translateY(-12px); } }
 @media (max-width:760px) {
-  .workspace-arriving .auth-art,.workspace-arriving .workspace .sidebar { view-transition-name:none; }
+  .workspace-arriving .auth-art,.workspace-arriving .auth-body,.workspace-arriving .workspace .sidebar { view-transition-name:none; }
 }
 
 .page-enter-active {
   will-change: opacity, transform;
   transition:
-    opacity 200ms ease,
-    transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
+    opacity 240ms ease,
+    transform 300ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .page-leave-active {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  transition: none;
+  transition: opacity 160ms ease;
 }
 
 .page-enter-from {
   opacity: 0;
-  transform: translateX(6px);
+  transform: translateX(12px);
 }
 
 .page-leave-to {
   opacity: 0;
-  transform: translateY(-4px);
+  transform: none;
 }
 
 html {
@@ -216,7 +216,7 @@ a {
   }
 }
 
-@media (max-width: 600px) {
+@media (max-width: 600px) and (prefers-reduced-motion: no-preference) {
   .page-enter-active,
   .page-leave-active {
     will-change: opacity, transform;
@@ -228,7 +228,7 @@ a {
   }
 
   .page-enter-from {
-    transform: translateY(8px) scale(0.996);
+    transform: translateX(16px);
   }
 }
 </style>

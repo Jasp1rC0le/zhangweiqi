@@ -7,10 +7,11 @@ import { useUnsavedChanges } from '@/utils/useUnsavedChanges'
 import FormDraftRecovery from '@/components/FormDraftRecovery.vue'
 import { feedbackFormRecovery } from '@/utils/formDraftRecovery'
 import { useFormDraftRecovery } from '@/utils/useFormDraftRecovery'
+import { feedbackPayload } from '@/utils/feedbackForm'
 
 const auth = useAuthStore()
 const busy = ref(false), error = ref(''), status = ref(''), conflict = ref(false)
-const form = reactive({ name: auth.user?.nickname || '', contact: '', subject: '', message: '' })
+const form = reactive({ name: auth.user?.nickname || auth.user?.username || '', contact: '', subject: '', message: '' })
 const checkpoint = createDraftCheckpoint(() => form)
 const requestId = ref(crypto.randomUUID())
 const initialName = form.name
@@ -41,9 +42,9 @@ function restoreDraft() {
 async function submit() {
   if (busy.value) return
   status.value = ''; error.value = ''
-  const payload = Object.fromEntries(Object.entries(form).map(([key, value]) => [key, value.trim()]))
+  const payload = feedbackPayload(form, auth.user?.nickname || auth.user?.username)
   if (Object.values(payload).some(value => !value)) {
-    error.value = '请完整填写称呼、联系方式、主题和具体意见，不能只填空格'
+    error.value = payload.name ? '请填写联系方式和具体意见' : '请在更多选项补充称呼'
     return
   }
   busy.value = true
@@ -66,18 +67,21 @@ async function submit() {
 
 <template>
   <div class="work-page feedback-page">
-    <header class="work-heading"><div><h1>意见反馈</h1><p>哪里不好用，告诉我们。</p></div></header>
-    <FormDraftRecovery :state="draftState" :pending="Boolean(draftPending)" :busy="busy" :enabled-allowed="Boolean(auth.user?.id)"
-      scope="反馈" :notice="draftNotice" storage-description="保留最近一份反馈的主题、正文和提交编号，不保留称呼、联系方式字段；正文中自行填写的个人信息仍会暂存"
-      @toggle="drafts.toggle" @restore="restoreDraft" @discard="drafts.discard" />
+    <header class="work-heading"><h1>意见反馈</h1></header>
     <form class="feedback-work" :aria-busy="busy" @submit.prevent="submit" @input="status = ''; error = ''">
-      <fieldset class="work-form feedback-form-grid" :disabled="busy">
+      <fieldset class="feedback-fields" :disabled="busy">
         <legend class="sr-only">意见反馈</legend>
-        <label>称呼<input v-model="form.name" required maxlength="80" autocomplete="name" placeholder="怎么称呼你" /></label>
-        <label>联系方式<input v-model="form.contact" required maxlength="120" placeholder="用于回复你的反馈" /></label>
-        <label>主题<input v-model="form.subject" required maxlength="120" placeholder="例如：实验数据导入失败" /></label>
-        <label>具体意见<textarea v-model="form.message" required maxlength="5000" rows="7" placeholder="告诉我们你操作了什么、期待什么、实际发生了什么"></textarea></label>
-        <small>仅管理员可见，不在校园墙公开。官方邮箱 contact@campthinkhub.cn</small>
+        <label>具体意见<textarea v-model="form.message" required maxlength="5000" rows="5" placeholder="遇到了什么问题？"></textarea></label>
+        <label>回复方式<input v-model="form.contact" required maxlength="120" placeholder="邮箱或其他联系方式" /></label>
+        <details class="feedback-options" :open="Boolean(draftPending)">
+          <summary>更多选项</summary>
+          <label>称呼<input v-model="form.name" maxlength="80" autocomplete="name" /></label>
+          <label>主题<input v-model="form.subject" maxlength="120" placeholder="默认使用正文第一行" /></label>
+          <FormDraftRecovery :state="draftState" :pending="Boolean(draftPending)" :busy="busy" :enabled-allowed="Boolean(auth.user?.id)"
+            scope="反馈" :notice="draftNotice" storage-description="保留主题、正文和提交编号，不保存称呼和联系方式；正文内自行填写的个人信息也会暂存"
+            @toggle="drafts.toggle" @restore="restoreDraft" @discard="drafts.discard" />
+        </details>
+        <small>仅管理员可见 · <a href="mailto:contact@campthinkhub.cn">联系邮箱</a></small>
         <p v-if="status" class="work-status" role="status">{{ status }}</p>
         <p v-if="error" class="work-error" role="alert">{{ error }}</p>
         <p v-if="conflict" class="work-status">原反馈已经收到，当前修改没有覆盖它。确需补充时，可<button type="button" class="work-button" @click="startSupplement">把修改作为新反馈</button></p>
@@ -88,7 +92,15 @@ async function submit() {
 </template>
 
 <style scoped>
-.feedback-work { max-width: 760px; }
-fieldset { margin-inline: 0; min-width: 0; }
+.feedback-work { max-width: 680px; }
+.feedback-fields { display: grid; gap: 22px; border: 0; padding: 0; margin: 0; min-width: 0; }
+.feedback-fields label { display: grid; gap: 8px; font-size: 14px; font-weight: 500; }
+.feedback-fields input, .feedback-fields textarea { box-sizing: border-box; width: 100%; padding: 12px 14px; border: 1px solid var(--assistant-line); border-radius: 12px; background: var(--assistant-surface, #fff); color: var(--assistant-ink); font: inherit; font-size: 16px; }
+.feedback-fields textarea { min-height: 160px; resize: vertical; line-height: 1.6; }
+.feedback-fields :is(input,textarea):focus-visible { outline: 2px solid var(--assistant-accent); outline-offset: 2px; }
+.feedback-fields small { color: var(--assistant-muted); font-size: 13px; }
+.feedback-fields a { color: var(--assistant-accent-hover); text-underline-offset: 3px; }
+.feedback-options summary { min-height: 44px; align-content: center; cursor: pointer; font-size: 14px; }
+.feedback-options label { margin-block: 14px; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 </style>

@@ -527,23 +527,22 @@ onBeforeUnmount(() => {
         <div>
           <h2 ref="heading" tabindex="-1" :data-workflow-ready="layoutReady">{{ store.schedule.semester }}</h2>
           <p>
-            {{ store.schedule.courses.length }}条课程安排 · 更新于
+            {{ store.schedule.courses.length }} 项 · 核对于
             {{ dateLabel(store.schedule.checkedAt) }}
           </p>
         </div>
         <button
-          v-if="!editing"
+          v-if="!editing && !manageOnly"
           class="work-button"
           :disabled="unavailable || operationsDirty || !store.loaded"
           @click="startImport"
         >
-          导入新表并比较
+          替换课表
         </button>
       </header>
-      <p class="course-teacher-summary">任课教师已填{{ filledTeachers }}/{{ store.schedule.courses.length }}项
-        <button class="work-button" type="button" :disabled="unavailable||editing||operationsDirty" @click="openTeacherEditing">补充任课教师</button>
+      <p class="course-teacher-summary">教师 {{ filledTeachers }}/{{ store.schedule.courses.length }}
+        <button class="work-button" type="button" :disabled="unavailable||editing||operationsDirty" @click="openTeacherEditing">编辑教师</button>
       </p>
-      <details class="course-teacher-note"><summary>教师账号如何关联？</summary><p>填教师姓名不会建立账号权限；正式课程需明确绑定教师账号，各日期与节次共用同一课程记录。</p></details>
       <template v-if="!manageOnly">
         <p v-if="nextCourse && !nextCourse.timeUnknown" class="course-next">
           <strong>{{
@@ -640,14 +639,14 @@ onBeforeUnmount(() => {
       </p>
       <div class="course-actions">
         <button class="work-button" :disabled="unavailable || operationsDirty || editing" @click="mutate('checked')">
-          我已核对，表格没变</button
+          确认无变更</button
         ><button class="course-delete" :disabled="unavailable || operationsDirty || editing" @click="mutate('delete')">
-          删除本站表格
+          删除课表
         </button>
       </div>
       <section ref="exportTarget" class="course-export" aria-label="导出本人已保存课表">
-        <button ref="exportStart" :data-workflow-ready="layoutReady" class="work-button" :disabled="unavailable || editing || store.loading || !!store.error" @click="exportStep('prepare')">{{ exportState.busy ? '正在重新读取并核验…' : '导出已保存课表' }}</button>
-        <p class="course-export-scope">仅导出本人保存的课程、任课教师、学期和周次 JSON，可重新导入。未保存草稿、教学名单和考勤不包含在内。</p>
+        <button ref="exportStart" :data-workflow-ready="layoutReady" class="work-button" :disabled="unavailable || editing || store.loading || !!store.error" @click="exportStep('prepare')">{{ exportState.busy ? '正在核验…' : '导出课表 JSON' }}</button>
+        <p class="course-export-scope">仅本人已保存课表，不含名单与考勤。</p>
         <div v-if="exportState.preview" ref="exportPreview" class="course-export-preview" tabindex="-1">
           <h3>核对这份个人课表</h3>
           <p>{{ exportState.preview.semester }} · 完整 {{ exportState.preview.count }} 项安排 · 版本 {{ exportState.preview.revision }}</p>
@@ -851,12 +850,15 @@ onBeforeUnmount(() => {
         </section>
       </fieldset>
     </form>
-    <details class="course-boundary"><summary>数据与同步说明</summary><p>
-      课表保存在统一数据库，按账号权限读取。截图由本站后台本地OCR处理，不发送给大模型；只采用图中明确的周次。聊天查课仍根据授权数据回答，不发送学号、名单、成绩或考勤。不自动同步教务或索取教务密码。
+    <details class="course-boundary"><summary>课表说明</summary><p>
+      课表保存在统一数据库，按账号权限读取。截图由本站后台本地OCR处理，不发送给大模型；只采用图中明确的周次。聊天查课仍根据授权数据回答，不发送学号、名单、成绩或考勤。教师姓名不授予账号权限。
     </p></details>
   </section>
 </template>
 <style scoped>
+:global(html:root body .workspace-page .course-panel .course-head h2) { font-size: 18px; font-weight: 500; margin: 0 0 6px; }
+.course-head p { font-size: 13px; }
+.course-teacher-summary { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; font-size: 14px; }
 .course-import-methods{display:flex;gap:8px;margin:18px 0 8px;flex-wrap:wrap}.course-import-methods .work-button{gap:8px;min-height:44px;font-size:16px}.course-import-methods .work-button[aria-pressed=true]{background:var(--assistant-soft,#eaf2ff);color:var(--assistant-accent,#0b62db);border-color:transparent}.course-import-methods svg,.course-panel>.work-button svg{width:19px;height:19px}.course-import-intro{color:var(--assistant-muted,#5d6876);font-size:14px;margin:0 0 8px}.course-teacher-note p{margin-top:0}
 .course-teacher-summary { display:flex;flex-wrap:wrap;align-items:center;gap:12px;font-size:14px;line-height:1.7; }
 .course-teacher-note { max-width:70ch;font-size:14px;line-height:1.7;color:var(--assistant-muted,#5d6876); }

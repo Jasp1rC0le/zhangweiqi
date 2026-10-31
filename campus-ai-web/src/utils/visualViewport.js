@@ -23,10 +23,10 @@ export function observeVisualViewport(win, onChange) {
     const layout = win.document?.documentElement?.clientHeight || win.innerHeight || 844
     const width = win.document?.documentElement?.clientWidth || win.innerWidth
     const focused = Boolean(win.document?.activeElement?.matches?.('input, textarea, [contenteditable="true"]'))
-    if (!baseline || width !== previousWidth || !focused) baseline = Math.max(layout, viewport?.height || 0)
+    if (!baseline || width !== previousWidth || (!focused && !previousBox?.keyboardOpen)) baseline = Math.max(layout, viewport?.height || 0)
     previousWidth = width
     const box = visualViewportBox({ layoutHeight: layout, height: viewport?.height, offsetTop: viewport?.offsetTop,
-      scale: viewport?.scale, baselineHeight: baseline, focused })
+      scale: viewport?.scale, baselineHeight: baseline, focused: focused || Boolean(previousBox?.keyboardOpen) })
     if (!previousBox || box.height !== previousBox.height || box.top !== previousBox.top || box.keyboardOpen !== previousBox.keyboardOpen) {
       previousBox = box
       onChange(box)

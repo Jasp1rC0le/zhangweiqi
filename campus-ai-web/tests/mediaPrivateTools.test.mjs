@@ -42,7 +42,7 @@ test('long attachment retrieval selects exact spans with markers and never trunc
 })
 function voiceFixture(){
   let recognition,clock=0,principal='a',state={},sent=[],timers=[]
-  class FakeSpeech {constructor(){recognition=this}start(){}stop(){}abort(){this.aborted=true}}
+  class FakeSpeech {constructor(){recognition=this}start(){this.onstart?.()}stop(){}abort(){this.aborted=true}}
   const talk=createHoldToTalk({engine:()=>FakeSpeech,owner:()=>principal,update:s=>state=s,submit:(text,owner)=>sent.push({text,owner}),now:()=>clock,timer:f=>{timers.push(f);return f},clear:f=>{timers=timers.filter(v=>v!==f)}})
   return{talk,result:(text,final=true)=>recognition.onresult?.({results:[Object.assign([{transcript:text}],{isFinal:final})]}),end:()=>recognition.onend?.(),fail:error=>recognition.onerror?.({error}),time:n=>{clock=n},owner:v=>{principal=v},state:()=>state,sent,timeout:()=>timers.at(-1)?.()}
 }

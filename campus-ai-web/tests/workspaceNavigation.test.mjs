@@ -16,10 +16,10 @@ test('daily sidebar contains exactly the four approved destinations in order', (
 test('secondary workspaces remain discoverable without duplicate navigation', () => {
   assert.deepEqual(
     workspaceTools.map((item) => item.name),
-    ['teaching', 'study', 'projects', 'instruments', 'reviews', 'account'],
+    ['school-invoice', 'teaching', 'study', 'projects', 'instruments', 'reviews', 'account'],
   )
   const all = [...primaryNavigation, ...workspaceTools]
-  assert.equal(new Set(all.map((item) => item.path)).size, 10)
+  assert.equal(new Set(all.map((item) => item.path)).size, 11)
   assert.ok(all.every((item) => item.label && item.icon && item.path.startsWith('/')))
   assert.ok(Object.isFrozen(primaryNavigation) && Object.isFrozen(workspaceTools))
 })

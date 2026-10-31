@@ -1,4 +1,6 @@
 <script setup>
+import MotionSelection from '@/components/MotionSelection.vue'
+import { animateContentChange, stopContentMotion } from '@/utils/interactionMotion'
 import DateField from '@/components/DateField.vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter } from 'vue-router'
@@ -242,6 +244,9 @@ async function loadVersions() {
   try { const result = await api.listVersions(id); if (current.value?.id === id) versions.value = result } catch (e) { if (current.value?.id === id) fail(e) }
   finally { versionsLoading.value = false }
 }
+const editorSurface = ref()
+watch(section, () => animateContentChange(editorSurface.value, window, { duration: 260, distance: 8, opacity: .5 }), { flush: 'post' })
+onBeforeUnmount(() => stopContentMotion(editorSurface.value))
 function selectSection(id) { section.value = id; if (id === 'versions') loadVersions() }
 async function followNextAction() {
   const action = nextAction.value
@@ -383,9 +388,9 @@ async function deleteCurrent() {
             <label>截止日期（选填）<DateField v-model="draft.deadline"  :disabled="busy" /></label>
           </fieldset>
           <div class="studio-next-action"><div><strong>下一步：{{ nextAction.label }}</strong><p>{{ nextAction.detail }}</p></div><button :disabled="busy" @click="followNextAction">{{ nextAction.label }}<ArrowRight /></button></div>
-          <nav class="studio-tabs" aria-label="项目步骤"><button v-for="tab in tabs" :key="tab.id" :aria-current="section === tab.id ? 'step' : undefined" :class="{active: section === tab.id}" :disabled="busy" @click="selectSection(tab.id)">{{ tab.label }}</button></nav>
+          <nav class="studio-tabs" aria-label="项目步骤"><MotionSelection :active-key="section" selector="button[aria-current='step']" /><button v-for="tab in tabs" :key="tab.id" :aria-current="section === tab.id ? 'step' : undefined" :class="{active: section === tab.id}" :disabled="busy" @click="selectSection(tab.id)">{{ tab.label }}</button></nav>
           <AttachmentImportPanel ref="importer" @apply="applyAttachment" />
-          <fieldset class="studio-editor" :disabled="busy">
+          <fieldset ref="editorSurface" class="studio-editor" :disabled="busy">
             <section v-if="section === 'requirements'" class="requirements-section">
               <div class="section-heading"><div><h2>任务要求</h2></div></div>
               <label class="text-label" for="project-brief">粘贴任务原文</label><p id="brief-help" class="studio-field-help">一行一项，再点“按行整理要求”核对。示例不是学校标准。</p><textarea id="project-brief" v-model="draft.brief" rows="6" maxlength="20000" :placeholder="hints.brief" aria-describedby="brief-help"></textarea>
@@ -433,7 +438,7 @@ async function deleteCurrent() {
                 </form>
               </template>
               <details v-if="draft.reviewFeedback?.length" class="data-details" open><summary>本人复核记录 · {{ draft.reviewFeedback.length }}条</summary><p class="data-help">随项目版本保存，不进入公共资料库、不修改规则结果；已消失的问题也保留记录供追溯</p><ul class="feedback-history"><li v-for="record in draft.reviewFeedback" :key="record.issueKey"><strong>{{ record.title }}</strong><p>{{ record.reason }}</p><small>{{ !reviewed || reviewStale ? '请先检查当前材料，确认记录是否仍适用' : record.fingerprint === reviewDigest ? '对应当前检查快照 · 仅本人意见' : '材料或规则已变化 · 旧理由需要重新核对' }}</small><button @click="draft.reviewFeedback = draft.reviewFeedback.filter(r => r !== record)">移除此记录</button></li></ul></details>
-              <p class="studio-boundary">这不是完整质量体检。原文按行拆分可能遗漏隐含要求；证据存在不代表论证正确。CSV结构与相对误差请到“数据检查”运行；通用公式、引用核验、代码运行和图片分析尚未接入。</p>
+              <details class="studio-boundary"><summary>检查范围</summary><p>本页检查要求与材料缺项，证据存在不等于论证正确。CSV结构与相对误差请使用“数据检查”；通用公式、引用核验、代码运行及图片分析尚未接入。</p></details>
             </section>
             <section v-else-if="section === 'defense'">
               <div class="section-heading"><div><h2>把做过的事，讲清楚</h2><p>从自己的要求清单生成练习提纲，不预测老师提问、不自动编造回答</p></div><button :disabled="!defense.length" @click="downloadDefense">导出准备稿<Download /></button></div>

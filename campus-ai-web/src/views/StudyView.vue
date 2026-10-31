@@ -1,4 +1,5 @@
 <script setup>
+import MotionSelection from '@/components/MotionSelection.vue'
 import {computed, onBeforeUnmount, onMounted, reactive, ref, watch} from 'vue'
 import {onBeforeRouteLeave, useRouter} from 'vue-router'
 import {createConversation, sendMessage} from '@/api/chat'
@@ -53,21 +54,21 @@ onMounted(()=>window.addEventListener('beforeunload',unload));onBeforeUnmount(()
 </script>
 <template>
   <div class="work-page study-page">
-    <header class="work-heading"><div><h1>学习助手</h1><p>带上题目，理清下一步。</p></div><RouterLink class="work-button" to="/instruments">仪器说明</RouterLink></header>
+    <header class="work-heading"><div><h1>学习助手</h1></div><RouterLink class="work-button" to="/instruments">仪器说明</RouterLink></header>
     <form class="work-form" @submit.prevent="help">
       <fieldset :disabled="busy || saving">
-        <div class="work-tabs" aria-label="学习任务类型"><button type="button" :aria-pressed="form.kind==='experiment'" @click="form.kind='experiment'">实验不会做</button><button type="button" :aria-pressed="form.kind==='homework'" @click="form.kind='homework'">作业卡住了</button></div>
+        <div class="work-tabs" aria-label="学习任务类型"><MotionSelection :active-key="form.kind" /><button type="button" :aria-pressed="form.kind==='experiment'" @click="form.kind='experiment'">实验不会做</button><button type="button" :aria-pressed="form.kind==='homework'" @click="form.kind='homework'">作业卡住了</button></div>
         <div class="study-fields">
           <div class="study-brief">
-            <label>哪门课<input v-model="form.course" required maxlength="100" placeholder="例如：大学物理、电路基础、统计学" /></label>
-            <label>题目或实验要求<textarea v-model="form.task" required maxlength="20000" rows="5" placeholder="粘贴老师的题目、实验目的和已知条件，不用先整理成报告"></textarea></label>
+            <label>哪门课<input v-model="form.course" required maxlength="100" placeholder="课程名称" /></label>
+            <label>题目或实验要求<textarea v-model="form.task" required maxlength="20000" rows="5" placeholder="题目、实验要求或已知条件"></textarea></label>
             <button class="work-button" type="button" @click="importer?.open('brief')">导入题目文件</button>
             <p class="work-help">PDF / Word / 表格 · 本机提取，确认后才发送</p>
             <AttachmentImportPanel ref="importer" @apply="imported" />
           </div>
           <div class="study-reflection">
             <label>具体卡在哪里<textarea v-model="form.blocker" required maxlength="3000" rows="3" placeholder="例如：不明白这一步为什么用线性回归；读数一直不稳定"></textarea></label>
-            <label><span>已经试过什么 <small>选填</small></span><textarea v-model="form.attempt" maxlength="8000" rows="3" placeholder="写出你的步骤、计算过程或观察到的现象，避免 AI 让你重复做"></textarea></label>
+            <label><span>已经试过什么 <small>选填</small></span><textarea v-model="form.attempt" maxlength="8000" rows="3" placeholder="已尝试的步骤或观察结果"></textarea></label>
           </div>
         </div>
         <div class="study-submit">

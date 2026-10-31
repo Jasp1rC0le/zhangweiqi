@@ -50,6 +50,12 @@ export async function publishAdminMerchants(items, files, options = {}) {
   return (await http.post('/api/admin/canteens/merchants/publish', body, options)).data
 }
 
+export async function appendAdminMerchantPhotos(id, files, options = {}) {
+  const form = new FormData()
+  for (const file of files) form.append('files', file)
+  return (await http.post(`/api/admin/canteens/merchants/${id}/photos`, form, options)).data
+}
+
 export async function getAdminMerchantReviews(options = {}) {
   return (await http.get('/api/admin/canteens/reviews', options)).data
 }

@@ -5,6 +5,8 @@ import { ElMessage } from 'element-plus'
 import { isCancel } from 'axios'
 import { userSessionGeneration } from '@/api/http'
 import { renderMarkdown, safeExternalUrl } from '@/utils/safeMarkdown'
+import { answerDisclosure, disclosedAnswerText } from '@/utils/answerDisclosure'
+import { animateContentChange, installWorkspaceMotion, stopContentMotion } from '@/utils/interactionMotion'
 import {
   ArrowDown,
   ArrowUp,
@@ -60,6 +62,8 @@ import { createWorkspaceDrafts } from '@/utils/workspaceDrafts.js'
 import { createChatRun } from '@/utils/chatRun.js'
 import { createLatestRequest } from '@/utils/latestRequest.js'
 import { retireRoutePage, activateRoutePage } from '@/utils/routeMotion.js'
+import MotionSelection from '@/components/MotionSelection.vue'
+import ClassReminderHost from '@/components/ClassReminderHost.vue'
 import { isAdministrator } from '@/utils/adminAccess.js'
 import { singleCitedKnowledgeSource } from '@/utils/answerSource.js'
 import { quotaPresentation } from '@/utils/quotaPresentation.js'
@@ -82,9 +86,13 @@ import '@/styles/chat-refinement.css'
 import '@/styles/workspace-composition.css'
 import '@/styles/workspace-color.css'
 import '@/styles/chat-viewport.css'
+import '@/styles/workspace-motion.css'
 import { observeVisualViewport } from '@/utils/visualViewport'
 
 const router = useRouter()
+let disposeWorkspaceMotion = () => {}
+onMounted(() => { disposeWorkspaceMotion = installWorkspaceMotion(document) })
+onBeforeUnmount(() => disposeWorkspaceMotion())
 const route = useRoute()
 const expandedWorkspace = ref(false)
 // Keep the same sidebar state while switching between chat and workspaces.
@@ -94,11 +102,14 @@ const chatAttachment = ref()
 const keyboardHeight = ref('100dvh')
 const keyboardTop = ref('0px')
 const keyboardOpen = ref(false)
+const composerFocused = ref(false), composerSession = ref(false)
+const compactChat = computed(() => mobileLayout.value && (composerFocused.value || (composerSession.value && keyboardOpen.value)))
 let chatViewportObserver
 function updateChatViewport(box) {
   keyboardHeight.value = `${box.height}px`
   keyboardTop.value = `${box.top}px`
   keyboardOpen.value = box.keyboardOpen
+  if (!box.keyboardOpen && !composerFocused.value) composerSession.value = false
   nextTick(resizeComposer)
 }
 function toggleChatSidebar() {
@@ -149,8 +160,9 @@ function resetWorkspaceScroll(){ workspaceContent.value?.scrollTo({top:0,left:0,
 function workspaceReady(element){element.dispatchEvent(new CustomEvent('campthink-workspace-ready'))}
 function cancelWorkspaceFocus(element){element.dispatchEvent(new CustomEvent('campthink-workspace-cancelled'))}
 const isChatRoute = computed(() => route.name === 'chat' || !route.name)
-const contentTitle = computed(() => ({wall:'校园墙',canteens:'食堂评分',projects:'我的项目',reviews:'协作审阅',account:'个人信息',admin:'管理后台',instruments:'仪器资料',study:'实验与作业',timetable:'我的课表',teaching:'教学考勤',feedback:'提交意见',pro:'Campthink Pro'})[route.name] || '工作区')
+const contentTitle = computed(() => ({wall:'校园墙',canteens:'食堂评分',campus:'校园资料',projects:'我的项目',reviews:'协作审阅',account:'个人信息',admin:'管理后台',instruments:'仪器资料',study:'实验与作业',timetable:'我的课表',teaching:'教学考勤',feedback:'意见反馈',pro:'Campthink Pro'})[route.name] || '工作区')
 watch(() => route.name, async () => {
+  const leavingDrawer = mobileLayout.value && mobileSidebarOpen.value
   closeChatTools()
   chatAttachment.value?.reset()
   const transition = ++routeReadSequence
@@ -162,6 +174,9 @@ watch(() => route.name, async () => {
   profileMenuOpen.value = false
   await nextTick()
   if (disposed || transition !== routeReadSequence) return
+  if (mobileLayout.value) animateContentChange(isChatRoute.value ? workspaceScene.value : workspaceContent.value, window, {
+    axis: 'x', distance: 14, opacity: .35, duration: 320, delay: leavingDrawer ? 80 : 0,
+  })
   if (isChatRoute.value) {
     resizeComposer()
     await Promise.all([
@@ -283,8 +298,9 @@ function updateMobileLayout(event) {
 watch(mobileSidebarOpen, async (open) => {
   if (!mobileLayout.value) return
   await nextTick()
-  if (open) sidebarElement.value?.querySelector('button')?.focus()
-  else menuTrigger.value?.focus()
+  if (open) sidebarElement.value?.querySelector('button')?.focus({ preventScroll: true })
+  else if (sidebarElement.value?.contains(document.activeElement) || document.activeElement === document.body)
+    menuTrigger.value?.focus({ preventScroll: true })
 })
 const pendingDeleteConversation = ref(null)
 const deletingConversationId = ref(null)
@@ -452,7 +468,7 @@ async function navigateAccount(path) {
       closeProfileMenu()
       if (mobileLayout.value) mobileSidebarOpen.value = false
       await nextTick()
-      if (mobileLayout.value) menuTrigger.value?.focus()
+      if (mobileLayout.value && sidebarElement.value?.contains(document.activeElement)) menuTrigger.value?.focus({ preventScroll: true })
       else accountTrigger.value?.focus()
     }
   } catch { if (!disposed) ElMessage.error('页面暂时没能打开，请再试一次') }
@@ -675,7 +691,7 @@ function campusServiceResult(message) {
 
 async function copyAnswer(message) {
   try {
-    await navigator.clipboard.writeText(`【Campthink AI 生成内容，请核实】\n\n${message.content || ''}`)
+    await navigator.clipboard.writeText(disclosedAnswerText(message))
     ElMessage.success('回答已复制')
   } catch {
     ElMessage.error('复制失败，请手动选择内容')
@@ -1515,6 +1531,9 @@ async function confirmLogout() {
 }
 
 watch(() => [isChatRoute.value, mobileLayout.value], () => chatViewportObserver?.refresh())
+watch([compactChat, () => messages.value.length], ([active, count]) => {
+  if (active && count === 0) nextTick(() => messageScroller.value?.scrollTo({ top: 0, left: 0, behavior: 'instant' }))
+})
 onMounted(async () => {
   chatViewportObserver = observeVisualViewport(window, updateChatViewport)
   window.addEventListener('keydown', handleEscape)
@@ -1545,6 +1564,8 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  stopContentMotion(workspaceContent.value)
+  stopContentMotion(workspaceScene.value)
   chatViewportObserver?.stop()
   disposed = true
   routeReadSequence++
@@ -1561,7 +1582,8 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div :data-section="isChatRoute ? selectedModelKey : route.name" class="workspace persistent-workspace" :class="{ 'workspace-expanded': !isChatRoute && expandedWorkspace, 'chat-focused': isChatRoute, 'chat-keyboard-open': isChatRoute && mobileLayout && keyboardOpen, 'calm-workspace': !isChatRoute && route.name !== 'pro', 'chat-sidebar-collapsed': isChatRoute && chatSidebarCollapsed && !mobileLayout }" :style="isChatRoute ? { '--chat-viewport-height': keyboardHeight, '--chat-viewport-top': keyboardTop, ...(mobileLayout ? { height: keyboardHeight } : {}) } : undefined" :inert="membershipVisible || membershipPresent">
+  <div :data-section="isChatRoute ? selectedModelKey : route.name" class="workspace persistent-workspace" :class="{ 'workspace-expanded': !isChatRoute && expandedWorkspace, 'chat-focused': isChatRoute, 'chat-keyboard-open': isChatRoute && mobileLayout && keyboardOpen, 'chat-composer-active': isChatRoute && compactChat, 'calm-workspace': !isChatRoute && route.name !== 'pro', 'chat-sidebar-collapsed': isChatRoute && chatSidebarCollapsed && !mobileLayout }" :style="isChatRoute ? { '--chat-viewport-height': keyboardHeight, '--chat-viewport-top': keyboardTop, ...(mobileLayout ? { height: keyboardHeight } : {}) } : undefined" :inert="membershipVisible || membershipPresent">
+    <ClassReminderHost :paused="logoutConfirmVisible || membershipVisible || membershipPresent || (mobileLayout && mobileSidebarOpen)" />
     <aside ref="sidebarElement" id="campus-sidebar" class="sidebar" :class="{ 'mobile-open': mobileSidebarOpen }" :inert="logoutConfirmVisible || (mobileLayout && !mobileSidebarOpen) || (!mobileLayout && (isChatRoute ? chatSidebarCollapsed : expandedWorkspace))" aria-label="校园导航">
       <div class="sidebar-top">
         <div class="brand">
@@ -1581,6 +1603,7 @@ onBeforeUnmount(() => {
       <nav class="sidebar-nav" aria-label="主要功能与对话">
         <p class="nav-label">我的校园</p>
         <div class="primary-navigation">
+          <MotionSelection :active-key="route.name" selector="button[aria-current='page']" />
           <button v-for="item in primaryNavigation" :key="item.name" class="nav-item"
             :data-destination="item.name"
             :class="{active: route.name === item.name || (item.name === 'chat' && isChatRoute)}"
@@ -1753,15 +1776,14 @@ onBeforeUnmount(() => {
           <button class="work-button" type="button" @click="startNewConversation">另开新对话</button>
         </section>
         <section v-else-if="messages.length === 0" :key="selectedModelKey" class="welcome" :class="{ 'welcome--expressive': selectedModelKey === 'standard', 'welcome--mode': selectedModelKey !== 'standard' }">
-          <ChatStart v-if="selectedModelKey === 'standard'" :active="isChatRoute" :suggestions="suggestions" :campus-open="selectedQuickAction === 'campus'" :disabled="sending || switchingWorkspace || loadingMessages || Boolean(activeChatAction)" @activate="activateQuickAction" />
+          <ChatStart v-if="selectedModelKey === 'standard'" :active="isChatRoute" :suggestions="suggestions" :compact="compactChat" :campus-open="selectedQuickAction === 'campus'" :disabled="sending || switchingWorkspace || loadingMessages || Boolean(activeChatAction)" @activate="activateQuickAction" />
           <template v-else>
           <div class="welcome-heading">
-            <WorkspaceIcon :mode="selectedModelKey" class="welcome-current-icon" /><div>
+            <WorkspaceIcon v-if="!compactChat" :mode="selectedModelKey" class="welcome-current-icon" /><div>
               <h1>{{ selectedModelKey === 'standard' ? '今天想聊什么？' : selectedModelKey === 'kimi' ? '论文与写作' : '代码与调试' }}</h1>
-              <p class="welcome-subtitle">{{ selectedModelKey === 'standard' ? '校园里的小事，或是卡住你的难题，都可以从这里说起。' : activeWorkspace.subtitle }}</p>
             </div>
           </div>
-          <div class="suggestion-grid">
+          <div v-if="!compactChat" class="suggestion-grid">
             <button
               v-for="item in suggestions"
               :key="item.title"
@@ -1775,16 +1797,15 @@ onBeforeUnmount(() => {
               <span class="quick-tool-icon"><QuickActionIcon :name="item.icon" /></span>
               <span class="suggestion-copy">
                 <strong>{{ item.title }}</strong>
-                <small>{{ item.description }}</small>
+
               </span>
             </button>
           </div>
           </template>
           <Transition name="quick-disclosure">
-            <div v-if="selectedQuickAction === 'campus'" id="campus-quick-lookups" class="campus-quick-lookups">
+            <div v-if="selectedQuickAction === 'campus'" v-show="!compactChat" id="campus-quick-lookups" class="campus-quick-lookups">
               <div><strong>你想了解什么？</strong><button type="button" aria-label="收起校园速查" @click="selectedQuickAction = null">收起 <el-icon aria-hidden="true"><ArrowUp /></el-icon></button></div>
               <div class="lookup-options"><button v-for="item in campusLookups" :key="item.label" type="button" @click="chooseSuggestion(item.prompt)">{{ item.label }}<el-icon aria-hidden="true"><Promotion /></el-icon></button></div>
-              <small>选择后填入输入框，确认再发送；回答以已核实资料为准</small>
               <CampusDirectory v-if="currentSchoolName === '天津中德应用技术大学'" />
             </div>
           </Transition>
@@ -1802,6 +1823,7 @@ onBeforeUnmount(() => {
               <span class="message-role">{{
                 message.role === 'assistant' ? 'Campthink' : '你'
               }}</span>
+              <span v-if="answerDisclosure(message)" class="content-origin-label">{{ answerDisclosure(message) }}</span>
               <p v-if="message.interrupted" class="answer-interrupted" role="status">
                 {{ message.stopped ? '已停止接收，以下内容可能不完整；可稍后查看历史记录核对' : '回答中途断开，以下内容不完整；请查看历史记录后重试' }}
               </p>
@@ -2025,6 +2047,8 @@ onBeforeUnmount(() => {
             :maxlength="selectedModelKey === 'kimi' ? 50000 : 10000"
             :disabled="sending || switchingWorkspace || loadingMessages"
             :placeholder="activeChatAction ? '继续补充当前操作，或输入“预览”；不会直接保存' : sending ? '正在生成回答…' : composerPlaceholder"
+            @focus="composerFocused = composerSession = true"
+            @blur="composerFocused = false"
             @input="resizeComposer"
             @compositionstart="composerComposing = true"
             @compositionend="composerComposing = false"
@@ -2077,9 +2101,6 @@ onBeforeUnmount(() => {
         <ChatDraftRecovery v-if="pendingDrafts.length || draftRecoveryNotice || chatDraftRecoveryState.error" :settings="false" :state="chatDraftRecoveryState" :pending="pendingDrafts" :notice="draftRecoveryNotice"
           :busy="!draftsReady || sending || switchingWorkspace || loadingMessages || Boolean(deletingConversationId)"
           @toggle="toggleDraftRecovery" @restore="restoreChatDraft" @discard="discardRecoveredDrafts" />
-        <p class="composer-meta">
-          <span>AI 回答可能有误，重要信息请核对来源</span>
-        </p>
       </section>
     </main>
     <section v-if="!isChatRoute" class="workspace-pane workspace-reveal" :inert="logoutConfirmVisible || (mobileLayout && mobileSidebarOpen)" aria-label="功能工作区">
@@ -4262,7 +4283,7 @@ a:focus-visible {
 
 .contact-modal-enter-active,
 .contact-modal-leave-active {
-  transition: opacity 280ms ease;
+  transition: opacity 200ms ease;
 }
 
 .contact-modal-enter-active .chat-contact-dialog,
@@ -4354,7 +4375,7 @@ a:focus-visible {
     width: min(286px, calc(100vw - 48px));
     padding: 22px 16px 16px;
     transform: translateX(-105%);
-    transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+    transition: transform 300ms cubic-bezier(0.22, 1, 0.36, 1);
     z-index: 30;
   }
 
@@ -4416,7 +4437,7 @@ a:focus-visible {
     display: block;
     background: rgba(15, 15, 17, 0.35);
     border-radius: 0;
-    backdrop-filter: blur(8px);
+    backdrop-filter: none;
     z-index: 25;
   }
 

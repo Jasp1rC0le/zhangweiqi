@@ -60,7 +60,14 @@ public class ScheduleFileWriter {
     private static byte[] ics(ScheduleExportSource.Snapshot s,Instant at){
         if(s.entries().stream().anyMatch(r->r.startTime()==null||r.endTime()==null))throw ScheduleExportSource.error(400,"范围含未核定钟点，不能生成ICS日历；请先配置作息或换用表格");
         var out=new StringBuilder("BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Campthink//Schedule Export//ZH\r\nCALSCALE:GREGORIAN\r\n");var utc=DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'").withZone(ZoneOffset.UTC);
-        for(var r:s.entries()){fold(out,"BEGIN:VEVENT");fold(out,"UID:"+hash(r.id().getBytes(StandardCharsets.UTF_8))+"@campthink.cn");fold(out,"DTSTAMP:"+utc.format(at));fold(out,"DTSTART:"+utc.format(r.date().atTime(LocalTime.parse(r.startTime())).atZone(ZoneId.of("Asia/Shanghai")).toInstant()));fold(out,"DTEND:"+utc.format(r.date().atTime(LocalTime.parse(r.endTime())).atZone(ZoneId.of("Asia/Shanghai")).toInstant()));fold(out,"SUMMARY:"+escape(r.name()));fold(out,"LOCATION:"+escape(r.room()));fold(out,"DESCRIPTION:"+escape("任课教师："+r.teacher()+"；班级或教学组："+r.className()+"；来源："+source(r)+"；这是下载快照，不是实时订阅。"));fold(out,"STATUS:"+(r.cancelled()?"CANCELLED":"CONFIRMED"));fold(out,"END:VEVENT");}
+        for(var r:s.entries()){fold(out,"BEGIN:VEVENT");fold(out,"UID:"+hash(r.id().getBytes(StandardCharsets.UTF_8))+"@campthink.cn");fold(out,"DTSTAMP:"+utc.format(at));fold(out,"DTSTART:"+utc.format(r.date().atTime(LocalTime.parse(r.startTime())).atZone(ZoneId.of("Asia/Shanghai")).toInstant()));fold(out,"DTEND:"+utc.format(r.date().atTime(LocalTime.parse(r.endTime())).atZone(ZoneId.of("Asia/Shanghai")).toInstant()));fold(out,"SUMMARY:"+escape(r.name()));fold(out,"LOCATION:"+escape(r.room()));fold(out,"DESCRIPTION:"+escape("任课教师："+r.teacher()+"；班级或教学组："+r.className()+"；来源："+source(r)+"；这是下载快照，不是实时订阅。"));fold(out,"STATUS:"+(r.cancelled()?"CANCELLED":"CONFIRMED"));
+            Integer minutes=s.filter().reminderMinutes();
+            if(!r.cancelled()&&minutes!=null&&minutes>0){
+                if(!Set.of(5,10,15,30).contains(minutes))throw ScheduleExportSource.error(400,"课前提醒分钟数无效");
+                fold(out,"BEGIN:VALARM");fold(out,"TRIGGER:-PT"+minutes+"M");fold(out,"ACTION:DISPLAY");
+                fold(out,"DESCRIPTION:"+escape(r.name()+"即将上课"));fold(out,"END:VALARM");
+            }
+            fold(out,"END:VEVENT");}
         out.append("END:VCALENDAR\r\n");return out.toString().getBytes(StandardCharsets.UTF_8);
     }
     public static String hash(byte[] bytes){try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));}catch(java.security.NoSuchAlgorithmException e){throw new IllegalStateException(e);}}

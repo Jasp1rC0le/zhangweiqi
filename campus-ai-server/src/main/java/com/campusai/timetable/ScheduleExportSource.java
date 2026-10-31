@@ -18,7 +18,11 @@ public class ScheduleExportSource {
     public static final int MAX_ROWS=2000,MAX_DAYS=210;
     private final JdbcTemplate db;private final CourseScheduleService personal;private final UnifiedTimetableService unified;private final TeachingService teaching;private final long bellSchool;
     public ScheduleExportSource(JdbcTemplate db,CourseScheduleService personal,UnifiedTimetableService unified,TeachingService teaching,@Value("${app.timetable.bell-school-id:1}") long bellSchool){this.db=db;this.personal=personal;this.unified=unified;this.teaching=teaching;this.bellSchool=bellSchool;}
-    public record Filter(String source,String view,LocalDate from,LocalDate to,String classId,String period,String format,String search,boolean includeCancelled){}
+    public record Filter(String source,String view,LocalDate from,LocalDate to,String classId,String period,String format,String search,boolean includeCancelled,Integer reminderMinutes){
+        public Filter(String source,String view,LocalDate from,LocalDate to,String classId,String period,String format,String search,boolean includeCancelled){
+            this(source,view,from,to,classId,period,format,search,includeCancelled,null);
+        }
+    }
     public record Row(String id,LocalDate date,String name,String room,String teacher,String className,String startTime,String endTime,String timeLabel,List<String> sources,boolean cancelled){}
     public record Access(List<String> sources,List<String> teachingViews,List<String> personalViews,List<String> formats,LocalDate defaultFrom,LocalDate defaultTo,int maxDays,int maxRows,int expiresSeconds){}
     public record Snapshot(Filter filter,String scopeLabel,List<Row> entries,List<String> warnings){}
@@ -36,7 +40,9 @@ public class ScheduleExportSource {
         if(f.from==null||f.to==null||f.from.getYear()<2000||f.to.getYear()>2100||f.to.isBefore(f.from)||ChronoUnit.DAYS.between(f.from,f.to)>=MAX_DAYS)throw error(400,"请选择2000至2100年的明确日期，每份最多210天");
         String chosen=f.classId==null?"":f.classId,q=f.search==null?"":f.search.trim();if(!chosen.isEmpty()&&!chosen.matches("[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}")||q.length()>100||q.chars().anyMatch(Character::isISOControl))throw error(400,"班级或课程筛选条件无效");
         if(!"TEACHING".equals(f.source)&&(!chosen.isEmpty()||!Set.of("STUDENT","TEACHER").contains(f.view)))throw error(400,"本人课表不接受其他班级或领导身份");
-        return new Filter(f.source,f.view,f.from,f.to,chosen,f.period,f.format,q,f.includeCancelled);
+        if(f.reminderMinutes!=null&&(!"ICS".equals(f.format)||!Set.of(0,5,10,15,30).contains(f.reminderMinutes)))throw error(400,"课前提醒仅支持ICS日历的5、10、15或30分钟");
+        return new Filter(f.source,f.view,f.from,f.to,chosen,f.period,f.format,q,f.includeCancelled,
+                f.reminderMinutes!=null&&f.reminderMinutes>0?f.reminderMinutes:null);
     }
     @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ,timeout=25)
     public Snapshot read(long user,Filter raw){

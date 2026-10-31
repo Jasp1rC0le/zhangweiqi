@@ -411,8 +411,7 @@ onBeforeUnmount(() => {
       <RouterLink v-if="route.query.return === 'timetable' && !calendarBack.error" :to="calendarBack.to">返回课表</RouterLink>
       <p v-else-if="route.query.return === 'timetable'" class="teaching-error" role="alert">{{ calendarBack.error }} <RouterLink to="/timetable">重新选择课表范围</RouterLink></p>
       <div>
-        <h1>{{ title }}</h1>
-        <p v-if="!focused">{{ roleHint }}</p>
+        <h1 :title="roleHint">{{ title }}</h1>
       </div>
       <label v-if="!focused && !rollCallRequested && state.access?.views.length" class="view-control"
         >当前视图
@@ -422,32 +421,32 @@ onBeforeUnmount(() => {
           </option>
         </select>
       </label>
-      <button v-if="!focused" type="button" class="schedule-file-entry" @click="scheduleFiles?.open()">导出课程安排</button>
+      <button v-if="!focused" type="button" class="schedule-file-entry" @click="scheduleFiles?.open()">导出课表</button>
     </header>
     <p v-if="workflow?.error" class="teaching-workflow-warning" role="alert">{{ workflow.error }}</p>
-    <p v-else-if="workflow&&!['evidence','roll-call'].includes(workflow.tool)&&auth.user?.role!=='ADMIN'" class="teaching-workflow-warning" role="status">这个管理入口需要正常本校管理员账号；当前只显示你原有授权范围，没有授予管理权限。</p>
+    <p v-else-if="workflow&&!['evidence','roll-call'].includes(workflow.tool)&&auth.user?.role!=='ADMIN'" class="teaching-workflow-warning" role="status">此操作需要本校管理员权限。</p>
 
     <section v-if="state.access && !state.access.enabled" class="teaching-empty">
-      <h2>教学考勤尚未启用</h2>
-      <p>学校授权、课程归属和数据库迁移配置完成后，这里会显示你的课程。个人导入的课表继续可用。</p>
+      <h2>教学考勤未开放</h2>
+      <p>个人课表可继续使用。</p>
       <RouterLink to="/timetable">回到我的课表</RouterLink>
     </section>
     <section v-else-if="rollCallRequested && state.access && !state.access.views.includes('TEACHER')" class="teaching-empty" role="status">
       <h2>当前账号还不能点名</h2>
-      <p>点名需要已通过的教师身份和明确绑定的任课课程。学生、辅导员、书记或平台管理员身份不会自动获得任课权限；这里没有读取学生名单冒充点名。</p>
+      <p>需通过教师审核并绑定任课课程。</p>
       <RouterLink to="/account#teaching-identity">核对本人的教学身份</RouterLink> · <RouterLink to="/teaching">查看原有授权视图</RouterLink>
     </section>
     <section v-else-if="state.access && !state.access.views.length" class="teaching-empty">
       <h2>{{auth.user?.role==='ADMIN'?'管理教学安排':'还没有绑定教学归属'}}</h2>
-      <p v-if="auth.user?.role==='ADMIN'">在下方导入、绑定或核对具体课程。管理员权限与任课身份分开，无需把自己绑定成教师才能管理。</p>
+      <p v-if="auth.user?.role==='ADMIN'">导入并绑定课程；管理权限与任课身份分开。</p>
       <p v-else>
-        请联系教学管理员绑定本人账号、班级或课程。这里不会按同名匹配，也不能自行切换成教师或领导。
+        请联系管理员绑定账号、班级或课程。
       </p>
     </section>
     <template v-else>
-      <p v-if="rollCallRequested && state.access?.views.includes('TEACHER')" class="teaching-entry-hint">先选课程和具体节次，再逐人点名。这里只显示本人的任课课程，打开或切页不会自动记录按时。</p>
+      <p v-if="rollCallRequested && state.access?.views.includes('TEACHER')" class="teaching-entry-hint">选择节次后点名，打开页面不会自动登记。</p>
       <div v-if="!focused && leadership" class="leadership-query-controls">
-        <button type="button" class="teaching-button" :disabled="busy" :aria-expanded="filtersExpanded" aria-controls="teaching-query-filters" @click="filtersExpanded = !filtersExpanded">{{ filtersExpanded ? '收起筛选' : '调整日期与课程' }}</button>
+        <button type="button" class="teaching-button" :disabled="busy" :aria-expanded="filtersExpanded" aria-controls="teaching-query-filters" @click="filtersExpanded = !filtersExpanded">{{ filtersExpanded ? '收起筛选' : '筛选' }}</button>
         <span v-if="state.lessonQuery?.search">课程筛选：{{ state.lessonQuery.search }}</span>
       </div>
       <form v-if="!focused" v-show="!leadership || filtersExpanded" id="teaching-query-filters" class="teaching-filters" @submit.prevent="reload">
@@ -676,7 +675,7 @@ onBeforeUnmount(() => {
           <section v-else-if="state.lessons.length" class="teaching-selection-empty">
             <h2>{{ state.loading ? '正在读取名单' : '选一节课' }}</h2>
             <p>
-              {{ teacher ? '打开对应班级名单，记录到达情况。' : '查看课程地点、教师和考勤记录。' }}
+              {{ teacher ? '选择节次后点名' : '查看本节考勤' }}
             </p>
           </section>
         </Transition>

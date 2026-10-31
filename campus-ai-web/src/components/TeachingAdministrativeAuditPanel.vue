@@ -28,7 +28,7 @@ onBeforeUnmount(()=>{disposed=true;cancelExportFocus();resource.dispose()})
   <details class="management-audit" :open="opened" :data-workflow-ready="state.data?'ready':state.error?'error':'waiting'" @toggle="toggle">
     <summary>管理操作历史</summary>
     <div v-if="opened" class="management-body">
-      <p class="management-help">本校管理员只读核对：谁在什么时候，改了什么。按操作发生日期查询，不是上课日期。</p>
+      <p class="management-help">按操作发生日期查询。</p>
       <p v-if="!active" class="management-warning" role="status">先保存或取消正在编辑的配置，再读取历史；当前草稿仍保留。</p>
       <template v-else>
         <form v-if="state.access" class="management-filters" @submit.prevent="load()">
@@ -47,7 +47,7 @@ onBeforeUnmount(()=>{disposed=true;cancelExportFocus();resource.dispose()})
             <small>操作条数不等于人数；名称与归属以逐条历史依据为准，未保存的快照不补造。</small>
           </div>
           <div v-if="state.access?.exportEnabled" class="management-export">
-            <p>导出全部当前条件，不只这一页。每份最多2000条；下载不等于归档或备份。</p>
+            <p>导出全部当前条件，不只这一页，最多2000条。下载不等于归档。</p>
             <p v-if="state.data.total>2000" class="management-warning">超过2000条，请缩小日期、类型或搜索；不会截断文件。</p>
             <section v-if="state.preview" ref="previewElement" class="management-export-preview" tabindex="-1" aria-label="管理历史导出核对">
               <h3>完整导出 {{ state.preview.count }} 条管理记录</h3>

@@ -19,8 +19,8 @@ function download(){
 </script>
 <template>
   <details class="teaching-audit" @toggle="toggle">
-    <summary>查看更正记录与导出</summary>
-    <p class="audit-policy">任课教师直接更正，须写原因并保留旧值。保存期一年；到期仅标记待归档，本入口不会删除历史。</p>
+    <summary>更正记录</summary>
+    <p class="audit-policy">保留旧值与原因，一年后标记待归档，不自动删除。</p>
     <p v-if="state.loading" role="status">正在读取更正记录…</p>
     <p v-if="state.error" role="alert">{{ state.error }} <button type="button" :disabled="state.loading" @click="load()">重新读取</button></p>
     <template v-if="state.data && !state.error">

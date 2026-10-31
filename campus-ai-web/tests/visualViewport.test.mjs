@@ -38,3 +38,19 @@ test('orientation refresh resets the baseline and missing VisualViewport keeps a
   f.win.document.documentElement.clientWidth=844;f.win.document.documentElement.clientHeight=390;f.win.visualViewport.height=390;f.fire('window:orientationchange');f.flush();assert.equal(seen.at(-1).keyboardOpen,false);o.stop()
   const g=fixture(false),values=[],p=observeVisualViewport(g.win,x=>values.push(x));g.win.document.documentElement.clientHeight=620;g.fire('window:resize');g.flush();assert.equal(values.at(-1).height,620);p.stop()
 })
+test('keyboard closing keeps the input presentation until the visible height recovers after blur', () => {
+  const f=fixture(),seen=[],observer=observeVisualViewport(f.win,box=>seen.push(box))
+  f.win.document.activeElement.matches=()=>true
+  f.win.visualViewport.height=360
+  f.fire('window:focusin');f.fire('visual:resize');f.flush()
+  assert.equal(seen.at(-1).keyboardOpen,true)
+  f.win.document.activeElement.matches=()=>false
+  f.win.document.documentElement.clientHeight=360
+  f.fire('window:focusout');f.flush()
+  assert.equal(seen.at(-1).keyboardOpen,true,'blur must not reset the pre-keyboard baseline to the shrunken viewport')
+  f.win.document.documentElement.clientHeight=844
+  f.win.visualViewport.height=844
+  f.fire('visual:resize');f.flush()
+  assert.deepEqual(seen.at(-1),{height:844,top:0,keyboardOpen:false})
+  observer.stop()
+})

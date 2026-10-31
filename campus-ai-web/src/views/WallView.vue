@@ -1,4 +1,5 @@
 <script setup>
+import MotionSelection from '@/components/MotionSelection.vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter } from 'vue-router'
 import NavigationIcon from '@/components/NavigationIcon.vue'
@@ -128,7 +129,7 @@ onBeforeUnmount(()=>{disposed=true;sequence++;window.removeEventListener('before
       </article>
     </template>
     <template v-else>
-      <div class="wall-filter"><div class="work-tabs" aria-label="筛选话题"><button v-for="c in categories" :key="c.id" :aria-pressed="category===c.id" :disabled="busy" @click="category=c.id"><NavigationIcon :name="c.icon" />{{c.name}}</button></div><button class="work-button" :aria-pressed="mine" :disabled="busy" @click="mine=!mine">{{mine?'查看全部':'我的发布'}}</button></div>
+      <div class="wall-filter"><div class="work-tabs" aria-label="筛选话题"><MotionSelection :active-key="category" /><button v-for="c in categories" :key="c.id" :aria-pressed="category===c.id" :disabled="busy" @click="category=c.id"><NavigationIcon :name="c.icon" />{{c.name}}</button></div><button class="work-button" :aria-pressed="mine" :disabled="busy" @click="mine=!mine">{{mine?'查看全部':'我的发布'}}</button></div>
       <p v-if="loading&&!appending" class="work-loading" role="status">正在读取校园墙…</p>
       <section v-else-if="!loading&&!entries.length&&!error" class="wall-quiet-empty"><NavigationIcon name="wall" /><h2>{{mine?'你的动态，从这里开始':'今天有什么新鲜事？'}}</h2><button class="work-button" type="button" @click="startComposing">写第一条</button></section>
       <div v-else class="wall-list"><article v-for="entry in entries" :key="entry.id" class="wall-row"><div class="wall-meta"><span>{{categoryName(entry.category)}}</span><time>{{stamp(entry.createdAt)}}</time><span v-if="entry.mine">我</span></div><RouterLink :to="{path:'/wall',query:{post:entry.id}}"><h2 v-if="wallHasSeparateTitle(entry)">{{entry.title}}</h2><p>{{entry.body}}</p></RouterLink><footer><span v-if="entry.status!=='PUBLISHED'">{{stateName(entry.status)}}</span><span :aria-label="entry.replies+'条回复'"><NavigationIcon name="wall" />{{entry.replies}}</span><span :aria-label="entry.likes+'人赞同'"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 5c-2-2-5-1-8 2-3-3-6-4-8-2-4 4 1 9 8 14 7-5 12-10 8-14Z" /></svg>{{entry.likes}}</span></footer></article></div>

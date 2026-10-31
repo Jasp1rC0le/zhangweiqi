@@ -4,6 +4,7 @@ import { useTimetableStore } from '@/stores/timetable'
 import { useCourseScheduleStore } from '@/stores/courseSchedule'
 import UnifiedWeekCalendar from '@/components/UnifiedWeekCalendar.vue'
 import ScheduleExportPanel from '@/components/ScheduleExportPanel.vue'
+import ClassReminderPanel from '@/components/ClassReminderPanel.vue'
 import { computed, ref, nextTick, onMounted, watch, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { userSessionGeneration } from '@/api/http'
@@ -23,6 +24,7 @@ const calendarExportContext = ref(null)
 function calendarExportChanged(value) { calendarExportContext.value = value?.owner === calendarOwner.value ? value : null }
 watch(calendarOwner, () => { calendarExportContext.value = null }, { flush: 'sync' })
 async function openCalendarExport() { if (calendarExportContext.value?.owner === calendarOwner.value) await scheduleExportPanel.value?.open(calendarExportContext.value) }
+async function openCalendarReminder(minutes) { await scheduleExportPanel.value?.openReminder(minutes) }
 const fileExportPreset=computed(()=>scheduleExportRoute(route.query))
 const layoutReadiness = computed(() => calendarLayout.value.owner === calendarOwner.value ? calendarLayout.value.status : 'waiting')
 function calendarLayoutChanged(value) {
@@ -75,15 +77,16 @@ function loadLegacy(event) {
       </div>
     </header>
     <p v-if="importReceipt&&!importAction" class="timetable-import-receipt" role="status">{{importReceipt}}</p>
+    <ClassReminderPanel v-if="!importAction" :disabled="importPanel?.dirty || importPanel?.unavailable" @calendar="openCalendarReminder" />
     <UnifiedWeekCalendar v-show="!importAction" @available="unifiedAvailable = $event" @scope="scope = $event" @layout="calendarLayoutChanged" @export-context="calendarExportChanged" />
     <ScheduleExportPanel v-show="!importAction" ref="scheduleExportPanel" :owner="calendarOwner" :preferred-view="scope" :preset="fileExportPreset" :calendar-context="calendarExportContext" />
     <details ref="importDetails" class="import-management" :class="{'import-focused':importAction}" :open="importOpen || !unifiedAvailable" @toggle="importOpen = $event.target.open">
-      <summary>管理个人课表</summary>
+      <summary>管理课表</summary>
       <CourseSchedulePanel ref="importPanel" @imported="importedImage" :layout-ready="layoutReadiness" :export-requested="route.query.tool === 'personal-export'" :manage-requested="route.query.tool === 'personal-manage'" :manage-only="unifiedAvailable" />
     </details>
     <details v-show="!importAction" class="legacy-source" @toggle="loadLegacy">
       <summary>旧版原件</summary>
-      <p>新版统一显示解析后的课程，旧图片不再作为课表展示，已经保存的原件没有删除。</p>
+      <p>下载本人保留的旧原件。</p>
       <p v-if="legacy.loading" role="status">正在读取本人原件…</p>
       <p v-else-if="legacy.error" role="alert">
         {{ legacy.error }} <button class="work-button" @click="legacy.load(true)">重试</button>

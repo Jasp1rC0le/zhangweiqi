@@ -1,4 +1,5 @@
-/* Full-window authentication. Contact, Pro and the public introduction retain their owners. */
+/* Phone authentication only. Desktop keeps the incumbent dialog and arrival animation. */
+@media (max-width: 760px) {
 html:root body .login-overlay.auth-fullscreen {
   --el-text-color-placeholder: #606775;
   position: fixed;
@@ -53,13 +54,18 @@ html:root body .auth-fullscreen .auth-dialog.is-register .auth-body {
 html:root body .auth-fullscreen .auth-tabs { flex: none; margin-top: auto; margin-bottom: 28px; }
 html:root body .auth-fullscreen .auth-stage { flex: none; min-height: 0; }
 html:root body .auth-fullscreen .auth-note { flex: none; margin-top: 24px; margin-bottom: auto; padding-top: 0; color: #606775; line-height: 1.7; }
-html:root body .auth-fullscreen .auth-form h2 { color: #151925; font-size: 34px; line-height: 1.25; letter-spacing: -.025em; }
+html:root body .auth-fullscreen .auth-form h2 { margin: 0 0 24px; color: #151925; font-size: 30px; line-height: 1.25; letter-spacing: -.025em; }
 html:root body .auth-fullscreen .form-lead { color: #606775; font-size: 15px; line-height: 1.7; margin-bottom: 28px; }
 html:root body .auth-fullscreen .auth-body label { color: #303947; font-size: 14px; }
 html:root body .auth-fullscreen .auth-body :is(input, textarea) { font-size: 16px; }
 html:root body .auth-fullscreen .auth-body :is(.el-input__wrapper, .el-select__wrapper) { min-height: 50px; background: #f3f5f9; border-radius: 12px; }
 html:root body .auth-fullscreen .form-submit { min-height: 50px; border-radius: 12px; color: #fff; background: #0066cc; font-size: 16px; }
 html:root body .auth-fullscreen .form-submit:hover:not(:disabled) { background: #004f9e; }
+html:root body .auth-fullscreen .auth-note a { color: #606775; text-underline-offset: 4px; }
+html:root body .auth-fullscreen .login-submit { display: flex; align-items: center; justify-content: space-between; width: 100%; }
+html:root body .auth-fullscreen .auth-stage { height: auto; transition: none; }
+html:root body .auth-fullscreen .auth-stage > .auth-form { position: relative; inset: auto; }
+html:root body .auth-fullscreen .auth-stage > .auth-form.auth-step-leave-active { position: absolute; inset: 0 0 auto; }
 html:root body .auth-fullscreen .dialog-close { position: absolute; top: max(20px, env(safe-area-inset-top)); right: 24px; z-index: 3; width: 44px; height: 44px; border: 0; color: #303947; background: #edf1f7; }
 html:root body .auth-fullscreen .dialog-close:hover { background: #dfe8f6; }
 html:root body .auth-fullscreen.campus-modal-enter-active { transition: opacity 220ms ease; }
@@ -79,7 +85,26 @@ html:root body .auth-fullscreen.campus-modal-enter-active :is(.auth-art, .auth-t
   html:root body .auth-fullscreen .dialog-close { top: max(18px, env(safe-area-inset-top)); right: 18px; }
   html:root body .auth-fullscreen .auth-body,
   html:root body .auth-fullscreen .auth-dialog.is-register .auth-body { width: min(100%, 480px); max-height: none; padding: 28px 24px max(24px, env(safe-area-inset-bottom)); }
-  html:root body .auth-fullscreen .auth-form h2 { font-size: 30px; }
+  html:root body .auth-fullscreen .auth-form h2 { font-size: 28px; }
+  html:root body .auth-fullscreen .auth-tabs { margin-top: clamp(8px, 4svh, 32px); margin-bottom: 24px; }
+  html:root body .auth-fullscreen .auth-note { margin-top: 20px; margin-bottom: 0; }
+  html:root body .login-overlay.auth-fullscreen { background: transparent; }
+  html:root body .auth-fullscreen.campus-modal-enter-active { transition: none; }
+  html:root body .auth-fullscreen.campus-modal-enter-from { opacity: 1; }
+  html:root body .auth-fullscreen.campus-modal-enter-active .auth-dialog,
+  html:root body .auth-fullscreen.campus-modal-enter-from .auth-dialog { transition: none; transform: none; opacity: 1; }
+  html:root body .auth-fullscreen .dialog-close { z-index: 8; }
+  html:root body .auth-fullscreen.campus-modal-enter-active .auth-entry-curtain { display: block; position: absolute; top: 0; left: 0; width: 100%; height: calc(100% + 64px); z-index: 4; border-radius: 0 0 50% 50% / 0 0 64px 64px; background: #edf2fc; pointer-events: auto; transform: translate3d(0,-100%,0); transition: transform 720ms cubic-bezier(.65,0,.2,1); will-change: transform; }
+  html:root body .auth-fullscreen.campus-modal-enter-from .auth-entry-curtain { transform: translate3d(0,0,0); }
+  html:root body .auth-fullscreen.campus-modal-enter-active .auth-art { z-index: 6; overflow: visible; background: transparent; pointer-events: none; }
+  html:root body .auth-fullscreen.campus-modal-enter-active .art-brand { position: relative; transform: none; transition: transform 720ms cubic-bezier(.22,1,.36,1); will-change: transform; }
+  html:root body .auth-fullscreen.campus-modal-enter-from .art-brand { transform: translate3d(calc(50vw - 50% - 24px),calc((var(--auth-viewport-height,100dvh) - 80px) / 2),0) scale(1.08); }
+  html:root body .auth-fullscreen.campus-modal-enter-active .auth-body { animation: none; opacity: 1; transform: none; transition: opacity 320ms 180ms ease, transform 420ms 180ms cubic-bezier(.22,1,.36,1); }
+  html:root body .auth-fullscreen.campus-modal-enter-from .auth-body { opacity: 0; transform: translate3d(0,24px,0); }
+  html:root body .auth-fullscreen.campus-modal-leave-active { transition: none; }
+  html:root body .auth-fullscreen.campus-modal-leave-active .auth-dialog { transition: transform 180ms ease-out, opacity 160ms ease-out; }
+  html:root body .auth-fullscreen.campus-modal-leave-to { opacity: 1; }
+  html:root body .auth-fullscreen.campus-modal-leave-to .auth-dialog { transform: translate3d(0,12px,0); opacity: 0; }
   html:root body .auth-fullscreen .form-lead { margin-bottom: 24px; }
   html:root body .auth-fullscreen .auth-note { font-size: 12px; }
   html:root body .auth-fullscreen.auth-keyboard-open .auth-dialog .auth-art { min-height: 60px; height: 60px; padding-block: 12px; }
@@ -92,7 +117,21 @@ html:root body .auth-fullscreen.campus-modal-enter-active :is(.auth-art, .auth-t
   html:root body .auth-fullscreen.campus-modal-enter-active,
   html:root body .auth-fullscreen.campus-modal-leave-active,
   html:root body .auth-fullscreen.campus-modal-enter-active .auth-dialog,
-  html:root body .auth-fullscreen.campus-modal-leave-active .auth-dialog { transition: none; }
+  html:root body .auth-fullscreen.campus-modal-leave-active .auth-dialog,
+  html:root body .auth-fullscreen .login-submit { transition: none; animation: none; }
+  html:root body .auth-fullscreen.campus-modal-enter-active .auth-body, .auth-submit-spinner { animation: none; }
   html:root body .auth-fullscreen.campus-modal-enter-from .auth-dialog,
-  html:root body .auth-fullscreen.campus-modal-leave-to .auth-dialog { transform: none; }
+  html:root body .auth-fullscreen.campus-modal-leave-to .auth-dialog { transform: none; opacity: 1; }
+  html:root body .auth-fullscreen.campus-modal-enter-active .auth-entry-curtain { display: none; transition: none; }
+  html:root body .auth-fullscreen.campus-modal-enter-active .art-brand,
+  html:root body .auth-fullscreen.campus-modal-enter-from .art-brand,
+  html:root body .auth-fullscreen.campus-modal-enter-active .auth-body,
+  html:root body .auth-fullscreen.campus-modal-enter-from .auth-body { transition: none; transform: none; opacity: 1; }
 }
+
+}
+.auth-submit-spinner { display: block; width: 20px; height: 20px; border: 2px solid #ffffff70; border-top-color: #fff; border-radius: 50%; animation: auth-submit-turn 700ms linear infinite; }
+@keyframes auth-submit-turn { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .auth-submit-spinner { animation: none; } }
+
+.auth-entry-curtain { display: none; }

@@ -1,0 +1,146 @@
+/* Feedback uses paint/compositing; controls stay in the document flow. */
+html:root body :is(.workspace, dialog:not(.auth-dialog), .el-message-box) :is(button, summary, a[href], a[role='button']) {
+  transition-property: background-color, color, border-color, box-shadow, opacity, transform, scale;
+  transition-duration: 130ms;
+  transition-timing-function: ease-out;
+}
+html:root body :is(.workspace, dialog:not(.auth-dialog), .el-message-box) :is(button, summary, a[href], a[role='button']):active:not(:disabled):not([aria-disabled='true']):not([aria-busy='true']) {
+  box-shadow: inset 0 0 0 999px rgb(0 0 0 / .075);
+}
+html:root body .workspace :is(.table-filters, .table-categories, .work-tabs, .workspace-tools, .workspace-toolbar) button {
+  transition-duration: 150ms;
+}
+html:root body .workspace .content-origin-label {
+  display: inline-block;
+  margin-inline-start: 8px;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: var(--assistant-soft, #eaf2ff);
+  color: var(--assistant-accent-hover, #245b9e);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+/* Real controls keep their labels, focus rings and hit targets. This span is decorative. */
+html:root body .workspace :is(.primary-navigation, .table-filters, .table-categories, .work-tabs, .studio-tabs, .calendar-day-tabs) {
+  position: relative;
+  isolation: isolate;
+}
+html:root body .workspace .motion-selection-indicator {
+  position: absolute;
+  inset: 0 auto auto 0;
+  z-index: -1;
+  pointer-events: none;
+  margin: 0;
+  border-radius: var(--selection-radius, 12px);
+  background: var(--selection-surface, #fff);
+  box-shadow: var(--selection-shadow, none);
+  opacity: 0;
+}
+html:root body .workspace .motion-selection-indicator[data-ready='true'] {
+  opacity: 1;
+  transition: transform 300ms cubic-bezier(.22,.8,.24,1), width 260ms cubic-bezier(.22,.8,.24,1), height 260ms cubic-bezier(.22,.8,.24,1), opacity 180ms ease;
+}
+html:root body .workspace .primary-navigation {
+  --selection-radius: 16px;
+  --selection-shadow: 0 2px 8px rgb(32 58 89 / 5%);
+}
+html:root body .workspace .primary-navigation:has(> .motion-selection-indicator[data-ready='true']) .nav-item {
+  transform: none;
+}
+html:root body .workspace .primary-navigation:has(> .motion-selection-indicator[data-ready='true']) .nav-item.active {
+  background: transparent;
+  box-shadow: none;
+}
+html:root body .workspace :is(.table-filters, .table-categories) {
+  --selection-surface: #ffe5c9;
+  --selection-radius: 12px;
+  flex-wrap: nowrap;
+  box-sizing: border-box;
+  padding-block: 4px;
+  padding-inline: 4px;
+  scroll-padding-inline: 4px;
+  scrollbar-width: none;
+}
+html:root body .workspace :is(.table-filters, .table-categories)::-webkit-scrollbar { display: none; }
+html:root body .workspace :is(.table-filters, .table-categories):has(> .motion-selection-indicator[data-ready='true']) > button {
+  background: transparent;
+}
+html:root body .workspace :is(.table-filters, .table-categories):has(> .motion-selection-indicator[data-ready='true']) > button[aria-pressed='true'] {
+  color: #934315;
+}
+html:root body .workspace :is(.work-tabs, .studio-tabs):has(> .motion-selection-indicator[data-ready='true']) > button:is(.active, [aria-pressed='true'], [aria-current='step']) {
+  background: transparent;
+  box-shadow: none;
+}
+html:root body .workspace .work-tabs { --selection-radius: 999px; }
+html:root body .workspace .studio-tabs { --selection-radius: 10px; }
+html:root body .workspace .calendar-day-tabs { --selection-surface: var(--assistant-soft, #eaf2ff); --selection-radius: 12px; }
+html:root body .workspace .calendar-day-tabs:has(> .motion-selection-indicator[data-ready='true']) > button[aria-pressed='true'] { background: transparent; }
+@media (max-width: 760px) {
+  /* Identical geometry/timing across chat and every work page prevents a drawer snap. */
+  html:root body .workspace.persistent-workspace > .sidebar {
+    position: fixed;
+    display: flex;
+    inset: 0 auto 0 0;
+    z-index: 60;
+    box-sizing: border-box;
+    width: min(290px, 84vw);
+    height: 100dvh;
+    margin: 0;
+    padding: 24px 16px max(12px, env(safe-area-inset-bottom));
+    background: var(--assistant-bg, #edf2f8);
+    border: 0;
+    border-radius: 0;
+    box-shadow: 12px 0 36px rgb(27 42 60 / 9%);
+    transform: translate3d(-100%, 0, 0);
+    visibility: hidden;
+    transition: transform 360ms cubic-bezier(.22,.8,.24,1), visibility 0s linear 360ms;
+  }
+  html:root body .workspace.persistent-workspace > .sidebar.mobile-open {
+    transform: translate3d(0, 0, 0);
+    visibility: visible;
+    transition-delay: 0s;
+  }
+  html:root body .workspace.persistent-workspace .sidebar-top { display: flex; flex-direction: column; gap: 20px; flex: none; }
+  html:root body .workspace.persistent-workspace .sidebar .brand { min-height: 48px; padding: 0 10px; gap: 10px; }
+  html:root body .workspace.persistent-workspace .sidebar .brand strong { font-size: 22px; line-height: 1.3; }
+  html:root body .workspace.persistent-workspace .sidebar .brand small { font-size: 11px; line-height: 1.5; }
+  html:root body .workspace.persistent-workspace .sidebar .compose-button { min-height: 48px; padding: 12px 14px; gap: 10px; font-size: 14px; }
+  html:root body .workspace.persistent-workspace .sidebar-nav { flex: 1; min-height: 0; padding: 0; overflow-y: auto; overscroll-behavior: contain; }
+  html:root body .workspace.persistent-workspace .sidebar .nav-label { margin: 24px 10px 12px; font-size: 12px; line-height: 1.4; }
+  html:root body .workspace.persistent-workspace .sidebar .nav-item { display: flex; align-items: center; min-height: 56px; padding: 10px 14px; gap: 12px; font-size: 14px; }
+  html:root body .workspace.persistent-workspace .sidebar .history-search { min-height: 44px; margin: 0 0 10px; padding: 10px 12px; }
+  html:root body .workspace.persistent-workspace .sidebar .conversation-item { min-height: 44px; padding: 10px 12px; font-size: 13px; line-height: 1.45; }
+  html:root body .workspace.persistent-workspace .sidebar-account { flex: none; margin-top: 12px; padding-bottom: 0; }
+  html:root body .workspace.persistent-workspace .sidebar .profile { min-height: 56px; padding: 10px 12px; grid-template-columns: 36px minmax(0, 1fr) 16px; }
+  html:root body .workspace.persistent-workspace .mobile-sidebar-mask {
+    position: fixed;
+    inset: 0;
+    z-index: 59;
+    background: rgb(28 39 53 / 22%);
+    touch-action: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  html:root body .workspace.persistent-workspace :is(.sidebar-mask-enter-active, .sidebar-mask-leave-active) {
+    transition: opacity 320ms cubic-bezier(.22,.8,.24,1);
+  }
+  html:root body .workspace.persistent-workspace :is(.sidebar-mask-enter-from, .sidebar-mask-leave-to) { opacity: 0; }
+  html:root body .workspace.persistent-workspace .sidebar-mask-leave-active { pointer-events: none; }
+  /* One incoming-content effect is driven by the route watcher, including returning to chat. */
+  html:root body .workspace.persistent-workspace :is(.workspace-pane, .chat-main).workspace-reveal { animation: none; }
+  html:root body .workspace.persistent-workspace :is(.workspace-content-enter-active, .workspace-content-leave-active) { transition: none; }
+  html:root body .workspace.persistent-workspace :is(.workspace-content-enter-from, .workspace-content-leave-to) { opacity: 1; transform: none; }
+  @supports (scale: .98) {
+    html:root body .workspace :is(button, summary, a[href], a[role='button']):active:not(:disabled):not([aria-disabled='true']):not([aria-busy='true']):not(.mobile-sidebar-mask) { scale: .98; }
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html:root body :is(.workspace, dialog:not(.auth-dialog), .el-message-box) :is(button, summary, a[href], a[role='button']) { transition: none; }
+  html:root body .workspace.persistent-workspace > .sidebar,
+  html:root body .workspace.persistent-workspace :is(.sidebar-mask-enter-active, .sidebar-mask-leave-active),
+  html:root body .workspace .motion-selection-indicator[data-ready='true'] { transition: none; }
+  html:root body .workspace :is(button, summary, a[href], a[role='button']):active { scale: 1; }
+}

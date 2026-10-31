@@ -11,17 +11,27 @@ const fn=parse(script,{sourceType:'module'}).program.body.find(n=>n.type==='Func
 const actual=script.slice(fn.start,fn.end).replace("await import('@/views/ChatView.vue')",'await preloadWorkspace()')
 const helperUrl=new URL('../src/utils/routeMotion.js',import.meta.url)
 const helpers=fs.existsSync(helperUrl)?await import(helperUrl):{}
-function scenario({animation,failedNavigation=false}={}){
+function scenario({animation,failedNavigation=false,phone=false,native=false}={}){
   const classes=new Set(),state={pushes:0,resolved:0,rejected:0}
   const workspace=animation===null?{}:{animate:()=>animation}
   const context={arriving:{value:false},preloadWorkspace:async()=>{},nextTick:async()=>{},
     router:{push:async()=>{state.pushes++;return failedNavigation?{failed:true}:undefined}},
-    isNavigationFailure:value=>Boolean(value?.failed),window:{matchMedia:()=>({matches:false})},
+    isNavigationFailure:value=>Boolean(value?.failed),window:{matchMedia:query=>({matches:query.includes('max-width')&&phone})},
     document:{documentElement:{classList:{add:x=>classes.add(x),remove:x=>classes.delete(x)}},querySelector:()=>workspace},
     performance:{clearMarks(){},mark(){}},...helpers}
+  state.nativeCalls=0
+  if(native)context.document.startViewTransition=callback=>{
+    state.nativeCalls++;return{ready:Promise.resolve(),updateCallbackDone:callback(),finished:Promise.resolve()}
+  }
   const enter=vm.runInNewContext(actual+'\nenterWorkspace',context)
   return {state,classes,context,run:()=>enter({detail:{to:'/chat',resolve:()=>state.resolved++,reject:()=>state.rejected++}})}
 }
+test('phone and desktop use the same successful native route handoff',async()=>{
+  for(const phone of [false,true]){
+    const s=scenario({phone,native:true});await s.run()
+    assert.equal(s.state.nativeCalls,1);assert.equal(s.state.pushes,1);assert.equal(s.state.resolved,1);assert.equal(s.state.rejected,0)
+  }
+})
 test('a cancelled fallback animation cannot report a successful navigation as login failure',async()=>{
   const s=scenario({animation:{finished:Promise.reject(new Error('synthetic cancelled animation'))}})
   await s.run();assert.equal(s.state.pushes,1);assert.equal(s.state.resolved,1);assert.equal(s.state.rejected,0)

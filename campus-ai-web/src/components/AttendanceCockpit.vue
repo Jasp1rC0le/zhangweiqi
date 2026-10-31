@@ -64,6 +64,8 @@ const recordedShare = computed(() => distribution.value?.total ? distribution.va
 </template>
 
 <style scoped>
+:global(html:root body .workspace .attendance-cockpit .cockpit-distribution),
+:global(html:root body .workspace .attendance-cockpit .cockpit-registration) { padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
 .attendance-cockpit { margin-block: 24px 30px; color: var(--assistant-ink, #29323c); }
 .cockpit-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 8px 20px; flex-wrap: wrap; }
 .cockpit-heading h2 { margin: 0; font-size: 22px; font-weight: 500; letter-spacing: -.025em; }

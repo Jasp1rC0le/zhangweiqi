@@ -28,7 +28,8 @@ test('all empty chat modes share the phone role while existing body and controls
     assert.equal(values(rule)['font-size'], '1.25rem'); assert.equal(values(rule)['font-weight'], '500')
     assert.equal(values(rule)['line-height'], '1.35')
   }
-  assert.match(descriptor.styles[0].content, /min-height: 44px/)
+  const heights = [...descriptor.styles[0].content.matchAll(/min-height:\s*(\d+)px/g)].map(match => Number(match[1]))
+  assert.ok(heights.length && heights.every(height => height >= 44), 'compact icon entries retain touch-sized targets')
   assert.doesNotMatch(descriptor.scriptSetup.content, /setTimeout|fetch\(|localStorage|requestAnimationFrame/)
   assert.match(descriptor.styles[0].content.split('@media')[0], /font-size: 22px; font-weight: 500;/)
 })

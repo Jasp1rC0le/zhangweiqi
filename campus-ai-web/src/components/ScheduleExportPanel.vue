@@ -13,10 +13,10 @@ import {createGovernanceClassSelection} from '@/utils/governanceClassSelection'
 import TeachingScopePicker from './TeachingScopePicker.vue'
 const props=defineProps({owner:{type:String,required:true},active:{type:Boolean,default:true},preferredView:{type:String,default:''},from:{type:String,default:''},to:{type:String,default:''},preset:{type:Object,default:null},calendarContext:{type:Object,default:null}})
 const root=ref(),previewElement=ref(),noticeElement=ref(),opened=ref(false),termBusy=ref(false),requirement=ref(props.preset?.scope||'AUTHORIZED'),state=reactive({access:null,busy:false,preview:null,error:'',notice:'',downloaded:null})
-const form=reactive({source:'MY',view:'STUDENT',from:props.from||mondayOf(chinaDate()),to:props.to||addDays(mondayOf(chinaDate()),6),classId:'',period:'ALL',format:'XLSX',search:'',includeCancelled:false})
+const form=reactive({source:'MY',view:'STUDENT',from:props.from||mondayOf(chinaDate()),to:props.to||addDays(mondayOf(chinaDate()),6),classId:'',period:'ALL',format:'XLSX',search:'',includeCancelled:false,reminderMinutes:0})
 const initialized=ref(false),incomingCalendar=ref(null),applyingCalendar=ref(false),calendarProvenance=ref(''),classPickerRefresh=ref(0),calendarClassIntent=ref(false)
 const classSelection=reactive({items:[],selected:null,page:0,total:0,totalPages:0,loading:false,error:''})
-let disposed=false,adopting=false,intent,termController,termGeneration=0,handoffGeneration=0
+let disposed=false,adopting=false,intent,termController,termGeneration=0,handoffGeneration=0,reminderOpening=false
 const owner=()=>!disposed&&props.active?props.owner:''
 const busy=computed(()=>state.busy||termBusy.value||applyingCalendar.value||classSelection.loading||!props.active)
 const resource=createScheduleExportResource({owner,state,readAccess:readScheduleExportAccess,prepare:prepareScheduleExport,download:downloadScheduleExport,onFile:(blob,name)=>{const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}})
@@ -74,27 +74,44 @@ function chooseDefaults(preset=props.preset){
 }
 async function activate(){if(!owner()||!opened.value||busy.value)return;if(incomingCalendar.value&&!initialized.value){await applyCalendar();return}if(!state.access){if(!await resource.access())return;if(!initialized.value){chooseDefaults();initialized.value=true}}if(form.classId&&!incomingCalendar.value)await resolveClass()}
 async function open(context){if(!owner()||busy.value)return;if(context){try{const target=calendarExportIntent(context,owner());incomingCalendar.value=!initialized.value||calendarExportScopeKey(form)!==calendarExportScopeKey(target)?target:null}catch(error){state.error=error.message;return}}opened.value=true;await nextTick();await activate();const principal=owner();await nextTick();if(principal===owner()&&opened.value)focusWorkflowElement(root.value,()=>principal===owner()&&opened.value)}
-async function toggle(e){opened.value=e.target.open;if(opened.value){if(!initialized.value&&!props.preset&&props.calendarContext)incomingCalendar.value=currentCalendar();await activate()}else{cancelFocus();handoffGeneration++;applyingCalendar.value=false;incomingCalendar.value=null;classResource.reset();termGeneration++;termController?.abort();termBusy.value=false;resource.reset(true)}}
-async function step(method){
+async function openReminder(minutes=10){
+  if(!owner()||busy.value||![5,10,15,30].includes(minutes))return false
+  cancelFocus();const principal=owner(),generation=++handoffGeneration
+  const openingIntent=captureAuditFocusIntent(root.value?.closest('.workspace-page')||root.value)
+  reminderOpening=true;opened.value=true;incomingCalendar.value=null;calendarClassIntent.value=false;calendarProvenance.value=''
+  classResource.reset();resource.reset(true);termGeneration++;termController?.abort();initialized.value=false
+  const current=()=>!disposed&&opened.value&&principal===owner()&&generation===handoffGeneration
+  try{
+    await nextTick();if(!current())return false
+    if(openingIntent.current())root.value?.scrollIntoView({block:'nearest',behavior:'auto'})
+    if(!await resource.access()||!current())return false
+    chooseDefaults({source:'MY',view:'STUDENT',from:chinaDate(),to:addDays(chinaDate(),27),format:'ICS',period:'ALL',scope:'PERSONAL'})
+    form.search='';form.includeCancelled=true;form.reminderMinutes=minutes;initialized.value=true
+    await step('prepare',openingIntent.current())
+    return current()&&!!state.preview
+  }finally{openingIntent.dispose();if(generation===handoffGeneration)reminderOpening=false}
+}
+async function toggle(e){opened.value=e.target.open;if(opened.value){if(reminderOpening)return;if(!initialized.value&&!props.preset&&props.calendarContext)incomingCalendar.value=currentCalendar();await activate()}else{reminderOpening=false;cancelFocus();handoffGeneration++;applyingCalendar.value=false;incomingCalendar.value=null;classResource.reset();termGeneration++;termController?.abort();termBusy.value=false;resource.reset(true)}}
+async function step(method, shouldFocus=true){
   if(fileBlocked.value)return
   cancelFocus();let key;try{key=scheduleExportKey(form);if(requirement.value==='CLASS'&&(form.source!=='TEACHING'||!form.classId))throw new Error('这次请求是班级课表，请先在“班级与课程筛选”明确选择授权班级');if(requirement.value==='COLLEGE'&&(form.source!=='TEACHING'||!['SECRETARY','ADMIN'].includes(form.view)))throw new Error('学院导出需要实际负责学院的书记或正常管理员，请核对授权身份')}catch(e){state.error=e.message;return}
   const principal=owner(),focus=captureAuditFocusIntent(root.value?.closest('.workspace-page')||root.value);intent=focus
-  try{if(method==='prepare'&&form.classId&&!await resolveClass())return;if(principal!==owner()||!opened.value||key!==scheduleExportKey(form))return;const ok=method==='prepare'?await resource.prepare(form):await resource.download();if(!ok)return;await nextTick();if(!disposed&&opened.value&&owner()===principal&&key===scheduleExportKey(form)&&focus.current()){const target=state.preview?previewElement.value:noticeElement.value;target?.focus({preventScroll:true});target?.scrollIntoView({block:'start',behavior:'auto'})}}finally{focus.dispose();if(intent===focus)intent=null}
+  try{if(method==='prepare'&&form.classId&&!await resolveClass())return;if(principal!==owner()||!opened.value||key!==scheduleExportKey(form))return;const ok=method==='prepare'?await resource.prepare(form):await resource.download();if(!ok)return;await nextTick();if(shouldFocus&&!disposed&&opened.value&&owner()===principal&&key===scheduleExportKey(form)&&focus.current()){const target=state.preview?previewElement.value:noticeElement.value;target?.focus({preventScroll:true});target?.scrollIntoView({block:'start',behavior:'auto'})}}finally{focus.dispose();if(intent===focus)intent=null}
 }
 async function fullPersonal(){if(busy.value||!owner())return;calendarClassIntent.value=false;calendarProvenance.value='';termController?.abort();termController=new AbortController();const principal=owner(),epoch=++termGeneration;termBusy.value=true;state.error='';try{const response=await readCourseSchedule(termController.signal);if(disposed||principal!==owner()||epoch!==termGeneration)return;const s=validatedCourseSnapshot(response.data?.schedule);if(!s)throw new Error('本人尚未保存个人课表；请先导入，或选择授权教学日期');const range=savedCoverageRange(s);adopting=true;requirement.value='AUTHORIZED';Object.assign(form,{source:'PERSONAL',view:'STUDENT',classId:'',from:range.from,to:range.to,period:'ALL',search:''});adopting=false;resource.reset();state.notice=`已采用${s.semester}个人源的已保存范围（周次${range.weeks.join('、')}），不代表整学期已齐；不包含未保存课程或教学安排。尚未生成文件。`}catch(e){if(principal===owner())state.error=e.response?.data?.message||e.message||'个人学期读取失败'}finally{if(principal===owner()&&epoch===termGeneration)termBusy.value=false}}
 watch(()=>form.source,()=>{if(adopting||!state.access)return;calendarClassIntent.value=false;adopting=true;form.classId='';requirement.value='AUTHORIZED';const allowed=form.source==='TEACHING'?state.access.teachingViews:state.access.personalViews;if(!allowed.includes(form.view))form.view=allowed[0]||'';adopting=false;resource.reset()},{flush:'sync'})
 watch(()=>[form.source,form.view,form.classId],()=>{classResource.reset();if(!adopting&&opened.value&&form.classId&&state.access)void resolveClass()},{flush:'sync'})
 watch(form,()=>{if(!adopting){calendarProvenance.value='';cancelFocus();resource.reset()}},{deep:true,flush:'sync'})
-watch(()=>[props.owner,props.active],()=>{calendarClassIntent.value=false;calendarProvenance.value='';cancelFocus();handoffGeneration++;applyingCalendar.value=false;incomingCalendar.value=null;initialized.value=false;classResource.reset();termGeneration++;termController?.abort();termBusy.value=false;resource.reset(true);opened.value=false;adopting=true;Object.assign(form,{source:'MY',view:'STUDENT',classId:'',search:'',from:props.from||mondayOf(chinaDate()),to:props.to||addDays(mondayOf(chinaDate()),6)});adopting=false},{flush:'sync'})
+watch(()=>[props.owner,props.active],()=>{calendarClassIntent.value=false;calendarProvenance.value='';reminderOpening=false;cancelFocus();handoffGeneration++;applyingCalendar.value=false;incomingCalendar.value=null;initialized.value=false;classResource.reset();termGeneration++;termController?.abort();termBusy.value=false;resource.reset(true);opened.value=false;adopting=true;Object.assign(form,{source:'MY',view:'STUDENT',classId:'',search:'',from:props.from||mondayOf(chinaDate()),to:props.to||addDays(mondayOf(chinaDate()),6)});adopting=false},{flush:'sync'})
 watch(()=>calendarExportScopeKey(currentCalendar()),()=>{if(applyingCalendar.value){handoffGeneration++;applyingCalendar.value=false;classResource.reset();resource.reset(true);state.error='当前课表已切换，请重新采用最新范围；没有按迟到结果准备文件。'}},{flush:'sync'})
 watch(()=>props.preset,async p=>{if(p){calendarClassIntent.value=false;calendarProvenance.value='';handoffGeneration++;incomingCalendar.value=null;initialized.value=false;resource.reset();chooseDefaults(p);await open()}},{deep:true})
 onMounted(()=>{if(props.preset)open()})
 onBeforeUnmount(()=>{disposed=true;handoffGeneration++;cancelFocus();termGeneration++;termController?.abort();classResource.dispose();resource.dispose()})
-defineExpose({open})
+defineExpose({open,openReminder})
 </script>
 <template>
   <details ref="root" class="schedule-export" :open="opened" :data-workflow-ready="state.access?'ready':state.error?'error':'waiting'" @toggle="toggle">
-    <summary>导出课表文件</summary>
+    <summary>课表导出</summary>
     <div v-if="opened">
       <p class="hint">选择范围与格式，核对后下载。不含名单与考勤。</p>
       <section v-if="incomingCalendar" class="calendar-handoff" aria-label="沿用当前课表范围">
@@ -111,12 +128,12 @@ defineExpose({open})
       <button v-if="!state.access" type="button" :disabled="busy" @click="activate">重新读取导出能力</button>
       <template v-if="state.access">
         <section v-if="state.preview" ref="previewElement" class="export-preview" tabindex="-1" aria-label="课表文件下载核对">
-          <h3>完整导出 {{state.preview.count}} 项课程</h3><p>{{state.preview.filter.from}} 至 {{state.preview.filter.to}}，北京时间<br />{{state.preview.scope}}<br />{{SCHEDULE_FORMATS[state.preview.filter.format]}}，{{Math.ceil(state.preview.bytes/1024)}} KB</p>
+          <h3>{{state.preview.count}} 项课程安排</h3><p>{{state.preview.filter.from}} 至 {{state.preview.filter.to}}，北京时间<br />{{state.preview.scope}}<br />{{SCHEDULE_FORMATS[state.preview.filter.format]}}，{{Math.ceil(state.preview.bytes/1024)}} KB</p>
           <p v-if="state.preview.filter.period!=='ALL'||state.preview.filter.search||state.preview.filter.includeCancelled" class="hint">筛选：{{({ALL:'全天',MORNING:'上午',AFTERNOON:'下午',EVENING:'晚上'})[state.preview.filter.period]}}<span v-if="state.preview.filter.search"> · 课程匹配“{{state.preview.filter.search}}”</span><span v-if="state.preview.filter.includeCancelled"> · 含取消课程</span></p>
           <ul><li v-for="r in state.preview.sample" :key="r.id">{{r.date}} {{r.timeLabel}}<br />{{r.name}} · {{r.room}}<span v-if="r.teacher"> · {{r.teacher}}</span></li></ul>
           <details><summary>来源说明与校验值</summary><p v-for="w in state.preview.warnings" :key="w">{{w}}</p><code>{{state.preview.sha256}}</code></details>
-          <p class="hint">准备5分钟内有效，下载前重新读取权限与课表。数据变化会要求重新准备，不返回旧文件。</p>
-          <div class="actions"><button type="button" class="primary" :disabled="fileBlocked" @click="step('download')">核验并下载 {{state.preview.filter.format}}</button><button type="button" :disabled="busy" @click="resource.reset()">取消文件准备</button></div>
+          <p class="hint">准备有效期5分钟，下载时重新核对。<template v-if="state.preview.filter.reminderMinutes">提前 {{state.preview.filter.reminderMinutes}} 分钟提醒，导入手机日历后生效。</template></p>
+          <div class="actions"><button type="button" class="primary" :disabled="fileBlocked" @click="step('download')">{{ state.preview.filter.format==='ICS' ? '核验并下载日历' : '核验并下载 '+state.preview.filter.format }}</button><button type="button" :disabled="busy" @click="resource.reset()">取消预览</button></div>
         </section>
         <p v-if="state.notice" ref="noticeElement" class="notice" role="status" tabindex="-1">{{state.notice}}</p>
         <form v-if="!state.preview&&initialized" @submit.prevent="step('prepare')">
@@ -124,11 +141,12 @@ defineExpose({open})
           <label>核对身份<select v-model="form.view" aria-label="导出核对身份" required :disabled="busy"><option v-if="!form.view" value="" disabled>请选择当前有权身份</option><option v-for="v in views" :key="v" :value="v">{{EXPORT_VIEWS[v]}}</option></select></label>
           <div class="date-pair wide"><label>开始日期<DateField v-model="form.from" required :disabled="busy"  /></label><label>结束日期<DateField v-model="form.to" required :min="form.from" :max="addDays(form.from||chinaDate(),209)" :disabled="busy"  /></label></div>
           <label>文件格式<select v-model="form.format" aria-label="导出文件格式" :disabled="busy"><option v-for="f in state.access.formats" :key="f" :value="f">{{SCHEDULE_FORMATS[f]}}</option></select></label>
+          <label v-if="form.format==='ICS'">课前提醒<select v-model.number="form.reminderMinutes" aria-label="日历课前提醒" :disabled="busy"><option :value="0">不添加提醒</option><option v-for="minutes in [5,10,15,30]" :key="minutes" :value="minutes">提前 {{minutes}} 分钟</option></select></label>
           <details class="wide" :open="requirement==='CLASS'||form.period!=='ALL'"><summary>班级、课程与时段筛选</summary><TeachingScopePicker v-if="form.source==='TEACHING'" :model-value="form.classId" @update:model-value="manualClassChange" :owner="`${owner}:${form.view}`" label="导出班级" :read-page="readClasses" :refresh="classPickerRefresh" optional :disabled="busy" /><label>上课时段<select v-model="form.period" aria-label="导出上课时段" :disabled="busy"><option value="ALL">全天</option><option value="MORNING">上午（12点前）</option><option value="AFTERNOON">下午（12至18点）</option><option value="EVENING">晚上（18点后）</option></select></label><label>查找课程<input v-model="form.search" maxlength="100" placeholder="课程、地点、教师或教学组，按字面筛选" :disabled="busy" /></label><label class="check"><input v-model="form.includeCancelled" type="checkbox" :disabled="busy" /> 同时导出已取消的课程</label></details>
           <p v-if="form.classId" class="hint wide">班级文件只包含该班级的授权教学安排，不含本人个人导入；准备与下载时会再次核对权限。</p>
-          <div class="actions wide"><button class="primary" :disabled="fileBlocked">准备并核对文件</button><button type="button" :disabled="busy||!!incomingCalendar" @click="fullPersonal">采用本人已保存范围</button></div>
-          <p class="hint wide">每份最多210天、2000项课程，不会只导出当前页。ICS是一次性日历文件，不会自动收到后续调停课更新。</p>
-          <p v-if="form.format==='JSON'" class="hint wide">这里是JSON日期快照，不是个人原始JSON导入文件。可重新导入的原始JSON仍在下方“导入、更新或导出个人课表”。</p>
+          <div class="actions wide"><button class="primary" :disabled="fileBlocked">预览文件</button><button type="button" :disabled="busy||!!incomingCalendar" @click="fullPersonal">已保存范围</button></div>
+          <p class="hint wide">上限210天、2000项。日历是快照，改课后需重新导入；提醒依手机设置。</p>
+          <p v-if="form.format==='JSON'" class="hint wide">日期快照不能导入原课表；请使用个人课表的原始JSON导出。</p>
         </form>
       </template>
     </div>
