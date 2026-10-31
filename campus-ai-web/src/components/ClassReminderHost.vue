@@ -44,8 +44,8 @@ onBeforeUnmount(() => {
     <Transition name="class-notice">
       <section v-if="banner" class="class-reminder-toast" aria-label="课前提醒" role="status" aria-live="polite">
         <div class="class-notice-heading"><Bell aria-hidden="true" /><strong>即将上课</strong><button type="button" aria-label="关闭这次上课提醒" @click="reminders.dismiss"><Close aria-hidden="true" /></button></div>
-        <ul><li v-for="row in banner.rows.slice(0, 2)" :key="row.id"><strong>{{ row.name }}</strong><span>{{ row.startTime.slice(0, 5) }}<template v-if="row.room"> · {{ row.room }}</template> · {{ row.minutesUntil }} 分钟后</span></li></ul>
-        <p v-if="banner.rows.length > 1" class="class-notice-warning">{{ banner.rows.length }} 项同时段安排，请核对</p>
+        <ul><li v-for="row in banner.rows.slice(0, 2)" :key="row.id"><strong>{{ row.name }}</strong><span>{{ row.startTime.slice(0, 5) }}<template v-if="row.room"> · {{ row.room }}</template> · {{ row.minutesUntil }} 分钟后<template v-if="row.conflict"> · 时间重叠，请核对</template></span></li></ul>
+        <p v-if="banner.rows.length > 2" class="class-notice-warning">还有 {{ banner.rows.length - 2 }} 项即将上课</p>
         <p v-if="navigationError" class="class-notice-warning" role="alert">{{ navigationError }}</p>
         <button type="button" class="class-notice-open" @click="openCourse">查看课表</button>
       </section>
