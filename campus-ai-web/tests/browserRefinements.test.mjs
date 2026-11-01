@@ -21,7 +21,7 @@ test('failure grouping preserves every historical attempt and distinguishes inde
   assert.equal(groups[0].document, document)
   assert.deepEqual(groups.flatMap(group => group.records).map(job => job.id), [9, 8, 7, 6, 5])
   assert.deepEqual(jobs, before)
-  assert.equal(failedKnowledgeReason(jobs[0]), '上次官网读取失败')
+  assert.equal(failedKnowledgeReason(jobs[0]), '历史读取失败，未记录具体原因')
   assert.equal(failedKnowledgeReason({ lastError: '未获读取权限' }), '未获读取权限')
   assert.equal(failedKnowledgeReason(null), '未返回错误原因')
 })

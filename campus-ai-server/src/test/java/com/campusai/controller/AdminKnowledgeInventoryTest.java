@@ -11,7 +11,7 @@ import static org.mockito.Mockito.*;
 class AdminKnowledgeInventoryTest {
     final KnowledgeDocumentService documents=mock(KnowledgeDocumentService.class);
     final UserService users=mock(UserService.class);
-    final AdminKnowledgeController controller=new AdminKnowledgeController(documents,null,users,null,null,null,null);
+    final AdminKnowledgeController controller=new AdminKnowledgeController(documents,null,users,null,null,null,null,true);
     @Test void rejectsNonAdminBeforeQuerying() {
         assertThatThrownBy(()->controller.scanDocuments(1L,"STUDENT",null)).isInstanceOf(ResponseStatusException.class);
         verifyNoInteractions(documents,users);

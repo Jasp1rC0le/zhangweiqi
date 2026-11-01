@@ -24,6 +24,7 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
@@ -40,6 +41,7 @@ public class AdminKnowledgeController {
     private final KnowledgeImportPreviewService previewService;
     private final KnowledgeSourceRefreshService refreshService;
     private final BackgroundJobRepository jobs;
+    private final boolean jobsEnabled;
 
     public AdminKnowledgeController(
             KnowledgeDocumentService documentService,
@@ -48,7 +50,8 @@ public class AdminKnowledgeController {
             KnowledgeSemanticService semanticService,
             KnowledgeImportPreviewService previewService,
             KnowledgeSourceRefreshService refreshService,
-            BackgroundJobRepository jobs) {
+            BackgroundJobRepository jobs,
+            @Value("${app.jobs.enabled:true}") boolean jobsEnabled) {
 
         this.documentService = documentService;
         this.evaluationService = evaluationService;
@@ -57,6 +60,7 @@ public class AdminKnowledgeController {
         this.previewService = previewService;
         this.refreshService = refreshService;
         this.jobs = jobs;
+        this.jobsEnabled = jobsEnabled;
     }
 
     @PostMapping(value = "/preview-files", consumes = "multipart/form-data")
@@ -96,6 +100,9 @@ public class AdminKnowledgeController {
             @RequestAttribute("currentUserId") Long userId,
             @RequestAttribute("currentUserRole") String role, @PathVariable Long id) {
         Long schoolId = requireAdmin(userId, role).getSchoolId();
+        if (!jobsEnabled) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "自动更新已暂停，未加入队列；可检查来源或补充原文");
+        }
         KnowledgeDocument document = documentService.findOne(schoolId, id);
         if (!"PUBLISHED".equals(document.getStatus()) || document.getSourceUrl() == null
                 || document.getSourceUrl().isBlank()) {

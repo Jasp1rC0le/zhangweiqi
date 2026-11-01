@@ -38,6 +38,13 @@ public class KnowledgeRefreshScheduler {
                         + "WHERE active.school_id = document.school_id AND active.ref_id = document.id "
                         + "AND active.job_type = 'KNOWLEDGE_REFRESH' "
                         + "AND active.status IN ('PENDING', 'RUNNING')) "
+                        // A failed unchanged source needs an explicit recheck, not another daily failure.
+                        + "AND COALESCE((SELECT terminal.status FROM background_jobs terminal "
+                        + "WHERE terminal.school_id = document.school_id AND terminal.ref_id = document.id "
+                        + "AND terminal.job_type = 'KNOWLEDGE_REFRESH' "
+                        + "AND terminal.status IN ('DONE', 'FAILED') "
+                        + "AND terminal.created_at >= document.updated_at "
+                        + "ORDER BY terminal.created_at DESC, terminal.id DESC LIMIT 1), '') <> 'FAILED' "
                         + "AND NOT EXISTS (SELECT 1 FROM background_jobs today "
                         + "WHERE today.school_id = document.school_id AND today.ref_id = document.id "
                         + "AND today.job_type = 'KNOWLEDGE_REFRESH' "

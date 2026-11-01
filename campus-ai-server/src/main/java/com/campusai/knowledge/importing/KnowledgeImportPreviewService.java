@@ -95,7 +95,7 @@ public class KnowledgeImportPreviewService {
         } catch (ResponseStatusException exception) {
             throw exception;
         } catch (IOException exception) {
-            throw badRequest("网页读取失败，请检查链接或改用文件上传");
+            throw sourceReadFailure(exception);
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
             throw badRequest("网页读取已中断");
@@ -169,8 +169,9 @@ public class KnowledgeImportPreviewService {
                 }
             } catch (IOException exception) {
                 skipped++;
-                if (firstFailure == null) firstFailure = "读取失败或连接超时";
-                if (warnings.size() < 10) warnings.add(target.uri() + "：读取失败");
+                String reason = sourceReadFailure(exception).getReason();
+                if (firstFailure == null) firstFailure = reason;
+                if (warnings.size() < 10) warnings.add(target.uri() + "：" + reason);
             } catch (InterruptedException exception) {
                 Thread.currentThread().interrupt();
                 throw badRequest("整站解析已中断");
@@ -198,6 +199,30 @@ public class KnowledgeImportPreviewService {
         }
         return new KnowledgeSitePreviewResponse(List.copyOf(pages), attempted, skipped,
                 List.copyOf(warnings));
+    }
+
+    // Only fixed, public-safe messages leave the transport layer; never expose exception text.
+    static ResponseStatusException sourceReadFailure(IOException exception) {
+        Throwable cause = exception;
+        for (int depth = 0; cause != null && depth < 8; depth++, cause = cause.getCause()) {
+            if (cause instanceof java.net.http.HttpConnectTimeoutException) {
+                return new ResponseStatusException(HttpStatus.GATEWAY_TIMEOUT, "连接官网超时，未取得网页内容");
+            }
+            if (cause instanceof java.net.http.HttpTimeoutException
+                    || cause instanceof java.net.SocketTimeoutException) {
+                return new ResponseStatusException(HttpStatus.GATEWAY_TIMEOUT, "官网响应超时，未取得网页内容");
+            }
+            if (cause instanceof java.net.UnknownHostException) {
+                return new ResponseStatusException(HttpStatus.BAD_GATEWAY, "官网域名解析失败");
+            }
+            if (cause instanceof javax.net.ssl.SSLException) {
+                return new ResponseStatusException(HttpStatus.BAD_GATEWAY, "官网安全连接校验失败，未降低安全校验");
+            }
+            if (cause instanceof java.net.ConnectException || cause instanceof java.net.NoRouteToHostException) {
+                return new ResponseStatusException(HttpStatus.BAD_GATEWAY, "无法连接官网，请检查来源地址或网络");
+            }
+        }
+        return new ResponseStatusException(HttpStatus.BAD_GATEWAY, "官网连接中断，未取得完整网页内容");
     }
 
     private FetchedPage fetch(URI uri) throws IOException, InterruptedException {

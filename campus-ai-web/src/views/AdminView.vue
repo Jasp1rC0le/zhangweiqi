@@ -80,6 +80,7 @@ const editorLoading = ref(false), importError = ref(''), importSuccess = ref('')
 let disposed = false, inboxSequence = 0, editorSequence = 0, mergeReadSequence = 0
 const versionReads = new Map()
 const sourceReads = new Map(), sourceComparisons = reactive({})
+const sourceDiagnostics = reactive({}), sourceProbeBusy = ref('')
 onBeforeUnmount(() => { disposed = true; inboxSequence++; editorSequence++ })
 const processingKey = ref('')
 const rejectionId = ref(null)
@@ -162,6 +163,7 @@ watch(editorOwner, () => {
   editorScope.invalidate(); inboxSequence++; editorSequence++
   adminActions.invalidate(); actionRunning.value = false; qualityBusy.value = false; processingKey.value = ''
   mergeReadSequence++; versionReads.clear(); sourceReads.clear()
+  sourceProbeBusy.value = ''
   rejectionId.value = null; mergeSubmissionId.value = null; mergeDocumentId.value = ''; mergeDraft.value = null
   evaluationForm.question = ''; evaluationForm.expectedDocumentId = ''
   resetImportForm(); importSuccess.value = ''
@@ -169,7 +171,7 @@ watch(editorOwner, () => {
   for (const target of [submissions, contacts, feedback, modelUsage, failedBackgroundJobs,
     documents, updateCandidates, evaluationCases]) target.value = []
   overview.value = null; jobRuntime.value = null; showAllFailedJobs.value = false; evaluationReport.value = null; overviewUpdatedAt.value = null
-  for (const state of [sectionErrors, versionHistories, resolutionDrafts, rejectionNotes, sourceComparisons]) {
+  for (const state of [sectionErrors, versionHistories, resolutionDrafts, rejectionNotes, sourceComparisons, sourceDiagnostics]) {
     for (const key of Object.keys(state)) delete state[key]
   }
   loading.value = false
@@ -328,10 +330,34 @@ async function refreshDocumentsAfterImport() {
 }
 
 async function checkDocumentUpdate(item) {
+  if (jobRuntime.value?.enabled !== true) return
   const id = item.id
   await runInboxAction(`check-update-${id}`, signal => checkKnowledgeDocumentUpdate(id, { signal }), () => {
     ElMessage.success('已加入更新检查队列，发现变化后会出现在本页顶部')
   }, { label: '更新检查', targetCurrent: () => documents.value.some(doc => doc.id === id && doc.status === 'PUBLISHED') })
+}
+
+async function checkFailedSource(item) {
+  const document = item.document, url = document?.sourceUrl, key = item.key
+  if (!url || !safeExternalUrl(url) || !editorOwner.value || disposed || sourceProbeBusy.value || actionBusy.value) return
+  const ticket = editorScope.capture({ abortable: true })
+  const current = () => ticket.current() && documents.value.some(doc => doc.id === document.id && doc.sourceUrl === url)
+  sourceProbeBusy.value = key
+  try {
+    const preview = await previewKnowledgeUrl(url, { signal: ticket.signal, timeout: 16000 })
+    if (!current()) return
+    const readable = typeof preview.content === 'string' && Boolean(preview.content.trim())
+    const fallback = preview.warnings?.some(warning => warning.includes('未定位独立正文'))
+    sourceDiagnostics[key] = {
+      message: !readable ? '未取得可读正文' : fallback ? '可访问，未定位独立正文' : '官网可读取，尚未同步',
+      checkedAt: new Date().toISOString(),
+    }
+  } catch (error) {
+    if (current()) sourceDiagnostics[key] = { message: resolveErrorMessage(error, '来源检查未完成'), checkedAt: new Date().toISOString() }
+  } finally {
+    if (ticket.current() && sourceProbeBusy.value === key) sourceProbeBusy.value = ''
+    ticket.release()
+  }
 }
 
 async function applyDetectedUpdate(item) {
@@ -989,17 +1015,19 @@ async function exitAdmin() {
               <div><h2 id="failed-jobs-title">资料同步历史</h2></div>
               <small>{{ failedJobGroups.length }} 组来源 · {{ failedBackgroundJobs.length }} 条失败历史</small>
             </div>
-            <p class="job-runtime" :class="{ paused: jobRuntime?.enabled === false }" role="status">{{ jobRuntime?.enabled === false ? '自动执行已暂停，需核对来源或补传文件。' : jobRuntime?.enabled === true ? '先处理来源，再手动重试。' : '执行状态未确认，暂不可重试。' }}</p>
+            <p class="job-runtime" :class="{ paused: jobRuntime?.enabled === false }" role="status">{{ jobRuntime?.enabled === false ? '自动更新已暂停' : jobRuntime?.enabled === true ? '失败来源等待处理' : '执行状态未确认' }}</p>
             <div id="failed-job-history">
               <div v-for="item in visibleFailedJobs" :key="item.key" class="overview-queue-row failed-job-row">
                 <details class="failed-job-details">
                   <summary>
                     <span class="failed-job-heading"><b>{{ item.document?.title || `${jobTypeLabel(item.type)} #${item.refId || '—'}` }}</b><small>{{ item.records.length }} 条历史</small></span>
-                    <span class="failed-job-reason">{{ failedKnowledgeReason(item.records[0]) }}</span>
+                    <span class="failed-job-reason" role="status">{{ sourceDiagnostics[item.key]?.message || failedKnowledgeReason(item.records[0]) }}</span>
                     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m7 5 5 5-5 5" /></svg>
                   </summary>
                   <p>最后失败：{{ formatAdminDate(item.records[0].updatedAt) }}</p>
+                  <p v-if="sourceDiagnostics[item.key]">本次检查：{{ formatAdminDate(sourceDiagnostics[item.key].checkedAt) }}</p>
                   <p v-if="item.document">当前资料：{{ ({PUBLISHED:'已发布',ARCHIVED:'已归档',DRAFT:'草稿',PENDING:'待审核'})[item.document.status] || item.document.status }}。此状态不代表失败的更新内容已经补齐。</p>
+                  <button v-if="item.document?.sourceUrl && safeExternalUrl(item.document.sourceUrl)" type="button" :disabled="Boolean(sourceProbeBusy) || actionBusy" @click="checkFailedSource(item)">{{ sourceProbeBusy === item.key ? '检查中…' : '检查来源' }}</button>
                   <button v-if="item.document" type="button" :disabled="actionBusy || editorLoading" @click="editDocument(item.document)">核对 / 补充原文</button>
                   <p v-else>原资料未在当前列表中，需先在资料列表核对。</p>
                   <div v-for="record in item.records" :key="record.id" class="failed-job-record">
@@ -1318,8 +1346,8 @@ async function exitAdmin() {
           <div class="card-actions">
             <button type="button" @click="showVersions(item)">版本记录</button>
             <button v-if="item.status === 'PUBLISHED' && safeExternalUrl(item.sourceUrl)"
-              type="button" :disabled="Boolean(processingKey) || actionBusy" @click="checkDocumentUpdate(item)">
-              {{ processingKey === `check-update-${item.id}` ? '正在安排…' : '检查官网更新' }}
+              type="button" :disabled="Boolean(processingKey) || actionBusy || jobRuntime?.enabled !== true" @click="checkDocumentUpdate(item)">
+              {{ jobRuntime?.enabled === false ? '自动更新已暂停' : processingKey === `check-update-${item.id}` ? '正在安排…' : '检查官网更新' }}
             </button>
             <button v-if="item.status === 'PUBLISHED'" type="button" :disabled="editorLoading || importLoading || previewLoading || importConfirming" @click="editDocument(item)">{{ editorLoading ? '正在读取…' : '编辑并发布新版本' }}</button>
             <button v-if="item.status === 'PUBLISHED' || !item.hasSuccessor"
