@@ -66,7 +66,7 @@ public class SchoolTimetableImageParser {
     public List<Card> cards(BufferedImage image,Header h,Grid grid){
         var result=new ArrayList<Card>();int first=Math.max(0,(int)Math.floor(grid.top())),bottom=Math.min(image.getHeight(),(int)Math.ceil(grid.top()+grid.maxPeriod()*grid.periodHeight()));
         for(int day=0;day<7;day++){
-            int x=Math.max(0,(int)Math.floor(h.left()+day*h.columnWidth())+2),right=Math.min(image.getWidth(),(int)Math.floor(h.left()+(day+1)*h.columnWidth())-2);
+            int x=Math.max(0,(int)Math.round(h.left()+day*h.columnWidth())),right=Math.min(image.getWidth(),(int)Math.round(h.left()+(day+1)*h.columnWidth()));
             int start=-1,last=-1;double[] previous=null;
             for(int y=first;y<=bottom;y++){
                 double[] color=y<bottom?colorRow(image,x,right,y):new double[]{0,0,0,0};boolean strong=color[0]>=.18;
@@ -106,7 +106,9 @@ public class SchoolTimetableImageParser {
             // The location prefix can include 综合/公共 before 教学楼.
             if(split>=2&&(text.substring(split-2,split).equals("公共")||text.substring(split-2,split).equals("综合")))split-=2;
             String name=split<0?text:text.substring(0,split),place=split<0?"":text.substring(split);
+            if(teacher.isEmpty()&&recognized.title()!=null&&recognized.room()!=null){name=normalize(recognized.title());place=normalize(recognized.room());}
             String note="";if(name.isBlank())note="课程名称需补充";
+            if(Boolean.FALSE.equals(recognized.reliable()))note="课程文字未读清";
             else if(name.matches(".*[川W|]+(?:[（(].*)?$"))note="名称中的符号需对照原图核对";
             if(c.startPeriod()==null||c.endPeriod()==null)note=note.isEmpty()?"节次边界需核对":note+"；节次边界需核对";
             if(!note.isEmpty())warnings.add("第"+(i+1)+"行："+note);

@@ -2,6 +2,7 @@ package com.campusai.timetable;
 
 import jakarta.annotation.PreDestroy;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
@@ -21,16 +22,20 @@ public class CommandLocalOcrEngine implements LocalOcrEngine,AutoCloseable {
     private static final int MAX_OUTPUT=1024*1024;
     private final ObjectMapper json;
     private final String command;
+    private final String python;
     private final boolean mac;
     private final Set<Process> processes=ConcurrentHashMap.newKeySet();
     private Path runtime,binary;
-    public CommandLocalOcrEngine(ObjectMapper json,@Value("${app.timetable.ocr.command:}") String configured){
+    public CommandLocalOcrEngine(ObjectMapper json,String configured){this(json,configured,"");}
+    @Autowired
+    public CommandLocalOcrEngine(ObjectMapper json,@Value("${app.timetable.ocr.command:}") String configured,@Value("${app.timetable.ocr.python:/opt/campus-ai/ocr/ppocrv5-20261101-r1/bin/python3}") String python){
         this.json=json;
+        this.python=python;
         mac=configured.isBlank()&&System.getProperty("os.name","").toLowerCase(Locale.ROOT).contains("mac");
         command=mac?"/usr/bin/swiftc":configured.isBlank()?List.of("/usr/bin/tesseract","/usr/local/bin/tesseract","/opt/homebrew/bin/tesseract").stream().filter(p->Files.isExecutable(Path.of(p))).findFirst().orElse(""):configured;
     }
-    public String engine(){return mac?"apple-vision":"tesseract";}
-    public boolean available(){return !command.isBlank()&&Path.of(command).isAbsolute()&&Files.isExecutable(Path.of(command));}
+    public String engine(){return mac?"apple-vision":python.isBlank()?"tesseract":"tesseract+ppocrv5-local";}
+    public boolean available(){return !command.isBlank()&&Path.of(command).isAbsolute()&&Files.isExecutable(Path.of(command))&&(mac||python.isBlank()||Path.of(python).isAbsolute()&&Files.isExecutable(Path.of(python)));}
     private synchronized Path runtime() throws IOException {
         if(runtime==null)runtime=Files.createTempDirectory("campthink-local-ocr-",PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------")));
         return runtime;
@@ -53,6 +58,7 @@ public class CommandLocalOcrEngine implements LocalOcrEngine,AutoCloseable {
     public List<RegionText> regions(BufferedImage image,List<Region> regions,long deadline){
         if(regions.size()>120)throw unavailable();
         if(mac)return nativeRead(image,regions,deadline).regions();
+        if(!python.isBlank()&&regions.stream().allMatch(Region::enhance))return accurateRegions(image,regions,deadline);
         var result=new ArrayList<RegionText>();
         for(int i=0;i<regions.size();i++){
             var r=regions.get(i);validateRegion(image,r);
@@ -62,6 +68,23 @@ public class CommandLocalOcrEngine implements LocalOcrEngine,AutoCloseable {
         return List.copyOf(result);
     }
     private record NativeOutput(int version,int width,int height,List<Line> lines,List<RegionText> regions){}
+    private List<RegionText> accurateRegions(BufferedImage image,List<Region> regions,long deadline){
+        Path job=null;
+        try{
+            if(!available())throw unavailable();
+            for(var region:regions)validateRegion(image,region);
+            job=Files.createTempDirectory(runtime(),"text-",PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------")));
+            Path input=privateFile(job,"image.png"),ranges=privateFile(job,"regions.json"),worker=privateFile(job,"worker.py");
+            ImageIO.write(image,"png",input.toFile());Files.writeString(ranges,json.writeValueAsString(regions));
+            try(var source=getClass().getResourceAsStream("/ocr/ppocr-worker.py")){if(source==null)throw unavailable();Files.write(worker,source.readAllBytes());}
+            Path models=Path.of(python).getParent().getParent().resolve("models");
+            String output=run(List.of(python,worker.toString(),input.toString(),ranges.toString(),models.toString()),job,deadline);
+            var parsed=json.readValue(output,NativeOutput.class);
+            if(parsed.version()!=1||parsed.width()!=image.getWidth()||parsed.height()!=image.getHeight()||parsed.regions()==null||parsed.regions().size()!=regions.size())throw unavailable();
+            for(int i=0;i<parsed.regions().size();i++){var region=parsed.regions().get(i);if(region.index()!=i||region.reliable()==null||region.title()!=null&&region.title().length()>100||region.room()!=null&&region.room().length()>100)throw unavailable();validLines(region.lines());}
+            return parsed.regions();
+        }catch(ResponseStatusException failure){throw failure;}catch(Exception failure){throw unavailable();}finally{delete(job);}
+    }
     private NativeOutput nativeRead(BufferedImage image,List<Region> regions,long deadline){
         Path job=null;
         try{

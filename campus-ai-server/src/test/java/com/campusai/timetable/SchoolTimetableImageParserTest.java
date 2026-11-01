@@ -58,4 +58,9 @@ class SchoolTimetableImageParserTest {
         supplied.add(line("第9周",350,60,80,20));supplied.add(line("第10周",350,60,80,20));
         assertNull(new SchoolTimetableImageParser().header(image(),supplied).week());
     }
+    @Test void layoutFieldsKeepLocationsOutOfTitlesAndNormalizeRomanTypography(){
+        var parser=new SchoolTimetableImageParser();var h=parser.header(image(),lines());var cards=parser.cards(image(),h,parser.grid(image(),h,lines(),List.of(),parser.periodStrip(image(),h)));
+        var result=parser.finish(h,cards,List.of(new RegionText(0,List.of(),"混读内容", "合成课程Ⅲ","实验楼(Q座)Q-101",true),new RegionText(1,List.of(),"另一个混读内容","另一课程","合成场馆",false)));
+        assertEquals("合成课程III",result.rows().get(0).name());assertEquals("实验楼(Q座)Q-101",result.rows().get(0).room());assertTrue(result.rows().get(1).reviewNote().contains("文字未读清"));
+    }
 }

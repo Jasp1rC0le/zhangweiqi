@@ -10,7 +10,9 @@ public interface LocalOcrEngine {
         public double centerY(){return y+height/2;}
     }
     record Region(int x,int y,int width,int height,boolean enhance) {}
-    record RegionText(int index,List<Line> lines,String joined) {}
+    record RegionText(int index,List<Line> lines,String joined,String title,String room,Boolean reliable) {
+        public RegionText(int index,List<Line> lines,String joined){this(index,lines,joined,null,null,null);}
+    }
     boolean available();
     String engine();
     List<Line> read(BufferedImage image,long deadlineNanos);

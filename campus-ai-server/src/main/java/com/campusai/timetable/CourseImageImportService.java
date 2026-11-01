@@ -27,6 +27,7 @@ public class CourseImageImportService {
         if(parsed.week()==null||parsed.week()<1||parsed.week()>30||parsed.semester()==null||parsed.semester().isBlank()||parsed.rows().isEmpty())throw error(422,"截图周次或课程未读完整，请换一张完整截图；未保存");
         var incoming=new ArrayList<Course>();var timed=new ArrayList<TimedRow>();var warnings=new ArrayList<String>();
         for(var row:parsed.rows()){
+            if(row.reviewNote()!=null&&row.reviewNote().contains("文字未读清"))throw error(422,"课程名称或地点未读清，未保存；请使用清晰原图");
             if(row.startPeriod()==null||row.endPeriod()==null||row.startPeriod()<1||row.endPeriod()>16||row.endPeriod()<row.startPeriod())
                 throw error(422,"截图课程节次边界未读清，请使用完整清晰截图；未保存");
             if(!List.of(parsed.week()).equals(row.weeks()))throw error(422,"截图课程周次与当前周不一致，未保存");
@@ -68,6 +69,7 @@ public class CourseImageImportService {
             else if(!monday.equals(first)||!semester.equals(page.semester()))throw error(422,"图片不属于同一学期，整批未保存");
             var courses=byWeek.computeIfAbsent(page.week(),key->new ArrayList<>());
             for(var row:page.rows()){
+                if(row!=null&&row.reviewNote()!=null&&row.reviewNote().contains("文字未读清"))throw error(422,"第"+(index+1)+"张课程文字未读清，整批未保存");
                 if(row==null||row.startPeriod()==null||row.endPeriod()==null||row.startPeriod()<1||row.endPeriod()>16||row.endPeriod()<row.startPeriod()||!List.of(page.week()).equals(row.weeks()))
                     throw error(422,"第"+(index+1)+"张节次或周次不明确，整批未保存");
                 courses.add(new Course(row.name(),row.weekday(),null,null,List.of(page.week()),row.room(),row.startPeriod(),row.endPeriod(),row.teacher()));
