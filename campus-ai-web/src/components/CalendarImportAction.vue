@@ -1,12 +1,13 @@
 <script setup>
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { ElDialog } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 import { userSessionGeneration } from '@/api/http'
 import { readCalendarLink, enableCalendarLink, revokeCalendarLink } from '@/api/calendarImport'
 import { readScheduleExportAccess, prepareScheduleExport, downloadScheduleExport } from '@/api/teaching'
 import { calendarDevice, CALENDAR_GUIDES, createCalendarImport } from '@/utils/calendarImport'
 
-const props = defineProps({ minutes: { type: Number, default: 10 }, active: Boolean, disabled: Boolean })
+const props = defineProps({ minutes: { type: Number, default: 30 }, active: Boolean, disabled: Boolean })
 const emit = defineEmits(['fallback'])
 const auth = useAuthStore(), device = calendarDevice(window.navigator), help = ref(false), guide = ref(device.platform)
 const state = reactive({ busy: false, ready: false, count: 0, error: '', notice: '', hasLink: false })
@@ -25,7 +26,7 @@ function downloadFile(file) {
   const url = URL.createObjectURL(file.blob), link = document.createElement('a'); urls.add(url)
   link.href = url; link.download = file.filename; link.rel = 'noopener'; document.body.append(link); link.click(); link.remove()
   const timer = window.setTimeout(() => { URL.revokeObjectURL(url); urls.delete(url); timers.delete(timer) }, 60000); timers.add(timer)
-  model.notice('文件已交给浏览器，请在手机日历确认导入'); help.value = true
+  model.notice('请在系统日历确认'); help.value = true
 }
 function nativeFile(file) { return new File([file.blob], file.filename, { type: 'text/calendar' }) }
 function canShare(file) { try { return typeof navigator.share === 'function' && navigator.canShare?.({ files: [nativeFile(file)] }) === true } catch { return false } }
@@ -49,7 +50,7 @@ async function begin() {
     if (device.platform === 'apple') {
       const url = await model.subscription()
       if (!url || disposed || started !== scope.value) return
-      model.notice('已发起打开日历，请完成系统订阅确认')
+      model.notice('请在系统日历确认')
       window.location.assign(url)
       return
     }
@@ -59,7 +60,7 @@ async function begin() {
     if (canShare(file)) {
       try {
         await navigator.share({ files: [nativeFile(file)], title: 'Campthink 课表' })
-        if (!disposed && started === scope.value) model.notice('已交给系统处理，是否写入以日历确认为准')
+        if (!disposed && started === scope.value) model.notice('请在系统日历确认')
         return
       } catch (failure) {
         if (disposed || started !== scope.value) return
@@ -91,28 +92,21 @@ defineExpose({ begin, busy: computed(() => state.busy || launching.value) })
 </script>
 
 <template>
-  <div class="calendar-import-action">
-    <div class="calendar-import-main">
-      <button type="button" class="calendar-import-primary" :disabled="disabled || state.busy || launching" @click="begin">{{ state.busy ? '正在核对课程…' : '导入手机日历' }}</button>
-      <span v-if="state.ready && !device.embedded" class="calendar-import-scope">{{ state.count }} 项本人安排 · 未来4周</span>
-    </div>
-    <p class="calendar-import-short">{{ device.embedded ? '内置浏览器可能拦截，未打开时请用系统浏览器' : '系统确认后生效，仅处理本人课表' }}</p>
-    <p v-if="device.platform === 'apple'" class="calendar-import-short">私人订阅最长180天，可停用，请勿转发</p>
-    <p v-if="state.error" class="calendar-import-error" role="alert">{{ state.error }} <button type="button" :disabled="state.busy || disabled" @click="warm">重试</button><RouterLink v-if="/钟点|作息/.test(state.error)" to="/timetable?tool=personal-manage">核对课程钟点</RouterLink></p>
-    <p v-if="state.notice" class="calendar-import-status" role="status">{{ state.notice }}</p>
-    <button type="button" class="calendar-import-help" :aria-expanded="help" @click="help = !help">{{ help ? '收起兼容方法' : '未打开日历？' }}</button>
-    <div v-if="help" class="calendar-import-guide">
-      <p v-if="device.embedded">右上角菜单 → 在浏览器打开 → 导入手机日历</p>
-      <div class="calendar-import-platforms" role="group" aria-label="查看其他系统的兼容方法"><button v-for="(name, key) in labels" :key="key" type="button" :aria-pressed="guide === key" @click="guide = key">{{ name }}</button></div>
-      <ol><li v-for="step in steps" :key="step">{{ step }}</li></ol>
-      <p v-if="guide === 'android'">菜单随品牌变化，Google日历手机版需在电脑网页批量导入</p>
-      <p v-if="guide === 'harmony'">新版可从“添加 → 导入日程”进入；旧版若无文件导入入口，需使用支持ICS的日历</p>
-      <button v-if="device.embedded" type="button" @click="copySite">复制网址到系统浏览器</button>
-      <div class="calendar-import-secondary"><button type="button" :disabled="disabled || state.busy || !state.ready" @click="compatibleDownload">下载兼容文件</button><button type="button" :disabled="disabled || state.busy" @click="emit('fallback')">高级导出</button></div>
-      <button v-if="guide === 'apple'" type="button" :disabled="disabled || state.busy" @click="copySubscription">复制私人订阅地址</button>
-      <input v-if="copyValue" class="calendar-import-address" :value="copyValue" readonly aria-label="私人日历订阅地址，请勿转发" @focus="$event.target.select()" />
-      <template v-if="state.hasLink"><p>订阅为私人只读链接，请勿转发，最长180天，可随时停用</p><button type="button" :disabled="state.busy || disabled" @click="revoke">停用日历链接</button><p>手机已保存的日程需在系统日历中移除</p></template>
-    </div>
+  <div class="calendar-import-action calendar-import-compact">
+    <button type="button" class="calendar-import-primary" :disabled="disabled||state.busy||launching" @click="begin">{{state.busy?'准备中…':'导入日历'}}</button>
+    <p v-if="state.error" class="calendar-import-error" role="alert">{{state.error}} <button type="button" :disabled="state.busy||disabled" @click="warm">重试</button><RouterLink v-if="/钟点|作息/.test(state.error)" to="/timetable?tool=personal-manage">修改时间</RouterLink><button type="button" @click="help=true">导入帮助</button></p>
+    <p v-if="state.notice" class="calendar-import-status" role="status">{{state.notice}}</p>
+    <ElDialog v-model="help" title="导入日历" width="min(440px, calc(100vw - 24px))" append-to-body>
+      <div class="calendar-import-guide">
+        <button v-if="device.embedded" type="button" :disabled="state.busy||disabled" @click="copySite">复制网址到浏览器</button>
+        <button type="button" :disabled="state.busy||disabled" @click="compatibleDownload">保存日历文件</button>
+        <button v-if="device.platform==='apple'" type="button" :disabled="state.busy||disabled" @click="copySubscription">复制私人订阅</button>
+        <button type="button" :disabled="state.busy||disabled" @click="emit('fallback',minutes)">其他导入方式</button>
+        <button v-if="state.hasLink" type="button" :disabled="state.busy||disabled" @click="revoke">停用订阅</button>
+        <input v-if="copyValue" :value="copyValue" readonly aria-label="私人日历订阅地址" @focus="$event.target.select()"/>
+        <details><summary>操作方法</summary><div class="calendar-import-platforms" role="group" aria-label="选择日历系统"><button v-for="(name,key) in labels" :key="key" type="button" :aria-pressed="guide===key" @click="guide=key">{{name}}</button></div><ol><li v-for="step in steps" :key="step">{{step}}</li></ol></details>
+      </div>
+    </ElDialog>
   </div>
 </template>
 
@@ -122,4 +116,8 @@ defineExpose({ begin, busy: computed(() => state.busy || launching.value) })
 .calendar-import-address{box-sizing:border-box;width:100%;min-width:0;min-height:44px;margin-top:10px;padding:8px;border:1px solid #dbe3ec;border-radius:8px;font-size:16px;color:#29323c;background:#fff}
 .calendar-import-action button.calendar-import-primary{background:#0b62db;color:#fff;font-weight:500}.calendar-import-action button:disabled{opacity:.55;cursor:not-allowed}.calendar-import-action button:focus-visible{outline:2px solid #0b62db;outline-offset:2px}.calendar-import-action button:active:not(:disabled){scale:.98}.calendar-import-scope{font-size:12px;color:#5d6876}.calendar-import-short,.calendar-import-status{margin:8px 0;color:#5d6876;font-size:12px;line-height:1.6}.calendar-import-error{color:#a43434;font-size:13px;line-height:1.6}.calendar-import-action button.calendar-import-help{padding:0;background:transparent;font-size:12px;color:#526984}.calendar-import-guide{padding:12px 0;font-size:12px;line-height:1.65;color:#526174}.calendar-import-guide p{margin:8px 0}.calendar-import-platforms,.calendar-import-secondary{display:flex;flex-wrap:wrap;gap:6px}.calendar-import-platforms button{font-size:13px;background:#f1f4f8;color:#526174}.calendar-import-platforms button[aria-pressed=true]{background:#e8f0fd;color:#245b9e}.calendar-import-guide ol{margin:12px 0;padding-left:20px}.calendar-import-guide li{padding:4px 0}.calendar-import-secondary button{font-size:12px}
 @media(prefers-reduced-motion:reduce){.calendar-import-action button{transition:none}.calendar-import-action button:active:not(:disabled){scale:1}}
+</style>
+
+<style scoped>
+.calendar-import-compact{position:relative;display:inline-flex;flex-direction:column;align-items:flex-start}.calendar-import-compact>.calendar-import-primary{white-space:nowrap;min-height:44px;padding:10px 16px;background:var(--assistant-accent,#087f7b);color:#fff;border:0;border-radius:12px;font-size:14px;font-weight:500}.calendar-import-compact>.calendar-import-status,.calendar-import-compact>.calendar-import-error{max-width:32ch;margin:8px 0 0;font-size:12px}.calendar-import-guide{display:flex;gap:10px;flex-wrap:wrap}.calendar-import-guide>button{min-height:44px;border-radius:10px;font-size:14px}.calendar-import-guide details{flex-basis:100%;font-size:13px}.calendar-import-guide summary{min-height:44px;align-content:center;cursor:pointer}.calendar-import-guide>input{font-size:16px;min-height:44px;width:100%;box-sizing:border-box}
 </style>

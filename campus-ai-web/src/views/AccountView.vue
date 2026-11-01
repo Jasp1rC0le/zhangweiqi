@@ -9,6 +9,7 @@ import AccountIdentityPanel from '@/components/AccountIdentityPanel.vue'
 import AccountCredentials from '@/components/AccountCredentials.vue'
 import TeachingIdentityPanel from '@/components/TeachingIdentityPanel.vue'
 import ProductUpdates from '@/components/ProductUpdates.vue'
+import ClassReminderPanel from '@/components/ClassReminderPanel.vue'
 import { wasRouteFailureHandled } from '@/utils/routeRecovery'
 import { createDraftCheckpoint } from '@/utils/draftCheckpoint'
 import { useUnsavedChanges } from '@/utils/useUnsavedChanges'
@@ -191,7 +192,7 @@ async function focusAccountWorkflow() {
     catch (error) { if (!wasRouteFailureHandled(error)) ElMessage.error('校园资料暂未打开，请重试') }
     return
   }
-  if (!['#personal','#security','#password-security','#sessions','#my-data','#close-account','#token-activity','#teaching-identity','#product-updates'].includes(hash)) return
+  if (!['#class-reminder-preferences','#personal','#security','#password-security','#sessions','#my-data','#close-account','#token-activity','#teaching-identity','#product-updates'].includes(hash)) return
   await nextTick()
   if (focusDisposed || owner.value !== current || route.hash !== hash) return
   const target = accountRoot.value?.querySelector(hash)
@@ -228,6 +229,8 @@ onMounted(focusAccountWorkflow)
       <AccountCredentials ref="credentialsPanel" :owner="owner" :nickname="auth.user?.nickname || ''" :blocked="externalAccountBusy"
         :other-dirty="checkpoint.isDirty() || Boolean(emailForm.email || emailForm.password || deletion.password)"
         :verified-email="verifiedEmail" :email-known="!emailLoading && !emailError" @nickname-saved="applyNickname" @password-changed="finishPasswordChange" />
+
+      <ClassReminderPanel :owner="owner" :disabled="accountBusy" />
 
       <section id="personal" class="account-card account-profile" aria-labelledby="personal-title">
         <div class="account-section-heading"><h2 id="personal-title">个人资料</h2><span>选填</span></div>

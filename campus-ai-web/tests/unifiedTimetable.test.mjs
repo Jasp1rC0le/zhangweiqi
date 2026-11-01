@@ -168,16 +168,14 @@ test(
       new URL('../src/components/UnifiedWeekCalendar.vue', import.meta.url),
       'utf8',
     )
-    assert.match(calendar, /state\.week\.gridSafe/)
-    assert.match(calendar, /:disabled="unavailable"/)
-    assert.match(calendar, /state\.week\.focusLabel/)
-  assert.match(calendar, /state\.week\.summary\.attendance\.unknown/)
-  assert.match(calendar, /已记录旷课/)
-  assert.match(calendar, /已记录迟到/)
+    assert.match(calendar, /<VisualTimetable/)
+    assert.match(calendar, /:record-disabled="recordUnavailable"/)
+    assert.match(calendar, /:entries="state.week.entries"/)
+    assert.match(calendar, /:counts="state.week.summary.attendance"/)
     const chat = readFileSync(new URL('../src/views/ChatView.vue', import.meta.url), 'utf8')
     assert.match(chat, /import \{ queryOwnTimetable, askOwnTimetable \} from '@\/api\/unifiedTimetable'/)
     const page = readFileSync(new URL('../src/views/TimetableView.vue', import.meta.url), 'utf8')
-    assert.match(page, /<CourseSchedulePanel[^>]*:manage-only="unifiedAvailable"/)
+    assert.match(page, /<CourseSchedulePanel[^>]*:manage-only="true"/)
     assert.equal((page.match(/<CourseSchedulePanel\b/g) || []).length, 1, 'scope bootstrap must not remount and discard an import draft')
   },
 )

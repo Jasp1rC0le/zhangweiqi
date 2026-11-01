@@ -423,6 +423,9 @@ onBeforeUnmount(() => {
       </label>
       <button v-if="!focused" type="button" class="schedule-file-entry" @click="scheduleFiles?.open()">导出课表</button>
     </header>
+    <nav v-if="!focused&&view&&view!=='STUDENT'&&state.access?.enabled" class="staff-shortcuts" aria-label="考勤操作">
+      <a v-if="view==='TEACHER'" href="#attendance-records">点名</a><a href="#attendance-summary">汇总</a><a href="#attendance-records">记录</a>
+    </nav>
     <p v-if="workflow?.error" class="teaching-workflow-warning" role="alert">{{ workflow.error }}</p>
     <p v-else-if="workflow&&!['evidence','roll-call'].includes(workflow.tool)&&auth.user?.role!=='ADMIN'" class="teaching-workflow-warning" role="status">此操作需要本校管理员权限。</p>
 
@@ -444,7 +447,7 @@ onBeforeUnmount(() => {
       </p>
     </section>
     <template v-else>
-      <p v-if="rollCallRequested && state.access?.views.includes('TEACHER')" class="teaching-entry-hint">选择节次后点名，打开页面不会自动登记。</p>
+
       <div v-if="!focused && leadership" class="leadership-query-controls">
         <button type="button" class="teaching-button" :disabled="busy" :aria-expanded="filtersExpanded" aria-controls="teaching-query-filters" @click="filtersExpanded = !filtersExpanded">{{ filtersExpanded ? '收起筛选' : '筛选' }}</button>
         <span v-if="state.lessonQuery?.search">课程筛选：{{ state.lessonQuery.search }}</span>
@@ -492,7 +495,7 @@ onBeforeUnmount(() => {
           >
         </button>
       </section>
-      <AttendanceCockpit v-if="!focused && leadership && summary && state.lessonQuery"
+      <AttendanceCockpit id="attendance-summary" v-if="!focused && view!=='STUDENT' && summary && state.lessonQuery"
         :counts="summary" :planned="state.lessonPage?.planned"
         :absent-students="state.lessonPage?.summary.absentStudents"
         :from="state.lessonQuery.from" :to="state.lessonQuery.to" :summary-context="summaryContext">
@@ -517,7 +520,7 @@ onBeforeUnmount(() => {
       <p v-if="state.loading && !state.lessons.length" class="teaching-loading" role="status">
         正在读取授权范围内的课程…
       </p>
-      <div v-else class="teaching-layout" :class="{ 'focused-lesson': focused }">
+      <div v-else id="attendance-records" class="teaching-layout" :class="{ 'focused-lesson': focused }">
         <section v-if="!focused" ref="lessonList" class="lesson-list" tabindex="-1" aria-label="课程安排">
           <nav v-if="state.lessonPage && state.lessonPage.totalPages>1" class="roster-pagination" aria-label="课程分页">
             <span>共 {{ state.lessonPage.total }} 项课程 · 第 {{ state.lessonPage.page+1 }}/{{ state.lessonPage.totalPages }} 页</span>
@@ -578,19 +581,19 @@ onBeforeUnmount(() => {
               待点名 {{ state.detail.lesson.counts.unknown }}<small>人次；未点名不计旷课</small>
             </p>
             <p v-if="state.detail.lesson.cancelled" class="teaching-error">
-              此课已取消。保留原记录，不能继续点名。
+              {{view==='STUDENT'?'此课已取消。保留原记录，不能继续点名。':'本课已取消'}}
             </p>
-            <p v-else class="roll-call-hint">
+            <p v-else-if="view==='STUDENT'" class="roll-call-hint">
               {{
                 teacher
-                  ? '直接点选按时、旷课或早退，保存本页后生效。更正已有记录必须填写原因。'
+                  ? ''
                   : view === 'STUDENT'
                     ? '下方只有本人的记录，如有异议请联系任课老师核对。'
-                    : '负责范围内的只读记录，由任课教师点名和更正。'
+                    : ''
               }}
             </p>
             <p v-if="teacher && !canMark && !state.detail.lesson.cancelled" class="roll-call-hint">
-              名单可以先查看；课前5分钟可记录按时，开课后才可记旷课或早退。<button
+              尚未到点名时间。<button
                 type="button"
                 class="teaching-button"
                 :disabled="busy"
@@ -604,7 +607,7 @@ onBeforeUnmount(() => {
               <button class="teaching-button" :disabled="busy || dirty">查找</button>
               <span>{{ state.rosterPage.search ? '匹配' : '本课名单' }} {{ state.rosterPage.total }} 人 · 本课待点名 {{ state.detail.lesson.counts.unknown }} 人</span>
               <div><button type="button" class="teaching-button" :disabled="busy || dirty || state.rosterPage.page===0" @click="rosterPage(state.rosterPage.page-1)">上一页</button><span>{{ state.rosterPage.totalPages ? state.rosterPage.page+1 : 0 }}/{{ state.rosterPage.totalPages }}</span><button type="button" class="teaching-button" :disabled="busy || dirty || state.rosterPage.page+1>=state.rosterPage.totalPages" @click="rosterPage(state.rosterPage.page+1)">下一页</button></div>
-              <small v-if="dirty">先保存本页，再翻页或搜索；完成点名会核对本课完整名单。</small>
+              <small v-if="dirty">保存后可翻页</small>
             </form>
             <div class="roll-call-workflow">
             <ol class="roll-call-list">
@@ -628,10 +631,10 @@ onBeforeUnmount(() => {
             <form v-if="canMark" class="roll-call-actions" aria-label="点名保存与翻页" @submit.prevent="save(false,saveAndAdvance)">
               <p class="roll-call-progress" aria-live="polite">
                 <strong>本页已记录 {{ progress.recorded }}/{{ progress.total }} 人</strong>
-                <span>本课还有 {{ remainingUnknown }} 人待点名<span v-if="dirty"> · 未保存 {{ progress.changed }} 项</span></span>
+                <span>未点名 {{ remainingUnknown }} 人<span v-if="dirty"> · 未保存 {{ progress.changed }} 项</span></span>
               </p>
               <label v-if="correctionRequired"
-                >更正原因 <span>说明核对依据，保留更正记录</span
+                >更正原因 <span>必填</span
                 ><input
                   v-model="reason"
                   maxlength="300"
@@ -680,10 +683,9 @@ onBeforeUnmount(() => {
           </section>
         </Transition>
       </div>
-      <p v-if="!focused && state.access?.enabled" class="teaching-footnote">
-        站内通知按已配置钟点生成：学生课前1小时，教师课前5分钟。未绑定账号不会收到通知；这是站内收件箱，不是微信推送，也不代表实时教务同步。
-      </p>
+
     </template>
+    <p v-if="view==='STUDENT'&&!focused&&state.access?.enabled" class="teaching-footnote">站内通知按已配置钟点生成：学生课前1小时，教师课前5分钟。未绑定账号不会收到通知；这是站内收件箱，不是微信推送，也不代表实时教务同步。</p>
     <ScheduleExportPanel v-if="!focused" ref="scheduleFiles" :owner="owner" :preferred-view="auth.user?.role==='ADMIN'?'ADMIN':view" :active="!busy&&!dirty" :from="from" :to="to" />
     <TeachingGovernancePanel v-if="!focused && auth.user?.role !== 'ADMIN' && state.access?.governanceEnabled && view" :key="workflow?.tool==='evidence'?workflowKey:`evidence-${owner}-${view}`" :owner="owner" :preferred-view="view" :active="!busy && !dirty" :preset="workflow?.tool==='evidence'?workflow:null" />
     <AdminTeachingPanel v-if="!focused && auth.user?.role === 'ADMIN'" :workflow="workflow" @saved="configurationSaved" />
@@ -1186,4 +1188,12 @@ select:disabled {
     transform: none;
   }
 }
+</style>
+
+<style scoped>
+.teaching-page .teaching-heading{gap:12px;margin-bottom:16px}.roll-call-actions>div{display:flex;gap:8px;flex-wrap:wrap}.roll-call-actions .teaching-button{min-height:44px}.focused-counts{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-variant-numeric:tabular-nums}.teaching-filters{gap:12px}.roll-call-progress{gap:8px}.teaching-search input{font-size:16px}
+</style>
+
+<style scoped>
+.staff-shortcuts{display:flex;align-items:center;gap:8px;margin:4px 0 18px}.staff-shortcuts a{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:8px 18px;border-radius:10px;background:var(--assistant-soft,#e3f3ef);color:var(--assistant-accent,#087f7b);font-size:14px;text-decoration:none}.staff-shortcuts a:focus-visible{outline:2px solid var(--assistant-accent);outline-offset:3px}#attendance-summary,#attendance-records{scroll-margin-top:80px}
 </style>

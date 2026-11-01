@@ -51,20 +51,10 @@ test('learning layout retains all four fields, consent and existing explicit sub
   assert.match(source, /<fieldset :disabled="busy \|\| saving">/)
 })
 
-test('timetable action grouping retains role checks, disabled guards and destinations', () => {
-  const source = read('src/views/TimetableView.vue')
-  const start = source.indexOf('<div class="timetable-actions"')
-  const actions = source.slice(start, source.indexOf('</div>', start))
-  assert.match(actions, /aria-label="课表操作"/)
-  assert.equal((actions.match(/@click=/g) || []).length, 4)
-  assert.match(actions, /@click="openNativeCalendar"/)
-  assert.match(actions, /reminderPanel\?\.importBusy/)
-  assert.equal((actions.match(/!\['COUNSELOR','SECRETARY'\]\.includes\(scope\)/g) || []).length, 2)
-  assert.match(actions, /:disabled="importPanel\?\.dirty\|\|importPanel\?\.unavailable"/)
-  assert.match(actions, /@click="openOperations"/)
-  assert.match(actions, /@click="openCalendarExport"/)
-  assert.match(actions, /:disabled="!calendarExportContext"/)
-  assert.match(source, /scheduleExportPanel.value\?\.open\(calendarExportContext.value\)/)
+test('timetable primary actions stay compact while role checks and export scope remain guarded',()=>{
+ const source=read('src/views/TimetableView.vue')
+ assert.match(source,/<CalendarImportAction/);assert.match(source,/:disabled="blocked\|\|!personal.schedule"/);assert.match(source,/v-if="!leadership" command="import"/);assert.match(source,/v-if="!leadership" command="operations"/);assert.match(source,/:disabled="!calendarExportContext"/);assert.match(source,/scheduleExportPanel.value\?\.open\(calendarExportContext.value\)/)
+ assert.match(source,/class-reminder-preferences/);assert.match(source,/<CourseTeacherLink/);assert.doesNotMatch(source,/<ClassReminderPanel/)
 })
 
 test('production and isolated review load public polish, and workspace polish follows Apple', () => {

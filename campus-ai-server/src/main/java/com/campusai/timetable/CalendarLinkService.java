@@ -61,7 +61,7 @@ public class CalendarLinkService {
     private ScheduleExportSource.Filter filter(int minutes){return new ScheduleExportSource.Filter("PERSONAL","STUDENT",day(),day().plusDays(27),"","ALL","ICS","",true,minutes);}
     public Link status(long user){return status(user,()->true);}
     @Transactional(isolation=Isolation.REPEATABLE_READ)
-    public Link status(long user,java.util.function.BooleanSupplier session){long school=activeSchool(user,true);if(!session.getAsBoolean())throw error(401,"登录状态已变化");return ownGrants(user).stream().filter(g->Long.toString(school).equals(g.school())).findFirst().map(g->view(g,null)).orElse(new Link(false,null,null,10,null,day(),day().plusDays(27)));}
+    public Link status(long user,java.util.function.BooleanSupplier session){long school=activeSchool(user,true);if(!session.getAsBoolean())throw error(401,"登录状态已变化");return ownGrants(user).stream().filter(g->Long.toString(school).equals(g.school())).findFirst().map(g->view(g,null)).orElse(new Link(false,null,null,30,null,day(),day().plusDays(27)));}
     public Link enable(long user,int minutes){return enable(user,minutes,()->true);}
     @Transactional(isolation=Isolation.REPEATABLE_READ)
     public Link enable(long user,int minutes,java.util.function.BooleanSupplier session){

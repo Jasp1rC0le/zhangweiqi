@@ -74,7 +74,7 @@ function chooseDefaults(preset=props.preset){
 }
 async function activate(){if(!owner()||!opened.value||busy.value)return;if(incomingCalendar.value&&!initialized.value){await applyCalendar();return}if(!state.access){if(!await resource.access())return;if(!initialized.value){chooseDefaults();initialized.value=true}}if(form.classId&&!incomingCalendar.value)await resolveClass()}
 async function open(context){if(!owner()||busy.value)return;if(context){try{const target=calendarExportIntent(context,owner());incomingCalendar.value=!initialized.value||calendarExportScopeKey(form)!==calendarExportScopeKey(target)?target:null}catch(error){state.error=error.message;return}}opened.value=true;await nextTick();await activate();const principal=owner();await nextTick();if(principal===owner()&&opened.value)focusWorkflowElement(root.value,()=>principal===owner()&&opened.value)}
-async function openReminder(minutes=10){
+async function openReminder(minutes=30){
   if(!owner()||busy.value||![5,10,15,30].includes(minutes))return false
   cancelFocus();const principal=owner(),generation=++handoffGeneration
   const openingIntent=captureAuditFocusIntent(root.value?.closest('.workspace-page')||root.value)

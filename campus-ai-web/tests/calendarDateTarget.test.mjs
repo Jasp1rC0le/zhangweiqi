@@ -30,7 +30,7 @@ test('calendar date form compiles with a labelled date picker and explicit submi
   assert.match(picker,/font-size:16px/);assert.match(picker,/setCustomValidity/)
 })
 test('jump changes only intended day/week and resets page, preserving view and class through protected load',()=>{
-  const source=readFileSync(new URL('../src/components/UnifiedWeekCalendar.vue',import.meta.url),'utf8'),handler=source.slice(source.indexOf('async function jumpDate'),source.indexOf("const days ="))
+  const source=readFileSync(new URL('../src/components/UnifiedWeekCalendar.vue',import.meta.url),'utf8'),handler=source.slice(source.indexOf('async function jumpDate'),source.indexOf("const queryPreset="))
   assert.match(handler,/calendarDateTarget\(dateDraft.value\)/);assert.match(handler,/coursePage.value = 0/);assert.match(handler,/monday.value = target.monday/);assert.match(handler,/selectedDay.value = target.date/);assert.match(handler,/await load\(\)/);assert.doesNotMatch(handler,/classId.value\s*=|view.value\s*=|chinaDate\(|router|askOwnTimetable/)
 })
 test('draft input and applied scope remain separate and paged statistics never become claimed single-day totals',()=>{

@@ -44,6 +44,6 @@ test('tampered counts, kind, timestamps or duplicate rows cannot masquerade as c
 })
 test('folded audit interface is explicitly capability gated, read only, paged and touch sized',opts,()=>{
   const source=readFileSync(new URL('../src/components/TeachingAdministrativeAuditPanel.vue',import.meta.url),'utf8'),{descriptor}=parse(source);compileScript(descriptor,{id:'management'});assert.deepEqual(compileTemplate({source:descriptor.template.content,filename:'TeachingAdministrativeAuditPanel.vue',id:'management'}).errors,[])
-  assert.match(source,/管理操作历史/);assert.match(source,/操作发生日期/);assert.match(source,/state\.data\.totalPages/);assert.match(source,/历史依据与编号/);assert.match(source,/flush:'sync'/);assert.match(source,/font-size:16px/);assert.match(source,/min-height:44px/);assert.doesNotMatch(source,/v-html|localStorage|sessionStorage|(?:resource|http)\.delete\(/)
+  assert.match(source,/管理操作历史/);assert.match(source,/开始日期/);assert.match(source,/state\.data\.totalPages/);assert.match(source,/历史依据与编号/);assert.match(source,/flush:'sync'/);assert.match(source,/font-size:16px/);assert.match(source,/min-height:44px/);assert.doesNotMatch(source,/v-html|localStorage|sessionStorage|(?:resource|http)\.delete\(/)
   const parent=readFileSync(new URL('../src/components/AdminTeachingPanel.vue',import.meta.url),'utf8');assert.match(parent,/administrativeAuditEnabled===true/);assert.match(parent,/!courseOnly && administrativeAuditEnabled/)
 })

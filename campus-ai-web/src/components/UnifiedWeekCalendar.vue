@@ -1,6 +1,5 @@
 <script setup>
-import NavigationIcon from './NavigationIcon.vue'
-import MotionSelection from './MotionSelection.vue'
+import VisualTimetable from './VisualTimetable.vue'
 import { animateContentChange, stopContentMotion } from '@/utils/interactionMotion'
 import DateField from '@/components/DateField.vue'
 import { computed, onBeforeUnmount, onMounted, reactive, ref, useId, watch } from 'vue'
@@ -9,7 +8,6 @@ import { useCourseScheduleStore } from '@/stores/courseSchedule'
 import { userSessionGeneration } from '@/api/http'
 import { addDays, chinaDate, mondayOf } from '@/utils/timetable'
 import { createUnifiedTimetable, createUnifiedNoticeReader, createUnifiedScopes, unifiedLayoutReadiness } from '@/utils/unifiedTimetable'
-import { ATTENDANCE_STATUSES } from '@/utils/teaching'
 import { readUnifiedTimetablePage, readUnifiedScopesPage } from '@/api/unifiedTimetable'
 import { markTeachingNoticeRead, readTeachingNotices } from '@/api/teaching'
 import { useRouter, useRoute } from 'vue-router'
@@ -22,7 +20,7 @@ import { checkedCalendarExportContext } from '@/utils/calendarExportHandoff'
 import CourseEntryCopy from './CourseEntryCopy.vue'
 import { calendarDateTarget, CALENDAR_DATE_MIN, CALENDAR_DATE_MAX } from '@/utils/calendarDateTarget'
 import { calendarBackPreset, calendarBackQuery } from '@/utils/calendarReturnContext'
-const emit = defineEmits(['available', 'scope', 'layout', 'export-context'])
+const emit = defineEmits(['available', 'scope', 'layout', 'export-context', 'associate', 'import'])
 const auth = useAuthStore(),
   personal = useCourseScheduleStore(),
   router = useRouter(),
@@ -44,8 +42,7 @@ const coursePage = ref(0), classSearch = ref(''), classFinderVisible = ref(false
 const monday = ref(mondayOf(chinaDate())),
   view = ref(''),
   classId = ref(''),
-  selectedDay = ref(chinaDate()),
-  showWeek = ref(false)
+  selectedDay = ref(chinaDate())
 const dateDraft = ref(selectedDay.value), dateError = ref(''), dateHintId = useId()
 const dayList = ref(), emptyDay = ref()
 watch([selectedDay, () => state.week?.monday, () => state.pagination?.page], () => {
@@ -72,7 +69,6 @@ async function jumpDate() {
   selectedDay.value = target.date
   await load()
 }
-const days = ['一', '二', '三', '四', '五', '六', '日']
 const queryPreset=computed(()=>{
   const own=calendarSchedulePreset(route.query),back=calendarBackPreset(route.query)
   if(own&&back)return{error:'课表链接混合了不同返回入口，请重新选择课表范围；没有切换身份或班级。'}
@@ -88,7 +84,6 @@ const labels = {
   COUNSELOR: '班级考勤',
   SECRETARY: '学院考勤',
 }
-const focus = computed(() => state.week?.attention || state.week?.next)
 const leadership = computed(() => ['COUNSELOR', 'SECRETARY'].includes(state.week?.view))
 const displayed = computed(() => state.pagination?.totalPages > 1 ? state.week?.entries || [] : state.week?.entries.filter(e => e.date === selectedDay.value) || [])
 const unavailable = computed(() => state.loading || state.stale || noticeBusy.value)
@@ -293,264 +288,30 @@ onBeforeUnmount(() => {
 })
 </script>
 <template>
-  <section class="unified-calendar" aria-label="统一课程安排" :aria-busy="state.loading">
-    <p v-if="scopeState.error" class="calendar-error" role="alert">{{ scopeState.error }} <button type="button" @click="loadScopes()">重试班级筛选</button></p>
-    <p v-if="scopeState.loading" class="calendar-loading" role="status">正在读取授权范围…</p>
-    <p v-if="state.error" class="calendar-error" role="alert">
-      {{ state.error }} <button v-if="!state.unsupported" type="button" @click="load">重试</button>
-      <button v-if="coursePage > 0 && !state.unsupported" type="button" :disabled="state.loading || scopeState.loading" @click="firstCoursePage">读取该范围第一页</button>
-    </p>
-    <p v-if="state.loading && !state.week" class="calendar-loading" role="status">
-      正在读取课程安排…
-    </p>
-    <template v-if="scopeState.data">
-      <div class="calendar-toolbar"><header class="calendar-controls">
-        <label v-if="scopeState.data.scopes.views.length > 1"
-          >查看<select
-            v-model="view"
-            aria-label="查看范围"
-            :disabled="state.loading || scopeState.loading"
-            @change="changeView"
-          >
-            <option v-for="v in scopeState.data.scopes.views" :key="v" :value="v">{{ labels[v] }}</option>
-          </select></label
-        >
-        <label v-if="scopeState.data.total > 1 || classId || classSearch"
-          >班级<select
-            v-model="classId"
-            aria-label="筛选班级"
-            :disabled="state.loading || scopeState.loading"
-            @change="changeClass"
-          >
-            <option value="">全部负责班级</option>
-            <option v-if="outsideClassOption" :value="classId">指定班级（不在本页选项中）</option>
-            <option v-for="c in scopeState.data.scopes.classes" :key="c.id" :value="c.id">{{ c.college }} · {{ c.name }}</option>
-          </select></label
-        >
-        <span class="calendar-range"
-          >{{ monday.slice(5).replace('-', '/') }}—{{
-            addDays(monday, 6).slice(5).replace('-', '/')
-          }}</span
-        >
-        <nav aria-label="课表周次">
-          <button type="button" :disabled="state.loading" aria-label="上一周" @click="stepWeek(-1)">
-            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m12 5-5 5 5 5" /></svg></button
-          ><button type="button" :disabled="state.loading" @click="currentWeek">本周</button
-          ><button type="button" :disabled="state.loading" aria-label="下一周" @click="stepWeek(1)">
-            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m8 5 5 5-5 5" /></svg>
-          </button>
-        </nav>
-      </header>
-      <form class="calendar-date-jump" novalidate @submit.prevent="jumpDate">
-        <label>查看日期<DateField v-model="dateDraft" aria-label="查看课表日期" :aria-describedby="dateHintId" :aria-invalid="!!dateError" :min="CALENDAR_DATE_MIN" :max="CALENDAR_DATE_MAX" required :disabled="state.loading || scopeState.loading || noticeBusy" @input="dateError = ''"  /></label>
-        <button type="submit" :disabled="state.loading || scopeState.loading || noticeBusy">查看</button>
-      </form></div>
-      <p :id="dateHintId" class="calendar-date-hint" :class="{ 'calendar-error': dateError, 'calendar-quiet-hint': !dateError && dateDraft === selectedDay && !state.loading && !state.error && !state.stale && (!state.pagination || state.pagination.totalPages <= 1) }" :role="dateError ? 'alert' : 'status'">{{ dateError || dateHint }}</p>
-      <form v-if="classFinderVisible" class="calendar-class-search" @submit.prevent="searchClasses">
-        <label>找班级<input v-model="classSearch" maxlength="100" placeholder="班级或学院名称" :disabled="state.loading || scopeState.loading" /></label>
-        <button type="submit" :disabled="state.loading || scopeState.loading">搜索</button>
-        <span>第{{ scopeState.data.page + 1 }}页 · {{ scopeState.data.total }}个匹配班级</span>
-        <button type="button" :disabled="scopeState.data.page === 0 || state.loading || scopeState.loading" @click="classId = ''; loadScopes(scopeState.data.page - 1)">上一页班级</button>
-        <button type="button" :disabled="scopeState.data.page + 1 >= scopeState.data.totalPages || state.loading || scopeState.loading" @click="classId = ''; loadScopes(scopeState.data.page + 1)">下一页班级</button>
-      </form>
-      <p v-if="classSearch && scopeState.data.total === 0" class="calendar-footnote" role="status">没有匹配的授权班级。请更换关键词；当前课程范围仍为全部负责班级。</p>
-    </template>
+  <section class="unified-calendar">
+    <p v-if="scopeState.error" class="calendar-error" role="alert">{{ scopeState.error }} <button type="button" @click="loadScopes()">重试</button></p>
+    <p v-if="state.error" class="calendar-error" role="alert">{{ state.error }} <button v-if="!state.unsupported" type="button" @click="load">重试</button><button v-if="coursePage>0&&!state.unsupported" type="button" :disabled="state.loading" @click="firstCoursePage">第一页</button></p>
+    <p v-if="state.loading&&!state.week" class="calendar-loading" role="status">正在读取课表…</p>
+    <div v-if="scopeState.data" class="calendar-graph-toolbar">
+      <div class="calendar-graph-filters">
+        <label v-if="scopeState.data.scopes.views.length>1">范围<select v-model="view" aria-label="查看范围" :disabled="unavailable||scopeState.loading" @change="changeView"><option v-for="v in scopeState.data.scopes.views" :key="v" :value="v">{{ labels[v] }}</option></select></label>
+        <label v-if="scopeState.data.total>1||classId||classSearch">班级<select v-model="classId" aria-label="筛选班级" :disabled="unavailable||scopeState.loading" @change="changeClass"><option value="">全部负责班级</option><option v-if="outsideClassOption" :value="classId">指定班级</option><option v-for="c in scopeState.data.scopes.classes" :key="c.id" :value="c.id">{{ c.college }} · {{ c.name }}</option></select></label>
+      </div>
+      <div class="calendar-graph-week">
+        <details class="calendar-date-picker"><summary :aria-label="`选择课表日期，当前${monday}`">{{ monday.slice(5).replace('-','/') }}—{{ addDays(monday,6).slice(5).replace('-','/') }}</summary><form class="calendar-date-jump" novalidate @submit.prevent="jumpDate"><label>日期<DateField v-model="dateDraft" aria-label="查看课表日期" :aria-describedby="dateHintId" :aria-invalid="!!dateError" :min="CALENDAR_DATE_MIN" :max="CALENDAR_DATE_MAX" required :disabled="unavailable||scopeState.loading" @input="dateError=''" /></label><button type="submit" :disabled="unavailable||scopeState.loading">查看</button></form><p :id="dateHintId" :role="dateError ? 'alert' : 'status'" class="calendar-date-hint">{{ dateError||dateHint }}</p></details>
+        <nav aria-label="课表周次"><button type="button" :disabled="unavailable" aria-label="上一周" @click="stepWeek(-1)"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m12 5-5 5 5 5"/></svg></button><button type="button" :disabled="unavailable" @click="currentWeek">本周</button><button type="button" :disabled="unavailable" aria-label="下一周" @click="stepWeek(1)"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m8 5 5 5-5 5"/></svg></button></nav>
+      </div>
+    </div>
+    <form v-if="classFinderVisible" class="calendar-class-search" @submit.prevent="searchClasses"><label>班级<input v-model="classSearch" maxlength="100" placeholder="班级或学院" :disabled="unavailable||scopeState.loading"/></label><button type="submit" :disabled="unavailable||scopeState.loading">搜索</button><span>{{ scopeState.data?.page+1 }}/{{ scopeState.data?.totalPages }}</span><button type="button" :disabled="!scopeState.data||scopeState.data.page===0||unavailable" @click="classId='';loadScopes(scopeState.data.page-1)">上一页</button><button type="button" :disabled="!scopeState.data||scopeState.data.page+1>=scopeState.data.totalPages||unavailable" @click="classId='';loadScopes(scopeState.data.page+1)">下一页</button></form>
     <template v-if="state.week">
-      <TeachingChangeNotices v-if="state.week.teachingEnabled && ['STUDENT','TEACHER'].includes(state.week.view)" ref="changeNotices" :owner="owner" :disabled="state.loading||scopeState.loading||noticeBusy" @open="openChangedNotice" @new-change="changed" />
-      <nav v-if="state.pagination?.totalPages > 1" class="calendar-pagination" aria-label="课程明细分页">
-        <span>第{{ state.pagination.page + 1 }} / {{ state.pagination.totalPages }}页 · 共{{ state.pagination.total }}项安排</span>
-        <button type="button" :disabled="state.loading || state.pagination.page === 0" @click="stepCourse(-1)">上一页</button>
-        <button type="button" :disabled="state.loading || state.pagination.page + 1 >= state.pagination.totalPages" @click="stepCourse(1)">下一页</button>
-      </nav>
-
-      <p v-if="state.stale" class="calendar-footnote" role="status">
-        {{
-          state.loading
-            ? '正在刷新，保留上次读取的安排…'
-            : '暂时显示上次读取的安排；重新读取成功后可打开记录。'
-        }}
-      </p>
-      <details
-        v-if="state.week.notices.some((n) => !n.readAt)"
-        class="calendar-notices"
-        aria-label="未读课前通知"
-      >
-        <summary>{{ state.week.notices.filter(n=>!n.readAt).length }} 条课前提醒</summary>
-        <button
-          v-for="notice in state.week.notices.filter((n) => !n.readAt)"
-          :key="notice.id"
-          type="button"
-          :disabled="recordUnavailable"
-          @click="openNotice(notice)"
-        >
-          <strong>{{ notice.kind === 'TEACHER_ROSTER' ? '名单已备好' : '下节课提醒' }}</strong
-          ><span>{{ notice.course }} · {{ notice.room }}</span
-          ><small>打开记录并标为已读</small>
-        </button>
-      </details>
-      <section v-if="focus" class="calendar-focus" aria-label="当前需要关注的课程">
-        <div>
-          <h2>{{ focus.name }}</h2>
-          <p class="calendar-focus-state">{{ state.week.focusLabel }}</p>
-          <p>
-            {{ focus.date.slice(5).replace('-', '/') }} · {{ focus.timeLabel }}<span v-if="focus.startPeriod && focus.endPeriod"> · 第{{ focus.startPeriod }}{{ focus.startPeriod===focus.endPeriod?'':'—'+focus.endPeriod }}节</span> ·
-            {{ focus.room || '教室未填写' }}
-          </p>
-          <p v-if="focus.teacher">
-            任课教师 {{ focus.teacher }}<span v-if="focus.className"> · {{ focus.className }}</span>
-          </p>
-        </div>
-        <button
-          v-if="focus.lessonId"
-          class="calendar-primary"
-          type="button"
-          :disabled="recordUnavailable"
-          @click="open(focus)"
-        >
-          {{ state.week.view === 'TEACHER' ? (focus.canMark ? '去点名' : '查看名单') : '查看记录' }}
-        </button>
-      </section>
-      <p v-else-if="state.week.entries.length && ['STUDENT','TEACHER'].includes(state.week.view) && (!state.pagination || state.pagination.totalPages <= 1)" class="calendar-no-next">暂无下一节</p>
-      <AttendanceCockpit v-if="leadership" :counts="state.week.summary.attendance"
-        :planned="state.week.summary.plannedClasses" :absent-students="state.week.summary.absentStudents"
-        :from="state.week.monday" :to="state.week.sunday" :stale="state.stale" :summary-context="summaryContext">
-        <template #action>
-          <RouterLink v-if="!unavailable" :to="{ path: '/teaching', query: { view: state.week.view, tool: 'evidence', from: state.week.monday, to: state.week.sunday, classId: classId || undefined } }">核对记录与导出</RouterLink>
-        </template>
-      </AttendanceCockpit>
-      <div v-else class="calendar-totals" aria-label="后台计算的本周结果">
-        <span
-          >本周 <strong>{{ state.week.summary.plannedClasses }}</strong
-          >项安排</span
-        ><span v-if="state.week.view !== 'STUDENT' || state.week.summary.attendance.unknown > 0" :class="{ 'calendar-pending': state.week.summary.attendance.unknown > 0 }"
-          >待点名 <strong>{{ state.week.summary.attendance.unknown }}</strong
-          >{{ state.week.view === 'STUDENT' ? '次' : '人次' }}</span
-        ><span v-if="state.week.view !== 'STUDENT'" :class="{ 'calendar-recorded-absence': state.week.summary.absentStudents > 0 }"
-          >已记录旷课 <strong>{{ state.week.summary.absentStudents }}</strong
-          >人</span
-        ><span v-if="state.week.view !== 'STUDENT' || state.week.summary.attendance.late > 0" :class="{ 'calendar-pending': state.week.summary.attendance.late > 0 }"
-          >已记录迟到 <strong>{{ state.week.summary.attendance.late }}</strong
-          >人次</span
-        ><span v-if="state.week.view !== 'STUDENT' || state.week.summary.attendance.earlyLeave > 0" :class="{ 'calendar-pending': state.week.summary.attendance.earlyLeave > 0 }">早退 <strong>{{ state.week.summary.attendance.earlyLeave || 0 }}</strong>人次</span
-        ><span v-if="state.week.summary.conflicts" class="calendar-warning"
-          >{{ state.week.summary.conflicts }}项时间冲突待核对</span
-        ><small v-if="state.week.summary.mergedDuplicates"
-          >已合并{{ state.week.summary.mergedDuplicates }}项重复，原件未改</small
-        >
-      </div>
-      <h2 v-if="leadership" class="leadership-records-heading">课程明细</h2>
-      <div v-if="!state.pagination || state.pagination.totalPages <= 1" class="calendar-day-tabs" role="group" aria-label="选择上课日期">
-        <MotionSelection :active-key="selectedDay" />
-        <button
-          v-for="(day, i) in days"
-          :key="day"
-          type="button"
-          :aria-pressed="selectedDay === addDays(monday, i)"
-          @click="selectedDay = addDays(monday, i)"
-        >
-          <strong>{{ addDays(monday, i) === state.week.today ? '今天' : '周' + day }}</strong
-          ><span>{{ addDays(monday, i).slice(5).replace('-', '/') }}</span>
-        </button>
-      </div>
-      <ul ref="dayList" class="calendar-day-list">
-        <li v-for="entry in displayed" :key="entry.id" :class="{ cancelled: entry.cancelled }">
-          <time><small v-if="state.pagination?.totalPages > 1">{{ entry.date.slice(5).replace('-', '/') }} · 周{{ days[entry.weekday - 1] }}</small>{{ entry.timeLabel }}<small v-if="entry.startPeriod && entry.endPeriod" class="calendar-period">第{{ entry.startPeriod }}{{ entry.startPeriod===entry.endPeriod?'':'—'+entry.endPeriod }}节</small></time>
-          <div>
-            <strong>{{ entry.name }}</strong>
-            <p>
-              {{ entry.room || '教室未填写'
-              }}<span v-if="entry.teacher"> · {{ entry.teacher }}</span
-              ><span v-if="entry.className"> · {{ entry.className }}</span>
-            </p>
-            <small
-              >{{ entry.sources.includes('TEACHING') ? '教学安排' : '个人导入'
-              }}{{ entry.sources.length > 1 ? ' · 已与个人导入合并' : ''
-              }}<span v-if="entry.conflict"> · 时间冲突</span
-              ><span v-if="entry.cancelled"> · {{ entry.sources.includes('TEACHING')?'已取消':'学籍变动后待核对' }}</span></small
-            >
-            <CourseEntryCopy :entry="entry" :scope="copyScope" :as-of="state.week.now" />
-          </div>
-          <span v-if="entry.attendance" class="calendar-attendance" :data-status="entry.attendance">{{
-            ATTENDANCE_STATUSES[entry.attendance]
-          }}</span
-          ><button
-            v-if="entry.lessonId && !entry.cancelled"
-            type="button"
-            :disabled="recordUnavailable"
-            @click="open(entry)"
-          >
-            {{ state.week.view === 'TEACHER' ? (entry.canMark ? '点名' : '名单') : '记录' }}
-          </button>
-        </li>
-      </ul>
-      <section v-if="!displayed.length" ref="emptyDay" class="calendar-empty"><NavigationIcon name="timetable" /><h2>当天暂无已保存课程</h2><p>切换日期，或导入课表</p></section>
-      <button
-        v-if="state.week.gridSafe"
-        type="button"
-        class="calendar-week-toggle"
-        :aria-expanded="showWeek"
-        @click="showWeek = !showWeek"
-      >
-        {{ showWeek ? '收起周课表' : '展开整周课表' }}
-      </button>
-      <p v-else-if="state.week.entries.length" class="calendar-footnote">
-        {{ state.pagination?.totalPages > 1 || ['COUNSELOR','SECRETARY'].includes(state.week.view) ? '课程明细按日期逐条展示；上方统计覆盖全部筛选范围。' : '同一节次有多个安排或作息未配置，按日期逐条展示，不叠盖课程。' }}
-      </p>
-      <div
-        v-if="showWeek && state.week.gridSafe"
-        class="calendar-grid-scroll"
-        tabindex="0"
-        role="region"
-        aria-label="整周课表，可横向滚动"
-      >
-        <div class="calendar-grid">
-          <span class="grid-corner">节次</span
-          ><strong
-            v-for="(day, i) in days"
-            :key="day"
-            class="grid-day"
-            :style="{ gridColumn: i + 2, gridRow: 1 }"
-            >周{{ day }}</strong
-          ><template v-for="slot in state.week.bells" :key="slot.period"
-            ><span class="grid-time" :style="{ gridColumn: 1, gridRow: slot.period + 1 }"
-              ><b>{{ slot.period }}</b
-              >{{ slot.start }}<br />{{ slot.end }}</span
-            ><span
-              v-for="day in 7"
-              :key="day"
-              class="grid-cell"
-              :style="{ gridColumn: day + 1, gridRow: slot.period + 1 }" /></template
-          ><button
-            v-for="entry in state.week.entries.filter(
-              (e) => !e.cancelled && e.startPeriod >= 1 && e.endPeriod <= state.week.bells.length,
-            )"
-            :key="entry.id"
-            type="button"
-            class="grid-course"
-            :disabled="unavailable"
-            :style="{
-              gridColumn: entry.weekday + 1,
-              gridRow: `${entry.startPeriod + 1} / span ${entry.endPeriod - entry.startPeriod + 1}`,
-            }"
-            :aria-label="`${entry.date} ${entry.name} ${entry.timeLabel} ${entry.room}`"
-            @click="entry.lessonId ? open(entry) : (selectedDay = entry.date)"
-          >
-            <strong>{{ entry.name }}</strong
-            ><span>{{ entry.room }}</span
-            ><small>{{ entry.teacher }}</small>
-          </button>
-        </div>
-        <p class="calendar-footnote">不在已配置节次内的钟点课程仍保留在每日列表，没有删掉。</p>
-      </div>
-      <details v-if="state.week.warnings.length" class="calendar-explanations">
-        <summary>{{ state.week.warnings.length }}条安排需要核对</summary>
-        <p v-for="warning in state.week.warnings" :key="warning">{{ warning }}</p>
-      </details>
-      <details class="calendar-reading-notes"><summary>来源与统计口径</summary><p v-if="state.pagination" class="calendar-footnote">统计：{{ state.pagination.summaryScope }}</p><p class="calendar-footnote">{{ state.week.clockSource }}。来自本人导入及授权教学安排，不是实时教务同步。</p></details>
-      <p v-if="noticeError" class="calendar-footnote" role="status">
-        {{ noticeError
-        }}<button type="button" :disabled="state.loading" @click="load">重新读取</button>
-      </p>
+      <p v-if="state.stale" class="calendar-footnote" role="status">{{state.loading?'正在刷新…':'显示上次数据，请重试'}}</p>
+      <AttendanceCockpit v-if="leadership" :counts="state.week.summary.attendance" :planned="state.week.summary.plannedClasses" :absent-students="state.week.summary.absentStudents" :from="state.week.monday" :to="state.week.sunday" :stale="state.stale" :summary-context="summaryContext"><template #action><RouterLink v-if="!unavailable" :to="{path:'/teaching',query:{view:state.week.view,tool:'evidence',from:state.week.monday,to:state.week.sunday,classId:classId||undefined}}">查看记录</RouterLink></template></AttendanceCockpit>
+      <nav v-if="state.pagination?.totalPages>1" class="calendar-pagination" aria-label="课程明细分页"><span>{{state.pagination.page+1}}/{{state.pagination.totalPages}}页 · {{state.pagination.total}}项</span><button type="button" :disabled="unavailable||state.pagination.page===0" @click="stepCourse(-1)">上一页</button><button type="button" :disabled="unavailable||state.pagination.page+1>=state.pagination.totalPages" @click="stepCourse(1)">下一页</button></nav>
+      <VisualTimetable :entries="state.week.entries" :bells="state.week.bells" :monday="state.week.monday" :today="state.week.today" :selected-day="selectedDay" :owner="owner" :view="state.week.view" :disabled="unavailable||scopeState.loading" :record-disabled="recordUnavailable" @day="selectedDay=$event" @open="open" @associate="emit('associate')" @import="emit('import')"><template #actions="{entry}"><CourseEntryCopy :entry="entry" :scope="copyScope" :as-of="state.week.now" /></template></VisualTimetable>
+      <TeachingChangeNotices v-if="state.week.teachingEnabled&&['STUDENT','TEACHER'].includes(state.week.view)" ref="changeNotices" :owner="owner" :disabled="unavailable||scopeState.loading" @open="openChangedNotice" @new-change="changed"/>
+      <details v-if="state.week.notices.some(n=>!n.readAt)" class="calendar-notices"><summary>通知 {{state.week.notices.filter(n=>!n.readAt).length}}</summary><button v-for="notice in state.week.notices.filter(n=>!n.readAt)" :key="notice.id" type="button" :disabled="recordUnavailable" @click="openNotice(notice)"><strong>{{notice.course}}</strong><span>{{notice.room}}</span></button></details>
+      <details v-if="state.week.warnings.length" class="calendar-explanations"><summary>待核对 {{state.week.warnings.length}}</summary><p v-for="warning in state.week.warnings" :key="warning">{{warning}}</p></details>
+      <p v-if="noticeError" class="calendar-error" role="status">{{noticeError}}<button type="button" :disabled="unavailable" @click="load">刷新</button></p>
     </template>
   </section>
 </template>
@@ -1005,4 +766,9 @@ summary {
     padding-inline: 12px;
   }
 }
+</style>
+
+<style scoped>
+.calendar-graph-toolbar{margin:0 0 10px}.calendar-graph-filters{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.calendar-graph-filters:empty{display:none}.calendar-graph-filters label{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--assistant-muted)}.calendar-graph-filters select{min-height:44px;max-width:230px;font-size:14px}
+.calendar-graph-week{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:4px}.calendar-graph-week nav{display:flex;gap:4px}.calendar-graph-week nav button,.calendar-date-picker summary{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:8px 10px;font-size:13px;border:0;border-radius:10px;background:transparent;color:var(--assistant-ink);cursor:pointer}.calendar-graph-week nav svg{width:18px;height:18px;stroke:currentColor;stroke-width:1.6;fill:none}.calendar-date-picker summary{list-style:none;font-variant-numeric:tabular-nums}.calendar-date-picker summary::-webkit-details-marker{display:none}.calendar-date-picker[open]{flex:1}.calendar-date-picker[open] .calendar-date-jump{margin-top:10px}.calendar-graph-week:has(.calendar-date-picker[open]){align-items:flex-start}.calendar-date-picker .calendar-date-hint{font-size:12px;max-width:35ch}.unified-calendar .calendar-pagination{margin:8px 0;font-size:12px}.calendar-graph-toolbar button:focus-visible,.calendar-date-picker summary:focus-visible{outline:2px solid var(--assistant-accent);outline-offset:2px}
 </style>

@@ -59,9 +59,9 @@ test('literal routes and real management navigation do not import asserted ident
   assert.equal(teachingWorkflowRoute({tool:'roll-call',from:today,to:today,view:'ADMIN',userId:99}).tool,'roll-call');assert.equal(teachingWorkflowRoute({tool:'roll-call',from:today,to:'2026-12-18'}).error.length>0,true)
   const source=readFileSync(new URL('../src/views/ChatView.vue',import.meta.url),'utf8'),start=source.indexOf('let action=scheduleScope.value'),end=source.indexOf('// Personal schedule answers',start),branch=source.slice(start,end)
   assert.match(branch,/PERSONAL_MANAGE.*SCHEDULE_SOURCE/);assert.match(branch,/PERSONAL_COURSE_EDIT'\].includes\(workflow\?\.handoff\)/);assert.doesNotMatch(branch,/sendMessageStream|ensureConversation|saveCourseSchedule|post\(/)
-  const panel=readFileSync(new URL('../src/components/CourseSchedulePanel.vue',import.meta.url),'utf8'),manage=panel.slice(panel.indexOf('async function openManagement'),panel.indexOf('async function exportStep'))
+  const panel=readFileSync(new URL('../src/components/CourseSchedulePanel.vue',import.meta.url),'utf8'),manage=panel.slice(panel.indexOf('async function openManagement'),panel.indexOf('const currentWeek ='))
   assert.match(manage,/store.load\(force\)/);assert.match(manage,/props.manageRequested/);assert.match(manage,/owner!==store.principal/);assert.match(manage,/focusWorkflowElement/);assert.doesNotMatch(manage,/saveCourseSchedule|deleteCourseSchedule|mutate\(/)
-  const timetable=readFileSync(new URL('../src/views/TimetableView.vue',import.meta.url),'utf8');assert.match(timetable,/openManagement\(\)/);assert.match(timetable,/route.query.tool === tool/)
+  const timetable=readFileSync(new URL('../src/views/TimetableView.vue',import.meta.url),'utf8');assert.match(timetable,/personal-manage/);assert.match(timetable,/await openOperations\(\)/);assert.match(timetable,/owner!==personal.principal/)
 })
 test('only the new teacher entry is strict and all touched real surfaces compile',opts,()=>{
   const source=readFileSync(new URL('../src/views/TeachingView.vue',import.meta.url),'utf8');assert.match(source,/requireView:rollCallRequested.value/);assert.match(source,/!rollCallRequested && state.access/);assert.match(source,/rollCallRequested && state.access && !state.access.views.includes\('TEACHER'\)/)

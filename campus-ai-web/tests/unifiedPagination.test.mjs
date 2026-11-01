@@ -69,13 +69,13 @@ test('calendar first-load controls are outside the week success branch and real 
     const source = readFileSync(new URL('../src/' + path, import.meta.url), 'utf8'), { descriptor } = parse(source)
     compileScript(descriptor, { id: 'pagination' }); assert.deepEqual(compileTemplate({ source: descriptor.template.content, filename: path, id: 'pagination' }).errors, [])
     if (path.includes('UnifiedWeek')) {
-      assert.ok(source.indexOf('<template v-if="scopeState.data">') < source.indexOf('<template v-if="state.week">'))
+      assert.ok(source.indexOf('v-if="scopeState.data"') < source.indexOf('<template v-if="state.week">'))
       assert.match(source, /readUnifiedScopesPage/); assert.match(source, /readUnifiedTimetablePage/); assert.match(source, /课程明细分页/)
       assert.match(source, /<form v-if="classFinderVisible"/)
       assert.doesNotMatch(source, /<form v-if="[^"]*\|\| classSearch"/)
-      assert.match(source, /v-else-if="state.week.entries.length && \['STUDENT','TEACHER'\].includes\(state.week.view\) && \(!state.pagination \|\| state.pagination.totalPages <= 1\)" class="calendar-no-next"/)
+      assert.match(source, /<VisualTimetable/);assert.match(source, /:monday="state.week.monday"/)
     }
-    if (path.includes('TimetableView')) { assert.match(source, /@click="openImport"/); assert.equal((source.match(/<CourseSchedulePanel\b/g) || []).length, 1) }
+    if (path.includes('TimetableView')) { assert.match(source, /@import="openImport"/); assert.equal((source.match(/<CourseSchedulePanel\b/g) || []).length, 1) }
   }
 })
 test('semantic foregrounds and primary action meet AA contrast against their actual solid surfaces', opts, () => {

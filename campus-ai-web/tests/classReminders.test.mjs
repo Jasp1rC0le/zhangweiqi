@@ -24,8 +24,8 @@ function setup(options = {}) {
   return { controller, state, values, requests, reads: () => reads,
     time: value => { current = value }, owner: value => { principal = value }, visibility: value => { visible = value } }
 }
-test('reminders are opt-in and reads use the actual private own-schedule query without a supplied user id', async () => {
-  const s = setup(); assert.equal(s.state.enabled, false); assert.equal(s.reads(), 0)
+test('reminders default to thirty minutes and reads use the actual private own-schedule query without a supplied user id', async () => {
+  const s = setup(); assert.equal(s.state.enabled, true); assert.equal(s.state.minutes,30); assert.equal(s.reads(), 0)
   assert.equal(await s.controller.configure(true, 10), true); assert.equal(s.reads(), 1)
   assert.deepEqual(s.requests[0].query, { from: '2026-11-01', to: '2026-11-01', period: 'ALL', selection: 'ALL', detail: 'SUMMARY', perspective: 'AUTO' })
   assert.equal(s.state.banner.rows[0].name, '合成课程')
@@ -70,7 +70,7 @@ test('logout and disposal while event hashing is pending cannot deliver old-acco
   const pending = s.controller.configure(true, 10)
   while (!finish) await new Promise(resolve => setImmediate(resolve))
   s.owner('2:1:STUDENT:session-b'); s.controller.syncOwner(); finish(); await pending
-  assert.equal(s.state.banner, null); assert.equal(s.state.result, null); assert.equal(s.state.enabled, false)
+  assert.equal(s.state.banner, null); assert.equal(s.state.result, null); assert.equal(s.state.enabled, true)
   assert.ok([...s.values.keys()].every(key => key.endsWith('1%3A1')))
   s.controller.dispose()
 })
@@ -114,4 +114,17 @@ test('calendar reminder time is part of preview identity and unrelated formats p
   assert.equal(scheduleExportFilter({ ...f, reminderMinutes: 10 }).reminderMinutes, 10)
   assert.equal(scheduleExportFilter({ ...f, format: 'PDF', reminderMinutes: 10 }).reminderMinutes, undefined)
   for (const reminderMinutes of [-1, 1, 60, '10']) assert.throws(() => scheduleExportFilter({ ...f, reminderMinutes }))
+})
+
+test('new account defaults to thirty minutes and legacy default ten migrates without reenabling an explicit opt-out', async()=>{
+ const fresh=setup();assert.equal(fresh.state.enabled,true);assert.equal(fresh.state.minutes,30);fresh.controller.dispose()
+ const values=new Map([['campthink.class-reminders.v1.1%3A1',JSON.stringify({version:1,enabled:false,minutes:10,delivered:[]})]])
+ const old=setup({values});assert.equal(old.state.minutes,30);assert.equal(old.state.enabled,false);old.controller.dispose()
+})
+test('a newly chosen ten-minute preference is preserved as a custom value',async()=>{
+ const first=setup();await first.controller.configure(false,10);const next=setup({values:first.values});assert.equal(next.state.minutes,10);assert.equal(next.state.enabled,false);first.controller.dispose();next.controller.dispose()
+})
+test('the thirty-minute default admits a class twenty minutes away while a ten-minute choice does not',()=>{
+ const now=Date.parse('2026-11-01T07:40:00+08:00'),data=answer({from:'2026-11-01'},now)
+ assert.equal(dueClassReminders(data,30,now,now).length,1);assert.equal(dueClassReminders(data,10,now,now).length,0)
 })

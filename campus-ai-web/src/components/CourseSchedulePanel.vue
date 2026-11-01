@@ -7,7 +7,6 @@ import {
   saveCourseSchedule,
   confirmCourseSchedule,
   deleteCourseSchedule,
-  readCourseSchedule,
 } from '@/api/courseSchedule'
 import {
   COURSE_TEMPLATE,
@@ -32,7 +31,6 @@ import { useUnsavedChanges } from '@/utils/useUnsavedChanges'
 import { useScopedConfirmation } from '@/utils/useScopedConfirmation'
 import { takeCourseFile } from '@/utils/courseFile'
 import { captureDraftFields, hasDraftFieldChanges } from '@/utils/formDraft'
-import { createPrivateCourseExport, privateCourseReadState } from '@/utils/privateCourseExport'
 import { captureAuditFocusIntent as captureExportFocusIntent } from '@/utils/teachingAdministrativeAudit'
 import { focusWorkflowElement, cancelWorkflowFocus } from '@/utils/teachingWorkflows'
 
@@ -60,19 +58,18 @@ const editing = ref(false),
   fileNotice = ref(''),
   importHeading = ref(), emptyHeading = ref()
 const form = reactive({ semester: defaultSemester(), firstMonday: '', remindDays: 7 })
-const exportState = reactive({ busy: false, preview: null, error: '', notice: '' })
-const courseRoot = ref(), readErrorTarget = ref(), exportNotice = ref(), exportTarget = ref(), exportStart = ref(), exportPreview = ref(), exportFeedback = ref()
+const courseRoot = ref(), readErrorTarget = ref(), exportNotice = ref()
 const draftFields = ['semester', 'firstMonday', 'remindDays']
 const draftBaseline = ref(captureDraftFields(form, draftFields))
 const dirty = computed(
     () => editing.value && (!!raw.value.trim() || imagePending.value || hasDraftFieldChanges(form, draftBaseline.value)),
   ),
-  baseUnavailable = computed(() => busy.value || reading.value || confirming.value || exportState.busy || operationsBusy.value),
+  baseUnavailable = computed(() => busy.value || reading.value || confirming.value || operationsBusy.value),
   unavailable = computed(() => baseUnavailable.value || imageBusy.value)
 async function openOperations(){if(unavailable.value||editing.value)return;await operationsPanel.value?.openPanel()}
 async function openTeacherEditing(){if(unavailable.value||editing.value||operationsDirty.value)return;await operationsPanel.value?.openPanel({operation:'BATCH',missingTeachersOnly:true,firstMonday:store.schedule?.firstMonday})}
 const filledTeachers=computed(()=>store.schedule?.courses.filter(course=>course.teacher?.trim()).length||0)
-defineExpose({ dirty:computed(()=>dirty.value||operationsDirty.value), importing:editing, unavailable, openImport, openExport, openManagement, openOperations })
+defineExpose({ dirty:computed(()=>dirty.value||operationsDirty.value), importing:editing, unavailable, openImport, openManagement, openOperations })
 useUnsavedChanges(
   () => dirty.value || operationsDirty.value,
   () => unavailable.value,
@@ -84,17 +81,10 @@ const { confirming, confirm } = useScopedConfirmation(
   () => (store.principal ? `${store.principal}:${fileGeneration}` : null),
   () => !disposed,
 )
-const privateExport = createPrivateCourseExport({
-  owner: () => store.principal,
-  active: () => !disposed && !busy.value && !reading.value && !confirming.value && !editing.value,
-  state: exportState, read: readCourseSchedule,
-  onFile: (blob, filename) => download(blob, filename, blob.type),
-})
-let exportFocusIntent, navigationFocusIntent
-function resetPrivateExport() { exportFocusIntent?.dispose(); privateExport.reset() }
+let navigationFocusIntent
 function cancelExportNavigation() {
   navigationFocusIntent?.dispose()
-  for (const target of [exportStart.value, exportNotice.value, importHeading.value, readErrorTarget.value, heading.value, emptyHeading.value]) cancelWorkflowFocus(target)
+  for (const target of [exportNotice.value, importHeading.value, readErrorTarget.value, heading.value, emptyHeading.value]) cancelWorkflowFocus(target)
 }
 async function openManagement(force = false) {
   const owner=store.principal,generation=fileGeneration
@@ -111,39 +101,6 @@ async function openManagement(force = false) {
     focusWorkflowElement(target,()=>!disposed && owner===store.principal && generation===fileGeneration && props.manageRequested)
   } finally { intent.dispose() }
 }
-async function exportStep(method) {
-  exportFocusIntent?.dispose()
-  const intent = captureExportFocusIntent(courseRoot.value?.closest('.workspace-page') || courseRoot.value), owner = store.principal, generation = fileGeneration
-  exportFocusIntent = intent
-  await privateExport[method]()
-  await nextTick()
-  if (!disposed && owner === store.principal && generation === fileGeneration && intent.current()) {
-    const target = exportState.preview ? exportPreview.value : exportFeedback.value
-    target?.focus({ preventScroll: true }); target?.scrollIntoView({ block: 'nearest', behavior: 'auto' })
-  }
-  intent.dispose()
-}
-async function openExport(force = false) {
-  const owner = store.principal, generation = fileGeneration
-  cancelExportNavigation()
-  const intent = captureExportFocusIntent(courseRoot.value?.closest('.workspace-page') || courseRoot.value)
-  navigationFocusIntent = intent
-  try {
-    await store.load(force)
-    if (disposed || !owner || owner !== store.principal || generation !== fileGeneration || !intent.current()) return
-    const outcome = privateCourseReadState(store)
-    if (outcome === 'error' || outcome === 'waiting') notice.value = ''
-    else if (outcome === 'empty') notice.value = '请先导入课表'
-    else if (editing.value) notice.value = '请先完成或取消当前导入；未保存草稿不会混入导出文件。'
-    await nextTick()
-    if (disposed || owner !== store.principal || generation !== fileGeneration || !intent.current()) return
-    const target = outcome === 'error' || outcome === 'waiting' ? readErrorTarget.value : outcome === 'empty' ? exportNotice.value : editing.value ? importHeading.value : exportStart.value
-    if (target) focusWorkflowElement(target, () => !disposed && owner === store.principal && generation === fileGeneration && props.exportRequested)
-  } finally { intent.dispose() }
-}
-watch(editing, resetPrivateExport, { flush: 'sync' })
-watch(() => store.schedule, resetPrivateExport, { flush: 'sync' })
-watch(() => props.exportRequested, value => { if (!value) cancelExportNavigation() }, { flush: 'sync' })
 watch(() => props.manageRequested, value => { if (!value) cancelExportNavigation() }, { flush: 'sync' })
 const currentWeek = computed(() =>
   store.schedule
@@ -198,7 +155,6 @@ watch(
   () => store.principal,
   () => {
     cancelExportNavigation()
-    resetPrivateExport()
     fileGeneration++
     fileRead?.abort()
     fileRead = null
@@ -483,7 +439,6 @@ onMounted(async () => {
 })
 onBeforeUnmount(() => {
   cancelExportNavigation()
-  resetPrivateExport()
   disposed = true
   fileGeneration++
   fileRead?.abort()
@@ -492,20 +447,20 @@ onBeforeUnmount(() => {
 </script>
 <template>
   <section ref="courseRoot" class="course-panel" aria-label="私人课程表格" :aria-busy="unavailable || store.loading">
-    <PersonalScheduleOperations ref="operationsPanel" v-if="store.principal && !editing" :scope="store.principal" :disabled="busy||reading||confirming||exportState.busy" @state="operationsBusy=$event.busy;operationsDirty=$event.dirty" @changed="store.load(true)" />
+    <PersonalScheduleOperations ref="operationsPanel" v-if="store.principal && !editing" :scope="store.principal" :disabled="busy||reading||confirming" @state="operationsBusy=$event.busy;operationsDirty=$event.dirty" @changed="store.load(true)" />
     <p v-if="store.loading" role="status">正在读取课程表格…</p>
     <div v-if="store.error" ref="readErrorTarget" class="course-alert" role="alert" tabindex="-1" :data-workflow-ready="layoutReady">
       <p>{{ store.error }}</p>
       <button
         class="work-button"
         :disabled="store.loading || unavailable"
-        @click="props.exportRequested ? openExport(true) : props.manageRequested ? openManagement(true) : store.load(true)"
+        @click="props.manageRequested ? openManagement(true) : store.load(true)"
       >
         刷新课表
       </button>
     </div>
     <p v-if="notice" ref="exportNotice" class="course-notice" role="status" tabindex="-1" :data-workflow-ready="layoutReady">{{ notice }}</p>
-    <section v-if="store.schedule && !editing" class="course-saved" aria-label="已保存课程表格">
+    <section v-if="store.schedule && !editing && !manageOnly" class="course-saved" aria-label="已保存课程表格">
       <header class="course-head">
         <div>
           <h2 ref="heading" tabindex="-1" :data-workflow-ready="layoutReady">{{ store.schedule.semester }}</h2>
@@ -627,18 +582,7 @@ onBeforeUnmount(() => {
           删除课表
         </button>
       </div>
-      <section ref="exportTarget" class="course-export" aria-label="导出本人已保存课表">
-        <button ref="exportStart" :data-workflow-ready="layoutReady" class="work-button" :disabled="unavailable || editing || store.loading || !!store.error" @click="exportStep('prepare')">{{ exportState.busy ? '正在核验…' : '导出课表 JSON' }}</button>
-        <p class="course-export-scope">仅本人已保存课表，不含名单与考勤。</p>
-        <div v-if="exportState.preview" ref="exportPreview" class="course-export-preview" tabindex="-1">
-          <h3>核对这份个人课表</h3>
-          <p>{{ exportState.preview.semester }} · 完整 {{ exportState.preview.count }} 项安排 · 版本 {{ exportState.preview.revision }}</p>
-          <p>第1周周一 {{ exportState.preview.firstMonday }}。准备5分钟内有效；下载前再次读取校验，数据变化则重新准备。</p>
-          <details><summary>查看文件校验值</summary><code>{{ exportState.preview.sha256 }}</code></details>
-          <div class="course-actions"><button class="work-button primary course-export-download" :disabled="unavailable" @click="exportStep('download')">核验并下载本人课表 JSON</button><button class="work-button" :disabled="unavailable" @click="resetPrivateExport">取消准备</button></div>
-        </div>
-        <p v-if="exportState.error || exportState.notice" ref="exportFeedback" tabindex="-1" :role="exportState.error ? 'alert' : 'status'" :class="exportState.error ? 'course-alert' : 'course-notice'">{{ exportState.error || exportState.notice }}</p>
-      </section>
+
     </section>
     <div v-if="error" ref="fileError" class="course-alert" role="alert" tabindex="-1">
       <p>{{ error }}</p>

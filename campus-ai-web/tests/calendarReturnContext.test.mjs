@@ -33,7 +33,7 @@ test('return data uses existing protected reads and never grants from URL-select
 })
 test('off-page class and invalid course-page recovery remain explicit and retain other query conditions',()=>{
   const source=readFileSync(new URL('../src/components/UnifiedWeekCalendar.vue',import.meta.url),'utf8')
-  assert.match(source,/<option v-if="outsideClassOption" :value="classId">指定班级/);assert.match(source,/读取该范围第一页/)
+  assert.match(source,/<option v-if="outsideClassOption" :value="classId">指定班级/);assert.match(source,/第一页/)
   const reset=source.slice(source.indexOf('function firstCoursePage'),source.indexOf('function stepWeek'));assert.match(reset,/coursePage.value = 0; load\(\)/);assert.doesNotMatch(reset,/classId.value\s*=|view.value\s*=|monday.value\s*=/)
 })
 test('class/page404 is an unavailable exact target, not unsupported API or silent legacy fallback',async()=>{

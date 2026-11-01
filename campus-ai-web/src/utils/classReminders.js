@@ -2,6 +2,7 @@ import { createHomeAgenda, homeAgendaDestination } from './homeAgenda.js'
 import { chinaDate } from './timetable.js'
 import { privateCourseDigest } from './privateCourseExport.js'
 
+export const DEFAULT_CLASS_REMINDER_MINUTES = 30
 export const CLASS_REMINDER_MINUTES = Object.freeze([5, 10, 15, 30])
 const day = 86400000, maximumAge = 120000
 const encoder = new TextEncoder()
@@ -31,8 +32,8 @@ export function createClassReminders({ state, owner, preferenceOwner, read, visi
       const raw = storage?.getItem(key)
       if (!raw || raw.length > 20000) return null
       const value = JSON.parse(raw)
-      if (value.version !== 1 || typeof value.enabled !== 'boolean' || !CLASS_REMINDER_MINUTES.includes(value.minutes) || !Array.isArray(value.delivered)) return null
-      return value
+      if (![1, 2].includes(value.version) || typeof value.enabled !== 'boolean' || !CLASS_REMINDER_MINUTES.includes(value.minutes) || !Array.isArray(value.delivered)) return null
+      return { ...value, minutes: value.version === 1 && value.minutes === 10 ? DEFAULT_CLASS_REMINDER_MINUTES : value.minutes }
     } catch { return null }
   }
   function latestRecords() {
@@ -45,7 +46,7 @@ export function createClassReminders({ state, owner, preferenceOwner, read, visi
     if (!key || disposed) return
     try {
       if (!storage) throw new Error('unavailable')
-      storage.setItem(key, JSON.stringify({ version: 1, enabled: state.enabled, minutes: state.minutes, delivered: records }))
+      storage.setItem(key, JSON.stringify({ version: 2, enabled: state.enabled, minutes: state.minutes, delivered: records }))
       state.storageUnavailable = false
     } catch { state.storageUnavailable = true }
   }
@@ -53,7 +54,7 @@ export function createClassReminders({ state, owner, preferenceOwner, read, visi
   function syncOwner() {
     clearLive(); principal = owner(); key = principal && preferenceOwner() ? `campthink.class-reminders.v1.${encodeURIComponent(preferenceOwner())}` : ''
     records = []; const value = key ? saved() : null
-    state.enabled = Boolean(value?.enabled); state.minutes = value?.minutes || 10; state.storageUnavailable = false
+    state.enabled = Boolean(principal && key) && (value?.enabled ?? true); state.minutes = value?.minutes || DEFAULT_CLASS_REMINDER_MINUTES; state.storageUnavailable = false
     latestRecords()
   }
   async function refresh() {
@@ -103,7 +104,7 @@ export function createClassReminders({ state, owner, preferenceOwner, read, visi
   function suspend() { clearLive() }
   function storageChanged(changedKey) {
     if (!key || changedKey !== key || disposed) return false
-    const value = saved(), enabled = Boolean(value?.enabled), minutes = value?.minutes || 10
+    const value = saved(), enabled = value?.enabled ?? true, minutes = value?.minutes || DEFAULT_CLASS_REMINDER_MINUTES
     latestRecords()
     if (enabled === state.enabled && minutes === state.minutes) return false
     clearLive(); state.enabled = enabled; state.minutes = minutes
@@ -115,5 +116,5 @@ export function createClassReminders({ state, owner, preferenceOwner, read, visi
   }
   return { syncOwner, refresh, tick, configure, suspend, needsRefresh, storageChanged,
     dismiss() { state.banner = null },
-    dispose() { disposed = true; clearLive(); resource.dispose(); principal = ''; key = ''; records = [] } }
+    dispose() { disposed = true; clearLive(); resource.dispose(); state.enabled = false; principal = ''; key = ''; records = [] } }
 }

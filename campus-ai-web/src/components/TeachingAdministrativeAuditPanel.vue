@@ -28,15 +28,15 @@ onBeforeUnmount(()=>{disposed=true;cancelExportFocus();resource.dispose()})
   <details class="management-audit" :open="opened" :data-workflow-ready="state.data?'ready':state.error?'error':'waiting'" @toggle="toggle">
     <summary>管理操作历史</summary>
     <div v-if="opened" class="management-body">
-      <p class="management-help">按操作发生日期查询。</p>
-      <p v-if="!active" class="management-warning" role="status">先保存或取消正在编辑的配置，再读取历史；当前草稿仍保留。</p>
+
+      <p v-if="!active" class="management-warning" role="status">请先完成当前编辑</p>
       <template v-else>
         <form v-if="state.access" class="management-filters" @submit.prevent="load()">
           <label>操作类型<select v-model="kind" :disabled="state.busy"><option value="ALL">全部已启用类型</option><option v-for="category in state.access.categories" :key="category.key" :value="category.key" :disabled="!category.enabled">{{ category.label }}{{ category.enabled?'':'（尚未启用）' }}</option></select></label>
           <label>开始日期<DateField v-model="from" required :disabled="state.busy"  /></label>
           <label>结束日期<DateField v-model="to" :min="from" :max="addDays(from||chinaDate(),30)" required :disabled="state.busy"  /></label>
           <label class="management-search">查人、课程或依据<input v-model="search" maxlength="80" placeholder="姓名、学号、课程或记录编号" :disabled="state.busy" /></label>
-          <div class="management-actions"><button :class="{primary:!state.preview}" :disabled="state.busy">查询管理历史</button><button v-if="state.access.exportEnabled&&!state.preview" type="button" :disabled="state.busy||!state.data?.total||state.data.total>2000" :title="state.data?.total>2000?'超过2000条，请缩小日期、类型或搜索':'准备全部当前条件，不只这一页'" @click="exportStep('prepare')">准备完整导出<span v-if="state.data"> · {{ state.data.total }}条</span></button><button v-if="search" type="button" :disabled="state.busy" @click="clearSearch">清除搜索并读取</button></div>
+          <div class="management-actions"><button :class="{primary:!state.preview}" :disabled="state.busy">查询</button><button v-if="state.access.exportEnabled&&!state.preview" type="button" :disabled="state.busy||!state.data?.total||state.data.total>2000" :title="state.data?.total>2000?'超过2000条，请缩小日期、类型或搜索':'准备全部当前条件，不只这一页'" @click="exportStep('prepare')">导出记录<span v-if="state.data"> · {{ state.data.total }}条</span></button><button v-if="search" type="button" :disabled="state.busy" @click="clearSearch">清除</button></div>
         </form>
         <p v-if="state.busy" role="status">{{ state.operation==='download'?'正在重新核对权限、内容与文件校验…':state.operation==='prepare'?'正在核对完整范围并准备文件…':'正在核对管理员权限与完整记录范围…' }}</p>
         <p v-if="state.error" class="management-error" role="alert">{{ state.error }} <button type="button" :disabled="state.busy" @click="activate">重新读取</button></p>
@@ -44,7 +44,7 @@ onBeforeUnmount(()=>{disposed=true;cancelExportFocus();resource.dispose()})
           <div ref="resultElement" class="management-range" tabindex="-1" aria-label="管理历史查询范围">
             <strong>{{ state.data.filter.from }} 至 {{ state.data.filter.to }}</strong>
             <span>{{ ADMIN_AUDIT_KINDS[state.data.filter.kind]||'全部已启用类型' }} · 完整条件 {{ state.data.total }} 条操作</span>
-            <small>操作条数不等于人数；名称与归属以逐条历史依据为准，未保存的快照不补造。</small>
+
           </div>
           <div v-if="state.access?.exportEnabled" class="management-export">
             <p>导出全部当前条件，不只这一页，最多2000条。下载不等于归档。</p>

@@ -76,11 +76,11 @@ test('checksum failure and expiry during read fail closed without truncated outp
   const task = g.resource.download(); g.time(400000); pending.resolve({ data: { schedule: snapshot(1) } }); await task
   assert.equal(g.files.length, 0); assert.match(g.state.error, /到期/)
 })
-test('real panel uses the scoped resource rather than serializing a cached store, and chat routes to the literal export tool', async () => {
-  const panel = await readFile(new URL('../src/components/CourseSchedulePanel.vue', import.meta.url), 'utf8')
-  assert.match(panel, /createPrivateCourseExport/); assert.doesNotMatch(panel, /JSON\.stringify\(store\.schedule/)
-  assert.match(panel, /privateExport\.reset\(\)/); assert.match(panel, /read:\s*readCourseSchedule/)
-  const view = await readFile(new URL('../src/views/TimetableView.vue', import.meta.url), 'utf8'); assert.match(view, /personal-export/)
+test('visible export uses the scoped table-export resource and keeps the legacy route as a table handoff', async () => {
+  const panel = await readFile(new URL('../src/components/ScheduleExportPanel.vue', import.meta.url), 'utf8')
+  assert.match(panel, /createScheduleExportResource/);assert.match(panel, /readCourseSchedule/);assert.match(panel,/validatedCourseSnapshot/)
+  assert.doesNotMatch(panel,/JSON\.stringify\(store\.schedule/)
+  const view=await readFile(new URL('../src/views/TimetableView.vue',import.meta.url),'utf8');assert.match(view,/personal-export/);assert.match(view,/openCalendarExport/)
 })
 test('F1 waits for actual range and calendar termination, not early capability availability', () => {
   assert.equal(unifiedLayoutReadiness({ loading: false, week: null }, { loading: true }), 'waiting')
@@ -90,15 +90,9 @@ test('F1 waits for actual range and calendar termination, not early capability a
   assert.equal(unifiedLayoutReadiness({ loading: false, week: null, error: '失败' }, { loading: false }), 'error')
   assert.equal(unifiedLayoutReadiness({ loading: false, unsupported: true }, { loading: false }), 'error')
 })
-test('F2 snapshot invalidation is separate from the user navigation intent, and old target listeners are released', async () => {
-  const source = await readFile(new URL('../src/components/CourseSchedulePanel.vue', import.meta.url), 'utf8')
-  assert.match(source, /let exportFocusIntent, navigationFocusIntent/)
-  const reset = source.match(/function resetPrivateExport\(\) \{([^}]+)\}/)[1]
-  assert.doesNotMatch(reset, /navigationFocusIntent|cancelExportNavigation/)
-  assert.match(source, /watch\(\(\) => store\.schedule, resetPrivateExport/)
-  assert.match(source, /if \(fromAction !== false\) cancelExportNavigation/)
-  assert.match(source, /cancelWorkflowFocus\(target\)/)
-  assert.match(source, /props\.exportRequested/)
+test('table export navigation retains the guarded calendar handoff and cancelable focus intent', async () => {
+  const source=await readFile(new URL('../src/components/ScheduleExportPanel.vue',import.meta.url),'utf8')
+  assert.match(source,/captureAuditFocusIntent/);assert.match(source,/cancelWorkflowFocus/);assert.match(source,/calendarExportIntent/);assert.match(source,/props\.calendarContext/);assert.match(source,/props\.owner/)
 })
 test('F3 only a successfully loaded null is empty; network, permission and service errors remain errors even with cached data', () => {
   assert.equal(privateCourseReadState({ loaded: true, loading: false, error: '', schedule: null }), 'empty')

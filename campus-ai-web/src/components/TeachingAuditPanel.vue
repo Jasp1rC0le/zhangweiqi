@@ -20,7 +20,7 @@ function download(){
 <template>
   <details class="teaching-audit" @toggle="toggle">
     <summary>更正记录</summary>
-    <p class="audit-policy">保留旧值与原因，一年后标记待归档，不自动删除。</p>
+
     <p v-if="state.loading" role="status">正在读取更正记录…</p>
     <p v-if="state.error" role="alert">{{ state.error }} <button type="button" :disabled="state.loading" @click="load()">重新读取</button></p>
     <template v-if="state.data && !state.error">

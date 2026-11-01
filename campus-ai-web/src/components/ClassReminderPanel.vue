@@ -1,44 +1,36 @@
 <script setup>
-import { computed, nextTick, ref } from 'vue'
-import { Bell } from '@element-plus/icons-vue'
+import { onBeforeUnmount, ref, watch } from 'vue'
 import { useClassReminderStore } from '@/stores/classReminders'
 import { CLASS_REMINDER_MINUTES } from '@/utils/classReminders'
-import CalendarImportAction from '@/components/CalendarImportAction.vue'
-const props = defineProps({ disabled: Boolean, owner: { type: String, default: '' } })
-const emit = defineEmits(['calendar'])
-const reminders = useClassReminderStore(), root = ref(), expanded = ref(false), calendarAction = ref()
-const state = reminders.state
-const label = computed(() => !state.enabled ? '未开启网页提醒' : state.loading ? '核对中' : state.error ? '待重试'
-  : state.result?.unknownTimes ? '部分钟点待核对' : `提前 ${state.minutes} 分钟`)
-async function importCalendar() {
-  const principal = props.owner
-  if (!principal || props.disabled) return
-  if (root.value) root.value.open = true
-  expanded.value = true
-  await nextTick()
-  if (props.owner === principal && !props.disabled) await calendarAction.value?.begin()
+import { readCalendarLink, enableCalendarLink } from '@/api/calendarImport'
+const props=defineProps({disabled:Boolean,owner:{type:String,default:''}})
+const reminders=useClassReminderStore(),state=reminders.state,busy=ref(false),error=ref('')
+let generation=0,controller,disposed=false
+async function changeMinutes(value){
+  const minutes=Number(value),owner=props.owner
+  if(!owner||props.disabled||busy.value)return
+  const run=++generation
+  busy.value=true;error.value='';controller?.abort();const c=new AbortController();controller=c
+  try{
+    await reminders.configure(state.enabled,minutes)
+    if(disposed||run!==generation||owner!==props.owner)return
+    const {data}=await readCalendarLink(c.signal)
+    if(disposed||run!==generation||owner!==props.owner)return
+    if(data.active&&data.minutes!==minutes)await enableCalendarLink(minutes,c.signal)
+  }catch{if(!disposed&&run===generation&&owner===props.owner)error.value='日历提醒未更新，请重试'}
+  finally{if(run===generation){busy.value=false;controller=null}}
 }
-defineExpose({ importCalendar, importBusy: computed(() => Boolean(calendarAction.value?.busy)), open() { if (root.value) { root.value.open = true; root.value.scrollIntoView({ block: 'nearest', behavior: 'auto' }) } } })
+watch(()=>props.owner,()=>{generation++;controller?.abort();controller=null;busy.value=false;error.value=''}, {flush:'sync'})
+onBeforeUnmount(()=>{disposed=true;generation++;controller?.abort()})
 </script>
-
 <template>
-  <details id="class-reminders" ref="root" class="class-reminder-settings" @toggle.self="expanded = $event.target.open">
-    <summary><Bell aria-hidden="true" /><strong>上课提醒</strong><span>{{ label }}</span></summary>
-    <div class="class-reminder-options">
-      <label class="class-reminder-toggle"><input type="checkbox" :checked="state.enabled" :disabled="disabled" @change="reminders.configure($event.target.checked)" />网页内提醒</label>
-      <label class="class-reminder-lead">提前<select :value="state.minutes" :disabled="disabled" aria-label="课前提醒时间" @change="reminders.configure(state.enabled, Number($event.target.value))"><option v-for="minutes in CLASS_REMINDER_MINUTES" :key="minutes" :value="minutes">{{ minutes }} 分钟</option></select></label>
-      <CalendarImportAction ref="calendarAction" :minutes="state.minutes" :active="expanded" :disabled="disabled" @fallback="emit('calendar', state.minutes)" />
-    </div>
-    <p class="class-reminder-hint">网页提醒需保持页面打开，手机提醒按系统日历设置生效。</p>
-    <p v-if="state.storageUnavailable" class="class-reminder-hint" role="status">浏览器未允许保存设置，本次仅在当前页面生效。</p>
-    <p v-if="state.error" class="class-reminder-error" role="alert">{{ state.error }}<button type="button" :disabled="disabled || state.loading" @click="reminders.refresh">重试</button></p>
-    <p v-else-if="state.enabled && state.result?.unknownTimes" class="class-reminder-hint">{{ state.result.unknownTimes }} 项课程缺少钟点，<RouterLink to="/timetable?tool=personal-manage">核对课表</RouterLink>。</p>
-    <p v-else-if="state.enabled && state.result && !state.result.count" class="class-reminder-hint">今天暂无已保存课程。</p>
-  </details>
+  <section id="class-reminder-preferences" tabindex="-1" class="account-reminder-preferences" aria-labelledby="class-reminder-title">
+    <div class="reminder-preference-row"><h2 id="class-reminder-title">上课提醒</h2><label>提前<select :value="state.minutes" aria-label="上课提醒提前时间" :disabled="disabled||busy" @change="changeMinutes($event.target.value)"><option v-for="minutes in CLASS_REMINDER_MINUTES" :key="minutes" :value="minutes">{{minutes}}分钟</option></select></label></div>
+    <label class="reminder-page-toggle"><span>网页内提醒</span><input type="checkbox" :checked="state.enabled" :disabled="disabled||busy" @change="reminders.configure($event.target.checked,state.minutes)"/></label>
+    <p v-if="error" role="alert">{{error}} <button type="button" :disabled="disabled||busy" @click="changeMinutes(state.minutes)">重试</button></p>
+    <p v-if="state.storageUnavailable" role="status">设置仅在本页生效</p>
+  </section>
 </template>
-
 <style scoped>
-.class-reminder-settings{margin:0 0 20px;padding:0 0 8px;border-bottom:1px solid var(--assistant-line,#e2e7ec);color:var(--assistant-ink,#29323c);font-size:14px}
-.class-reminder-settings summary{display:flex;align-items:center;gap:8px;min-height:48px;cursor:pointer;list-style:none}.class-reminder-settings summary::-webkit-details-marker{display:none}.class-reminder-settings summary>svg{width:19px;height:19px;color:#245b9e}.class-reminder-settings summary strong{font-weight:500}.class-reminder-settings summary>span{margin-left:auto;color:#5d6876;font-size:12px}.class-reminder-settings summary:focus-visible{outline:2px solid #0b62db;outline-offset:2px;border-radius:6px}
-.class-reminder-options{display:flex;align-items:center;flex-wrap:wrap;gap:8px 16px;padding-top:8px}.class-reminder-options label{display:flex;align-items:center;gap:8px;min-height:44px}.class-reminder-toggle input{width:18px;height:18px;accent-color:#0b62db}.class-reminder-options select{box-sizing:border-box;min-height:44px;padding:8px 10px;border:1px solid #dbe3ec;border-radius:10px;background:#fff;color:#29323c;font:inherit;font-size:16px}.class-reminder-settings button{min-height:44px;padding:8px 12px;border:0;border-radius:10px;background:#e8f0fd;color:#245b9e;font:inherit;cursor:pointer}.class-reminder-settings :is(select,button,input):focus-visible{outline:2px solid #0b62db;outline-offset:2px}.class-reminder-settings :disabled{opacity:.55;cursor:not-allowed}.class-reminder-hint{margin:8px 0;color:#5d6876;font-size:12px;line-height:1.6}.class-reminder-hint a{color:#245b9e;text-underline-offset:3px}.class-reminder-error{margin:8px 0;color:#a43434;font-size:13px;line-height:1.6}.class-reminder-error button{margin-left:8px}
+.account-reminder-preferences{padding:20px 0;margin:18px 0;border-block:1px solid var(--assistant-line,#e2e7ec)}.reminder-preference-row{display:flex;align-items:center;justify-content:space-between;gap:16px}.reminder-preference-row h2{font-size:17px;font-weight:500;margin:0}.reminder-preference-row label{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--assistant-muted,#5d6876)}.reminder-preference-row select{min-height:44px;min-width:100px;padding:8px 12px;font:inherit;font-size:16px;border:1px solid var(--assistant-line,#e2e7ec);border-radius:10px;background:var(--assistant-surface,#fff);color:var(--assistant-ink,#29323c)}.reminder-page-toggle{display:flex;align-items:center;justify-content:space-between;min-height:44px;margin-top:8px;font-size:14px}.reminder-page-toggle input{width:20px;height:20px;accent-color:var(--assistant-accent,#0b62db)}.account-reminder-preferences :is(input,select,button):focus-visible{outline:2px solid var(--assistant-accent,#0b62db);outline-offset:3px}.account-reminder-preferences p{font-size:12px;color:var(--assistant-danger,#a43e42);margin:8px 0 0}.account-reminder-preferences button{min-height:44px;border:0;background:transparent;color:var(--assistant-accent);font:inherit;cursor:pointer}
 </style>

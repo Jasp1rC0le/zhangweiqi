@@ -113,11 +113,11 @@ test(
 test('one structured course surface replaces image modes without deleting legacy originals', options, () => {
   const source = readFileSync(new URL('../src/views/TimetableView.vue', import.meta.url), 'utf8')
   assert.match(source, /<UnifiedWeekCalendar /)
-  assert.match(source, /<CourseSchedulePanel[^>]*:manage-only="unifiedAvailable" \/>/)
+  assert.match(source, /<CourseSchedulePanel[^>]*:manage-only="true"[^>]*\/>/)
   assert.equal((source.match(/<CourseSchedulePanel\b/g) || []).length, 1)
   assert.doesNotMatch(source, /viewMode|switchMode|<img|deleteTimetable|saveTimetable/)
   assert.match(source, /download="我的旧课表原件.jpg"/)
-  assert.match(source, /@toggle="loadLegacy"/)
+  assert.match(source, /legacyOpen.value=true;await legacy.load\(\)/)
 })
 test('shared confirmations load overlay styles and keep mobile actions reachable', options, () => {
   const main = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8')

@@ -1,189 +1,83 @@
 <script setup>
 import CourseSchedulePanel from '@/components/CourseSchedulePanel.vue'
+import CourseTeacherLink from '@/components/CourseTeacherLink.vue'
 import { useTimetableStore } from '@/stores/timetable'
 import { useCourseScheduleStore } from '@/stores/courseSchedule'
+import { useClassReminderStore } from '@/stores/classReminders'
 import UnifiedWeekCalendar from '@/components/UnifiedWeekCalendar.vue'
 import ScheduleExportPanel from '@/components/ScheduleExportPanel.vue'
-import ClassReminderPanel from '@/components/ClassReminderPanel.vue'
+import CalendarImportAction from '@/components/CalendarImportAction.vue'
 import { computed, ref, nextTick, onMounted, watch, onBeforeUnmount } from 'vue'
+import { ElDropdown, ElDropdownMenu, ElDropdownItem, ElMessage } from 'element-plus'
+import { MoreFilled } from '@element-plus/icons-vue'
 import { useRoute, useRouter } from 'vue-router'
 import { userSessionGeneration } from '@/api/http'
-import {scheduleExportRoute} from '@/utils/scheduleFileIntent'
-const legacy = useTimetableStore()
-const personal = useCourseScheduleStore()
-const importDetails = ref(), importPanel = ref(),scheduleExportPanel=ref(), reminderPanel=ref()
-const importOpen = ref(false),pageHeading=ref(),importReceipt=ref(''),importUnknownTimes=ref(0)
-watch(()=>personal.principal,()=>{importReceipt.value='';importUnknownTimes.value=0},{flush:'sync'})
-const importAction = ref(false)
-watch(() => importPanel.value?.importing, active => { if (!active) importAction.value = false })
-const route = useRoute(), router = useRouter()
-async function importedImage(value){if(value?.owner!==personal.principal)return;const owner=value.owner;importAction.value=false;importOpen.value=false;if(importDetails.value)importDetails.value.open=false;importReceipt.value=value.message||`已导入${value.count}门课 · 第${value.week}周`;importUnknownTimes.value=Number.isInteger(value.unknownTimes)?value.unknownTimes:0;await router.replace({path:'/timetable',query:{queryView:'STUDENT',queryDate:value.date}});await nextTick();if(!disposed&&owner===personal.principal&&route.query.queryDate===value.date){pageHeading.value?.focus({preventScroll:true});pageHeading.value?.scrollIntoView({block:'start',behavior:'auto'})}}
-const calendarLayout = ref({ owner: '', status: 'waiting' })
-const calendarOwner = computed(() => personal.principal ? `${personal.principal}:${userSessionGeneration.value}` : '')
-const calendarExportContext = ref(null)
-function calendarExportChanged(value) { calendarExportContext.value = value?.owner === calendarOwner.value ? value : null }
-watch(calendarOwner, () => { calendarExportContext.value = null }, { flush: 'sync' })
-async function openCalendarExport() { if (calendarExportContext.value?.owner === calendarOwner.value) await scheduleExportPanel.value?.open(calendarExportContext.value) }
-async function openNativeCalendar() { await reminderPanel.value?.importCalendar() }
-async function openCalendarReminder(minutes) { await scheduleExportPanel.value?.openReminder(minutes) }
+import { scheduleExportRoute } from '@/utils/scheduleFileIntent'
+const legacy=useTimetableStore(),personal=useCourseScheduleStore(),reminders=useClassReminderStore()
+const importPanel=ref(),scheduleExportPanel=ref(),calendarAction=ref(),teacherLink=ref(),pageHeading=ref()
+const importOpen=ref(false),importAction=ref(false),operationsOpen=ref(false),exportOpen=ref(false),legacyOpen=ref(false)
+const route=useRoute(),router=useRouter(),unifiedAvailable=ref(false),scope=ref('')
+const leadership=computed(()=>['COUNSELOR','SECRETARY'].includes(scope.value))
+const calendarOwner=computed(()=>personal.principal?`${personal.principal}:${userSessionGeneration.value}`:'')
+const editingSurface=computed(()=>importAction.value||operationsOpen.value)
+const blocked=computed(()=>Boolean(importPanel.value?.dirty||importPanel.value?.unavailable||teacherLink.value?.dirty||teacherLink.value?.busy))
+const title=computed(()=>importAction.value?'导入课表':operationsOpen.value?'修改安排':({TEACHER:'课表与点名',COUNSELOR:'班级考勤',SECRETARY:'学院考勤'})[scope.value]||'我的课表')
+const calendarLayout=ref({owner:'',status:'waiting'}),calendarExportContext=ref(null)
+const layoutReadiness=computed(()=>calendarLayout.value.owner===calendarOwner.value?calendarLayout.value.status:'waiting')
+function calendarLayoutChanged(value){if(value?.owner===calendarOwner.value&&['waiting','ready','error'].includes(value.status))calendarLayout.value=value}
+function calendarExportChanged(value){calendarExportContext.value=value?.owner===calendarOwner.value?value:null}
+watch(calendarOwner,()=>{calendarExportContext.value=null;importAction.value=false;operationsOpen.value=false;exportOpen.value=false;legacyOpen.value=false},{flush:'sync'})
+watch(()=>importPanel.value?.importing,active=>{if(!active){importAction.value=false;if(!operationsOpen.value)importOpen.value=false}})
 const fileExportPreset=computed(()=>scheduleExportRoute(route.query))
-const layoutReadiness = computed(() => calendarLayout.value.owner === calendarOwner.value ? calendarLayout.value.status : 'waiting')
-function calendarLayoutChanged(value) {
-  if (value?.owner === calendarOwner.value && ['waiting', 'ready', 'error'].includes(value.status)) calendarLayout.value = value
+watch(fileExportPreset,value=>{if(value)exportOpen.value=true},{immediate:true})
+let disposed=false,routeGeneration=0
+async function importedImage(value){
+  if(value?.owner!==personal.principal)return
+  const owner=value.owner;importAction.value=false;importOpen.value=false;operationsOpen.value=false
+  ElMessage.success(value.message||'已导入')
+  await router.replace({path:'/timetable',query:{queryView:'STUDENT',queryDate:value.date}});await nextTick()
+  if(!disposed&&owner===personal.principal&&route.query.queryDate===value.date)pageHeading.value?.focus({preventScroll:true})
 }
-let routeGeneration = 0, disposed = false
-watch([() => route.query.tool, () => personal.principal], async ([tool]) => {
-  const started = ++routeGeneration, owner = personal.principal
-  if (!['personal-export','personal-manage','personal-operations'].includes(tool) || !owner) return
-  importOpen.value = true
-  if (importDetails.value) importDetails.value.open = true
-  await nextTick()
-  if (!disposed && started === routeGeneration && owner === personal.principal && route.query.tool === tool) {
-    if(tool==='personal-export')await importPanel.value?.openExport()
-    else if(tool==='personal-operations')await importPanel.value?.openOperations()
-    else await importPanel.value?.openManagement()
-  }
-}, { immediate: true, flush: 'post' })
-onBeforeUnmount(() => { disposed = true; routeGeneration++ })
-async function openImport() {
-  importAction.value = true
-  importOpen.value = true
-  if (importDetails.value) importDetails.value.open = true
-  await nextTick()
-  await importPanel.value?.openImport()
-  if (!importPanel.value?.importing) importAction.value = false
+async function openImport(){if(blocked.value)return;operationsOpen.value=false;importOpen.value=true;importAction.value=true;await nextTick();await importPanel.value?.openImport();if(!importPanel.value?.importing)importAction.value=false}
+async function openOperations(){if(blocked.value)return;importAction.value=false;operationsOpen.value=true;importOpen.value=true;await nextTick();await importPanel.value?.openOperations()}
+async function associate(){await teacherLink.value?.open()}
+async function openCalendarExport(){exportOpen.value=true;await nextTick();if(calendarExportContext.value?.owner===calendarOwner.value)await scheduleExportPanel.value?.open(calendarExportContext.value);else await scheduleExportPanel.value?.open()}
+async function openCalendarReminder(minutes=reminders.state.minutes){exportOpen.value=true;await nextTick();await scheduleExportPanel.value?.openReminder(minutes)}
+async function action(name){
+  if(name==='import')return openImport()
+  if(name==='operations')return openOperations()
+  if(name==='export')return openCalendarExport()
+  if(name==='settings')return router.push('/account#class-reminder-preferences')
+  if(name==='legacy'){legacyOpen.value=true;await legacy.load()}
 }
-async function openOperations(){importOpen.value=true;if(importDetails.value)importDetails.value.open=true;await nextTick();await importPanel.value?.openOperations()}
-onMounted(() => personal.load())
-const unifiedAvailable = ref(false)
-const scope = ref('')
-const title = computed(
-  () =>
-    ({ TEACHER: '课表与点名', COUNSELOR: '班级考勤', SECRETARY: '学院考勤' })[scope.value] ||
-    '我的课表',
-)
-function loadLegacy(event) {
-  if (event.target.open) legacy.load()
-}
+watch([()=>route.query.tool,()=>personal.principal],async([tool])=>{
+  const run=++routeGeneration,owner=personal.principal
+  if(!owner||!['personal-export','personal-manage','personal-operations'].includes(tool))return
+  await nextTick();if(disposed||run!==routeGeneration||owner!==personal.principal)return
+  if(tool==='personal-export')await openCalendarExport();else await openOperations()
+},{immediate:true,flush:'post'})
+onMounted(()=>personal.load())
+onBeforeUnmount(()=>{disposed=true;routeGeneration++})
 </script>
 <template>
-  <main class="work-page timetable-page">
+  <main class="work-page timetable-page timetable-direct">
     <header class="timetable-heading">
-      <h1 ref="pageHeading" tabindex="-1">{{ importAction ? '导入课表' : title }}</h1>
-
-      <div class="timetable-actions" v-if="!importAction" aria-label="课表操作">
-      <button v-if="!['COUNSELOR','SECRETARY'].includes(scope)" class="timetable-import-action" type="button" :disabled="importPanel?.dirty||importPanel?.unavailable" @click="openImport">{{ personal.schedule ? '更新课表' : '导入课表' }}</button>
-      <button class="timetable-import-action timetable-export-action" type="button" :disabled="!calendarOwner || reminderPanel?.importBusy || importPanel?.dirty || importPanel?.unavailable" @click="openNativeCalendar">{{ reminderPanel?.importBusy ? '正在准备日历…' : '导入手机日历' }}</button>
-      <button class="timetable-import-action timetable-export-action" type="button" :disabled="!calendarExportContext" @click="openCalendarExport">导出课表</button>
-      <button v-if="!['COUNSELOR','SECRETARY'].includes(scope)" class="timetable-import-action timetable-export-action" type="button" @click="openOperations">修改个人安排</button>
+      <h1 ref="pageHeading" tabindex="-1">{{title}}</h1>
+      <div v-if="!editingSurface" class="timetable-heading-actions">
+        <CalendarImportAction id="class-reminders" ref="calendarAction" :minutes="reminders.state.minutes" :active="!!calendarOwner&&personal.loaded&&!!personal.schedule" :disabled="blocked||!personal.schedule" @fallback="openCalendarReminder"/>
+        <ElDropdown trigger="click" @command="action"><button type="button" class="timetable-more" :disabled="blocked" aria-label="更多课表操作"><MoreFilled/></button><template #dropdown><ElDropdownMenu><ElDropdownItem v-if="!leadership" command="import">导入</ElDropdownItem><ElDropdownItem v-if="!leadership" command="operations">修改安排</ElDropdownItem><ElDropdownItem command="export" :disabled="!calendarExportContext">导出表格</ElDropdownItem><ElDropdownItem command="settings">提醒设置</ElDropdownItem><ElDropdownItem command="legacy">旧原件</ElDropdownItem></ElDropdownMenu></template></ElDropdown>
       </div>
+      <button v-else type="button" class="timetable-return" :disabled="blocked" @click="importAction=false;operationsOpen=false;importOpen=false">返回课表</button>
     </header>
-    <p v-if="importReceipt&&!importAction" class="timetable-import-receipt" role="status">{{importReceipt}} <RouterLink v-if="importUnknownTimes>0" to="/timetable?tool=personal-manage">核对钟点</RouterLink></p>
-    <ClassReminderPanel v-if="!importAction" ref="reminderPanel" :owner="calendarOwner" :disabled="importPanel?.dirty || importPanel?.unavailable" @calendar="openCalendarReminder" />
-    <UnifiedWeekCalendar v-show="!importAction" @available="unifiedAvailable = $event" @scope="scope = $event" @layout="calendarLayoutChanged" @export-context="calendarExportChanged" />
-    <ScheduleExportPanel v-show="!importAction" ref="scheduleExportPanel" :owner="calendarOwner" :preferred-view="scope" :preset="fileExportPreset" :calendar-context="calendarExportContext" />
-    <details ref="importDetails" class="import-management" :class="{'import-focused':importAction}" :open="importOpen || !unifiedAvailable" @toggle="importOpen = $event.target.open">
-      <summary>管理课表</summary>
-      <CourseSchedulePanel ref="importPanel" @imported="importedImage" :layout-ready="layoutReadiness" :export-requested="route.query.tool === 'personal-export'" :manage-requested="route.query.tool === 'personal-manage'" :manage-only="unifiedAvailable" />
-    </details>
-    <details v-show="!importAction" class="legacy-source" @toggle="loadLegacy">
-      <summary>旧版原件</summary>
-      <p>下载本人保留的旧原件。</p>
-      <p v-if="legacy.loading" role="status">正在读取本人原件…</p>
-      <p v-else-if="legacy.error" role="alert">
-        {{ legacy.error }} <button class="work-button" @click="legacy.load(true)">重试</button>
-      </p>
-      <a
-        v-else-if="legacy.imageUrl"
-        class="work-button"
-        :href="legacy.imageUrl"
-        download="我的旧课表原件.jpg"
-        >下载旧原件</a
-      >
-      <p v-else-if="legacy.loaded">没有旧版原件。</p>
-    </details>
+    <UnifiedWeekCalendar v-show="!editingSurface" @available="unifiedAvailable=$event" @scope="scope=$event" @layout="calendarLayoutChanged" @export-context="calendarExportChanged" @associate="associate" @import="openImport"/>
+    <div v-if="!editingSurface&&personal.schedule&&!leadership" class="timetable-teacher-action"><button type="button" :disabled="blocked" @click="associate">关联教师</button></div>
+    <section v-show="importOpen" class="timetable-edit-surface" aria-label="编辑本人课表"><CourseSchedulePanel ref="importPanel" :manage-only="true" :layout-ready="layoutReadiness" @imported="importedImage"/></section>
+    <ScheduleExportPanel v-show="exportOpen&&!editingSurface" ref="scheduleExportPanel" :owner="calendarOwner" :preferred-view="scope" :preset="fileExportPreset" :calendar-context="calendarExportContext"/>
+    <CourseTeacherLink ref="teacherLink" :owner="calendarOwner" :disabled="importPanel?.unavailable" @saved="ElMessage.success('已关联教师')"/>
+    <section v-if="legacyOpen&&!editingSurface" class="timetable-legacy" aria-label="旧原件"><p v-if="legacy.loading" role="status">读取中…</p><p v-else-if="legacy.error" role="alert">{{legacy.error}}</p><a v-else-if="legacy.imageUrl" class="work-button" :href="legacy.imageUrl" download="我的旧课表原件.jpg">下载旧原件</a><p v-else>暂无旧原件</p></section>
   </main>
 </template>
 <style scoped>
-.timetable-import-receipt{margin:0 0 18px;font-size:14px;line-height:1.7;color:var(--assistant-success,#187248)}
-.timetable-import-receipt a{display:inline-flex;align-items:center;min-height:44px;margin-left:8px;color:var(--assistant-accent,#0b62db);text-underline-offset:3px}
-.import-focused>summary{display:none}.import-focused{border-top:0!important;padding-top:0!important;margin-top:0!important}
-.timetable-page {
-  max-width: 1160px;
-}
-.timetable-heading {
-  margin-bottom: 32px;
-}
-.timetable-import-action {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 44px;
-  margin-top: 14px;
-  padding: 11px 22px;
-  border: 0;
-  border-radius: 12px;
-  background: var(--assistant-accent, #2b63cf);
-  color: #fff;
-  font: inherit;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background-color 180ms ease-out;
-}
-.timetable-import-action:hover { background: var(--assistant-accent-hover, #214ea6); }
-.timetable-export-action{margin-left:12px;background:var(--assistant-soft,#eaf2ff);color:var(--assistant-accent,#0b62db)}
-.timetable-export-action:hover{background:var(--assistant-hover,#e8edf2)}
-.timetable-heading .import-first-use { font-size: 14px; margin-top: 12px; max-width: 60ch; }
-@media (prefers-reduced-motion: reduce) { .timetable-import-action { transition: none; } }
-h1 {
-  font-size: 32px;
-  line-height: 1.3;
-  letter-spacing: -0.025em;
-  margin: 0 0 12px;
-}
-.timetable-heading p,
-.legacy-source {
-  color: #526377;
-  line-height: 1.7;
-}
-.import-management {
-  margin-top: 28px;
-  border-top: 1px solid var(--assistant-line, #e2e7ec);
-  padding-top: 12px;
-}
-.teaching-link {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  margin-top: 10px;
-  font-size: 14px;
-  color: var(--assistant-accent, #536f90);
-  text-underline-offset: 4px;
-}
-.legacy-source {
-  font-size: 14px;
-  border-top: 1px solid var(--ct-line);
-  padding-top: 16px;
-  margin-top: 32px;
-}
-summary {
-  cursor: pointer;
-  min-height: 44px;
-  align-content: center;
-}
-.legacy-source a {
-  text-decoration: none;
-}
-:focus-visible {
-  outline: 2px solid var(--ct-blue);
-  outline-offset: 3px;
-}
-@media (max-width: 760px) {
-  h1 {
-    font-size: 28px;
-  }
-  .timetable-heading {
-    margin-bottom: 24px;
-  }
-}
+.timetable-direct{max-width:1120px;margin-inline:auto}.timetable-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 16px}.timetable-heading h1{font-size:26px;font-weight:600;letter-spacing:-.025em;line-height:1.25;margin:0}.timetable-heading-actions{display:flex;align-items:flex-start;gap:6px}.timetable-more,.timetable-return{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;padding:10px;border:0;border-radius:12px;background:transparent;color:var(--assistant-ink,#29323c);font:inherit;cursor:pointer}.timetable-more svg{width:20px;height:20px}.timetable-return{font-size:14px;color:var(--assistant-accent)}.timetable-teacher-action{display:flex;justify-content:flex-end;margin-top:12px}.timetable-teacher-action button{min-height:44px;padding:8px 12px;border:0;background:transparent;color:var(--assistant-accent,#087f7b);font:inherit;font-size:14px;cursor:pointer}.timetable-direct button:focus-visible{outline:2px solid var(--assistant-accent,#087f7b);outline-offset:3px}.timetable-direct button:disabled{opacity:.55;cursor:default}.timetable-edit-surface{min-width:0}.timetable-legacy{margin-top:18px;font-size:14px}.timetable-heading h1:focus{outline:none}
+@media(max-width:600px){.timetable-heading{margin-bottom:10px;gap:8px}.timetable-heading h1{font-size:22px}.timetable-heading-actions{gap:0}.timetable-direct{padding-inline:0}}
 </style>

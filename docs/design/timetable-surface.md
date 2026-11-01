@@ -25,3 +25,12 @@ Two screenshot batches: empty desktop/mobile, then synthetic saved desktop/mobil
 ## Current increment 2026-11-01: batch import
 
 Mode remains Operate. Preserve the Campthink workspace and its main page title. The import form contains action buttons, core missing metadata only when required, and real progress/error/results. Remove the repeated form heading, large image picker, preview image, confirmation list and tutorial paragraphs. Multi-image import validates the whole batch before one private, revision-protected save; never replace a failed batch with a partial success. Source/functional evidence and remaining visual limits are recorded in `docs/timetable-batch-import-2026-11-01.md`; no new rendered-device acceptance is claimed.
+
+
+## Current increment 2026-11-02: timetable first
+
+The user replaces the text-first daily summary and optional week grid with a visible seven-day timetable immediately below the title and calendar-import action. Use the inherited workspace and system font, five stable pastel course surfaces with dark text, a narrow period rail, and one detail dialog. Preserve every authorized entry: aggregate overlapping entries into an inspectable count tile, keep cancelled entries and show clock-only/unmapped entries separately without inventing bell times. This supersedes the older gridSafe-only presentation rule for this renderer; authorization and server queries remain unchanged.
+
+Import is labelled 导入 and remains multi-select/atomic. Low-frequency import, edits, table export, reminder settings and old-original recovery live in the header menu; the private JSON export interface is removed. 关联教师 is directly accessible and edits only personal teacher annotations with revision protection. Reminder configuration belongs to account settings, defaults to 30 minutes, and preserves explicit opt-out; calendar handoff is not OS-import confirmation.
+
+Staff attendance uses compact 点名/汇总/记录 actions without removing save, complete, undo, correction reason, pagination, export or scope gates. Student attendance logic stays unchanged. No new authority, schema migration, model call, roster write or branding is introduced. Evidence: docs/timetable-direct-2026-11-02.md. One detector completed; no current rendered QA or fresh full visual verdict is available because browser tools remain unavailable. Prior narrow visual verdicts do not transfer to this increment.

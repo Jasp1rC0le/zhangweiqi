@@ -53,7 +53,7 @@ onMounted(loadCapability);onBeforeUnmount(()=>{disposed=true;reset();capControll
   <section class="course-image-import" aria-label="批量截图导入" :aria-busy="busy||loading">
     <div class="image-actions">
       <label class="image-picker work-button primary" :class="{'image-picker-disabled':disabled||busy||uncertain||!capability?.available}">
-        <NavigationIcon name="timetable"/><span>批量导入</span>
+        <NavigationIcon name="timetable"/><span>导入</span>
         <input type="file" multiple accept="image/png,image/jpeg,.png,.jpg,.jpeg" aria-label="选择课表截图，可多选" :disabled="disabled||busy||uncertain||!capability?.available" @change="choose"/>
       </label>
       <button v-if="busy" class="work-button" type="button" @click="cancel">停止等待</button>

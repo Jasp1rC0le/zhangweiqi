@@ -18,7 +18,7 @@ const recordedShare = computed(() => distribution.value?.total ? distribution.va
 <template>
   <section class="attendance-cockpit" aria-label="授权范围考勤概览">
     <header class="cockpit-heading">
-      <h2>考勤概览</h2>
+      <h2>考勤汇总</h2>
       <span>{{ from }} — {{ to }}<b v-if="stale">上次数据</b></span>
     </header>
     <template v-if="distribution">
@@ -41,23 +41,23 @@ const recordedShare = computed(() => distribution.value?.total ? distribution.va
           <AttendanceDistribution :counts="counts" />
         </section>
         <section class="cockpit-registration" :class="{'registration-incomplete': counts.unknown > 0, 'registration-empty': !distribution.total}" aria-label="点名登记进度">
-          <h3>登记进度<span class="registration-percentage">{{ distribution.total ? distributionPercent(recordedShare) : '—' }}</span></h3>
+          <h3>已点名<span class="registration-percentage">{{ distribution.total ? distributionPercent(recordedShare) : '—' }}</span></h3>
           <p class="registration-count"><strong>{{ cockpitCount(distribution.recorded) }}</strong><span>/ {{ cockpitCount(distribution.total) }} 人次</span></p>
           <div v-if="distribution.total" class="registration-track" role="progressbar" aria-label="已填写考勤人次"
             :aria-valuenow="distribution.recorded" :aria-valuemin="0" :aria-valuemax="distribution.total"
             :aria-valuetext="`${cockpitCount(distribution.recorded)} / ${cockpitCount(distribution.total)} 人次已填写，${distributionPercent(recordedShare)}，不是出勤率`">
             <span :style="{ width: `${recordedShare}%` }"></span>
           </div>
-          <p class="registration-pending">待点名 <strong>{{ cockpitCount(counts.unknown) }}</strong> 人次</p>
+          <p class="registration-pending">未点名 <strong>{{ cockpitCount(counts.unknown) }}</strong> 人次</p>
           <dl class="cockpit-facts">
-            <div><dt>涉及旷课学生</dt><dd>{{ cockpitCount(absentStudents) }} <small>人 · 去重</small></dd></div>
-            <div><dt>已配置安排</dt><dd>{{ cockpitCount(planned) }} <small>项</small></dd></div>
+            <div><dt>旷课人数</dt><dd>{{ cockpitCount(absentStudents) }} <small>人 · 去重</small></dd></div>
+            <div><dt>课程</dt><dd>{{ cockpitCount(planned) }} <small>项</small></dd></div>
           </dl>
 
         </section>
       </div>
       <AttendanceSummaryCopy v-if="summaryContext" :context="summaryContext" :counts="counts" :planned="planned" :absent-students="absentStudents" :from="from" :to="to" :disabled="stale" />
-      <details class="cockpit-definition"><summary>统计口径</summary><p>当前授权筛选范围的完整汇总，不是当前页小计。人数去重，人次按每节记录累计；已取消课程不计入。登记进度仅表示已填写记录的占比，不是出勤率。待点名可能包含尚未上课的安排，不计入旷课；记录更正由任课教师完成。</p></details>
+
     </template>
     <p v-else class="cockpit-incomplete" role="status">考勤统计不完整，请重新读取；未将缺失值显示为零。</p>
   </section>

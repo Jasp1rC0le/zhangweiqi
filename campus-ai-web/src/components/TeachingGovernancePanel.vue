@@ -57,10 +57,10 @@ onBeforeUnmount(()=>{disposed=true;resource.dispose();classResource.dispose()})
   <details class="teaching-governance" :aria-busy="operationBusy" :data-workflow-ready="state.data?'ready':state.error||classSelection.error||blockingMessage?'error':'waiting'" @toggle="toggle">
     <summary>记录核对、导出与到期清单</summary>
     <div v-if="opened" class="governance-body">
-      <p class="governance-policy">{{ viewLabel }} · 只读授权范围。保留一年；到期仅待归档核验，不会自动删除。</p>
-      <p v-if="preset?.classId && classId===preset.classId && !blockingMessage" class="governance-policy">已从统计页带入班级和日期；读取前会重新核对当前账号的班级权限。</p>
+      <p v-if="preferredView==='STUDENT'" class="governance-policy">{{ viewLabel }} · 只读授权范围。保留一年；到期仅待归档核验，不会自动删除。</p>
+      <p v-if="preset?.classId && classId===preset.classId && !blockingMessage" class="governance-policy">已带入班级和日期</p>
       <p v-if="blockingMessage" class="governance-warning" role="alert">{{ blockingMessage }} <RouterLink to="/timetable">返回课表重新选择</RouterLink></p>
-      <p v-if="!active" class="governance-warning" role="status">先保存或取消正在编辑的点名/配置，再核对记录；没有丢弃当前草稿。</p>
+      <p v-if="!active" class="governance-warning" role="status">请先完成当前编辑</p>
       <p v-else-if="state.access && !ready" role="status">当前账号还没有这个教学视图的记录权限。</p>
       <form v-if="ready" class="governance-filters" @submit.prevent="load()">
         <label>查看内容<select v-model="kind" :disabled="operationBusy"><option value="ATTENDANCE">考勤结果</option><option value="AUDIT">更正与点名变更</option></select></label>
@@ -84,7 +84,7 @@ onBeforeUnmount(()=>{disposed=true;resource.dispose();classResource.dispose()})
           <span :class="{'governance-warning':state.data.expiredWithinScope}">到期候选 {{ state.data.expiredWithinScope }} 条 · 尚未归档或删除</span>
         </div>
         <div class="governance-export">
-          <p>导出全部当前条件，不只这一页。每份最多2000条；考勤结果按下课与最后更正的较晚时间再保留一年。</p>
+          <p>导出当前条件的全部记录，最多2000条</p>
           <button type="button" :disabled="operationBusy || !state.data.total || state.data.total>2000" @click="prepareExport">准备范围导出</button>
           <p v-if="state.data.total>2000" class="governance-warning">超过2000条，请缩小日期或班级范围；不会截断文件。</p>
           <section v-if="state.preview" ref="previewElement" class="governance-export-preview" tabindex="-1" aria-label="待下载范围核对">
@@ -96,7 +96,7 @@ onBeforeUnmount(()=>{disposed=true;resource.dispose();classResource.dispose()})
           </section>
           <p v-if="state.downloaded" ref="exportResult" class="governance-success" tabindex="-1" role="status">{{ state.downloaded.count }} 条已核验并交给浏览器下载；请检查下载文件。未归档、未删除原记录。</p>
         </div>
-        <p v-if="!state.data.total">该条件下没有记录。可切换内容、日期或取消“只看到期候选”后重新读取。</p>
+        <p v-if="!state.data.total">暂无记录</p>
         <ol v-else class="governance-rows">
           <li v-for="row in state.data.items" :key="row.id">
             <div class="governance-row-head"><strong>{{ row.studentName }} <small>{{ row.studentNumber }}</small></strong><span class="governance-status" :data-status="state.data.filter.kind==='AUDIT'?row.newStatus:row.status">{{ state.data.filter.kind==='AUDIT'?`${ATTENDANCE_STATUSES[row.oldStatus]} → ${ATTENDANCE_STATUSES[row.newStatus]}`:ATTENDANCE_STATUSES[row.status] }}</span></div>

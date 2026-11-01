@@ -4,7 +4,7 @@ import { createClassReminders } from '@/utils/classReminders'
 import { queryOwnTimetable } from '@/api/unifiedTimetable'
 
 export const useClassReminderStore = defineStore('classReminders', () => {
-  const state = reactive({ enabled: false, minutes: 10, result: null, loading: false, error: '', banner: null, checkedAt: 0, storageUnavailable: false })
+  const state = reactive({ enabled: false, minutes: 30, result: null, loading: false, error: '', banner: null, checkedAt: 0, storageUnavailable: false })
   let controller
   function attach(owner, preferenceOwner) {
     controller?.dispose()
