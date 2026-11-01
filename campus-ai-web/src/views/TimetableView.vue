@@ -11,7 +11,7 @@ import { userSessionGeneration } from '@/api/http'
 import {scheduleExportRoute} from '@/utils/scheduleFileIntent'
 const legacy = useTimetableStore()
 const personal = useCourseScheduleStore()
-const importDetails = ref(), importPanel = ref(),scheduleExportPanel=ref()
+const importDetails = ref(), importPanel = ref(),scheduleExportPanel=ref(), reminderPanel=ref()
 const importOpen = ref(false),pageHeading=ref(),importReceipt=ref('')
 watch(()=>personal.principal,()=>{importReceipt.value=''},{flush:'sync'})
 const importAction = ref(false)
@@ -24,6 +24,7 @@ const calendarExportContext = ref(null)
 function calendarExportChanged(value) { calendarExportContext.value = value?.owner === calendarOwner.value ? value : null }
 watch(calendarOwner, () => { calendarExportContext.value = null }, { flush: 'sync' })
 async function openCalendarExport() { if (calendarExportContext.value?.owner === calendarOwner.value) await scheduleExportPanel.value?.open(calendarExportContext.value) }
+async function openNativeCalendar() { await reminderPanel.value?.importCalendar() }
 async function openCalendarReminder(minutes) { await scheduleExportPanel.value?.openReminder(minutes) }
 const fileExportPreset=computed(()=>scheduleExportRoute(route.query))
 const layoutReadiness = computed(() => calendarLayout.value.owner === calendarOwner.value ? calendarLayout.value.status : 'waiting')
@@ -72,12 +73,13 @@ function loadLegacy(event) {
 
       <div class="timetable-actions" v-if="!importAction" aria-label="课表操作">
       <button v-if="!['COUNSELOR','SECRETARY'].includes(scope)" class="timetable-import-action" type="button" :disabled="importPanel?.dirty||importPanel?.unavailable" @click="openImport">{{ personal.schedule ? '更新课表' : '导入课表' }}</button>
+      <button class="timetable-import-action timetable-export-action" type="button" :disabled="!calendarOwner || reminderPanel?.importBusy || importPanel?.dirty || importPanel?.unavailable" @click="openNativeCalendar">{{ reminderPanel?.importBusy ? '正在准备日历…' : '导入手机日历' }}</button>
       <button class="timetable-import-action timetable-export-action" type="button" :disabled="!calendarExportContext" @click="openCalendarExport">导出课表</button>
       <button v-if="!['COUNSELOR','SECRETARY'].includes(scope)" class="timetable-import-action timetable-export-action" type="button" @click="openOperations">修改个人安排</button>
       </div>
     </header>
     <p v-if="importReceipt&&!importAction" class="timetable-import-receipt" role="status">{{importReceipt}}</p>
-    <ClassReminderPanel v-if="!importAction" :disabled="importPanel?.dirty || importPanel?.unavailable" @calendar="openCalendarReminder" />
+    <ClassReminderPanel v-if="!importAction" ref="reminderPanel" :owner="calendarOwner" :disabled="importPanel?.dirty || importPanel?.unavailable" @calendar="openCalendarReminder" />
     <UnifiedWeekCalendar v-show="!importAction" @available="unifiedAvailable = $event" @scope="scope = $event" @layout="calendarLayoutChanged" @export-context="calendarExportChanged" />
     <ScheduleExportPanel v-show="!importAction" ref="scheduleExportPanel" :owner="calendarOwner" :preferred-view="scope" :preset="fileExportPreset" :calendar-context="calendarExportContext" />
     <details ref="importDetails" class="import-management" :class="{'import-focused':importAction}" :open="importOpen || !unifiedAvailable" @toggle="importOpen = $event.target.open">

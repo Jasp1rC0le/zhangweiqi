@@ -35,6 +35,12 @@ public class JwtInterceptor implements HandlerInterceptor {
             return true;
         }
 
+        // Calendar apps cannot send a browser bearer header. This one exact route uses its
+        // own signed, revocable, read-only grant; the controller validates it before any data.
+        if (("GET".equals(request.getMethod()) || "HEAD".equals(request.getMethod()))
+                && request.getRequestURI() != null
+                && request.getRequestURI().matches("/api/calendar-feed/[a-f0-9]{64}\\.[A-Za-z0-9_-]{43}/calendar\\.ics")) return true;
+
         // 已发布商家的照片不含账户数据；允许浏览器图片元素直接加载。
         if ("GET".equalsIgnoreCase(request.getMethod())
                 && request.getRequestURI() != null

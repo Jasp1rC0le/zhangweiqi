@@ -53,4 +53,17 @@ public class JwtService {
     public long getExpirationSeconds() {
         return expirationMillis / 1000;
     }
+
+    /** A separate, domain-derived proof for read-only calendar links; never a login JWT. */
+    public String calendarLinkProof(String id) {
+        if (id == null || !id.matches("[a-f0-9]{64}")) throw new IllegalArgumentException("Invalid calendar identifier");
+        try {
+            var derive = javax.crypto.Mac.getInstance("HmacSHA256");
+            derive.init(new javax.crypto.spec.SecretKeySpec(key.getEncoded(), "HmacSHA256"));
+            byte[] calendarKey = derive.doFinal("Campthink/calendar-link/key/v1".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            var proof = javax.crypto.Mac.getInstance("HmacSHA256");
+            proof.init(new javax.crypto.spec.SecretKeySpec(calendarKey, "HmacSHA256"));
+            return java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(proof.doFinal(id.getBytes(java.nio.charset.StandardCharsets.US_ASCII)));
+        } catch (java.security.GeneralSecurityException failure) { throw new IllegalStateException("Calendar signing unavailable", failure); }
+    }
 }

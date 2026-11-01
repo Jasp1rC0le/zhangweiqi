@@ -161,6 +161,7 @@ class AccountRecoveryServiceTest {
         when(jdbc.update("UPDATE users SET password_hash = ? WHERE id = ? AND status = 1", "encoded", 9L)).thenReturn(1);
         configured().resetPassword("opaque-token", "new-password");
         verify(jdbc).update("DELETE FROM account_action_tokens WHERE user_id = ? AND action = 'VERIFY_EMAIL'", 9L);
+        verify(jdbc).update("DELETE FROM account_action_tokens WHERE user_id = ? AND action IN ('CAL_FEED_5','CAL_FEED_10','CAL_FEED_15','CAL_FEED_30')", 9L);
     }
 
     @Test

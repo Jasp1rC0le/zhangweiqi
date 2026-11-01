@@ -1,26 +1,35 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import { Bell } from '@element-plus/icons-vue'
 import { useClassReminderStore } from '@/stores/classReminders'
 import { CLASS_REMINDER_MINUTES } from '@/utils/classReminders'
-defineProps({ disabled: Boolean })
+import CalendarImportAction from '@/components/CalendarImportAction.vue'
+const props = defineProps({ disabled: Boolean, owner: { type: String, default: '' } })
 const emit = defineEmits(['calendar'])
-const reminders = useClassReminderStore(), root = ref()
+const reminders = useClassReminderStore(), root = ref(), expanded = ref(false), calendarAction = ref()
 const state = reminders.state
 const label = computed(() => !state.enabled ? '未开启网页提醒' : state.loading ? '核对中' : state.error ? '待重试'
   : state.result?.unknownTimes ? '部分钟点待核对' : `提前 ${state.minutes} 分钟`)
-defineExpose({ open() { if (root.value) { root.value.open = true; root.value.scrollIntoView({ block: 'nearest', behavior: 'auto' }) } } })
+async function importCalendar() {
+  const principal = props.owner
+  if (!principal || props.disabled) return
+  if (root.value) root.value.open = true
+  expanded.value = true
+  await nextTick()
+  if (props.owner === principal && !props.disabled) await calendarAction.value?.begin()
+}
+defineExpose({ importCalendar, importBusy: computed(() => Boolean(calendarAction.value?.busy)), open() { if (root.value) { root.value.open = true; root.value.scrollIntoView({ block: 'nearest', behavior: 'auto' }) } } })
 </script>
 
 <template>
-  <details id="class-reminders" ref="root" class="class-reminder-settings">
+  <details id="class-reminders" ref="root" class="class-reminder-settings" @toggle.self="expanded = $event.target.open">
     <summary><Bell aria-hidden="true" /><strong>上课提醒</strong><span>{{ label }}</span></summary>
     <div class="class-reminder-options">
       <label class="class-reminder-toggle"><input type="checkbox" :checked="state.enabled" :disabled="disabled" @change="reminders.configure($event.target.checked)" />网页内提醒</label>
       <label class="class-reminder-lead">提前<select :value="state.minutes" :disabled="disabled" aria-label="课前提醒时间" @change="reminders.configure(state.enabled, Number($event.target.value))"><option v-for="minutes in CLASS_REMINDER_MINUTES" :key="minutes" :value="minutes">{{ minutes }} 分钟</option></select></label>
-      <button type="button" :disabled="disabled" @click="emit('calendar', state.minutes)">加入手机日历</button>
+      <CalendarImportAction ref="calendarAction" :minutes="state.minutes" :active="expanded" :disabled="disabled" @fallback="emit('calendar', state.minutes)" />
     </div>
-    <p class="class-reminder-hint">网页提醒需保持页面打开；日历提醒按手机设置生效，改课后需更新。</p>
+    <p class="class-reminder-hint">网页提醒需保持页面打开，手机提醒按系统日历设置生效。</p>
     <p v-if="state.storageUnavailable" class="class-reminder-hint" role="status">浏览器未允许保存设置，本次仅在当前页面生效。</p>
     <p v-if="state.error" class="class-reminder-error" role="alert">{{ state.error }}<button type="button" :disabled="disabled || state.loading" @click="reminders.refresh">重试</button></p>
     <p v-else-if="state.enabled && state.result?.unknownTimes" class="class-reminder-hint">{{ state.result.unknownTimes }} 项课程缺少钟点，<RouterLink to="/timetable?tool=personal-manage">核对课表</RouterLink>。</p>

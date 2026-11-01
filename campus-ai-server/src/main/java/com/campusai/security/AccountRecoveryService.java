@@ -129,6 +129,7 @@ public class AccountRecoveryService {
         jdbc.update("UPDATE auth_sessions SET revoked_at = NOW() WHERE user_id = ? AND revoked_at IS NULL",
                 row.userId());
         jdbc.update("DELETE FROM account_action_tokens WHERE user_id = ? AND action = 'VERIFY_EMAIL'", row.userId());
+        jdbc.update("DELETE FROM account_action_tokens WHERE user_id = ? AND action IN ('CAL_FEED_5','CAL_FEED_10','CAL_FEED_15','CAL_FEED_30')", row.userId());
     }
 
     private TokenRow consume(String rawToken, String action) {
