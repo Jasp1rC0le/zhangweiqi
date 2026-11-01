@@ -187,6 +187,6 @@ test(
     assert.match(choose, /preview\.value = \{ \.\.\.result, revision:/)
     assert.match(choose, /fileError\.value\?\.focus/)
     assert.equal((source.match(/fileRead\?\.abort\(\)/g) || []).length, 4)
-    assert.match(source, /aria-describedby="course-file-help"/)
+    assert.match(source, /<label class="course-file"\s*>导入表格<input/)
   },
 )

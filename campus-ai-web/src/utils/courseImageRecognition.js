@@ -1,7 +1,22 @@
 import {normalizeCourse,normalizeCourses,parseCourseWeeks,courseConflicts} from './courseSchedule.js'
 import {mondayOf} from './timetable.js'
 export function courseImageFileIssue(file){
-  return !file||!['image/png','image/jpeg'].includes(file.type)||!Number.isSafeInteger(file.size)||file.size<1||file.size>2*1024*1024?'请选择2MB以内的PNG/JPG课表图片；请先裁去姓名、学号等不必要信息':''
+  return !file||!['image/png','image/jpeg'].includes(file.type)||!Number.isSafeInteger(file.size)||file.size<1||file.size>2*1024*1024?'请选择2MB以内的PNG/JPG截图':''
+}
+export function courseImageFilesIssue(files) {
+  if (!Array.isArray(files) || !files.length || files.length > 20) return '一次请选择1—20张截图'
+  for (let index = 0; index < files.length; index++) {
+    const issue = courseImageFileIssue(files[index])
+    if (issue) return `第${index + 1}张：${issue}`
+  }
+  return files.reduce((total, file) => total + file.size, 0) > 32 * 1024 * 1024 ? '图片总计限32MB' : ''
+}
+export function buildCourseImageBatch(files) {
+  const issue = courseImageFilesIssue(files)
+  if (issue) throw new Error(issue)
+  const data = new FormData()
+  files.forEach((file, index) => data.append('images', file, `course-${index + 1}.${file.type === 'image/png' ? 'png' : 'jpg'}`))
+  return data
 }
 export function courseImageImportFeedback(result) {
   const unknown = new Set((result.recognized || []).filter(row => !row.startTime || !row.endTime)
@@ -10,7 +25,8 @@ export function courseImageImportFeedback(result) {
   const nameReview = (result.warnings || []).some(note => /名称|符号/.test(note))
   const practiceReview = (result.warnings || []).some(note => /第11—12节仅实践专周/.test(note))
   const notes = [unknownTimes ? `${unknownTimes}门课钟点待核对` : '', nameReview ? '部分名称请核对' : '', practiceReview ? '11—12节仅实践专周，请核对' : ''].filter(Boolean)
-  return { unknownTimes, nameReview, message: `已导入${result.importedRows}门课 · 第${result.week}周${notes.length ? '；' + notes.join('，') : ''}` }
+  const title = Array.isArray(result.weeks) ? `已导入${result.importedRows}项 · ${result.weeks.length}周` : `已导入${result.importedRows}门课 · 第${result.week}周`
+  return { unknownTimes, nameReview, message: `${title}${notes.length ? '；' + notes.join('，') : ''}` }
 }
 const single=(value,max)=>value==null?'':typeof value==='string'&&value.length<=max&&!/[\r\n\0]/.test(value)?value:(()=>{throw new Error('图片识别响应异常，未覆盖已有内容')})()
 const integer=(value,max)=>value==null?'':Number.isInteger(value)&&value>=1&&value<=max?String(value):(()=>{throw new Error('图片识别数值异常，未覆盖已有内容')})()

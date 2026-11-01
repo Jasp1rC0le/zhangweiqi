@@ -7,6 +7,11 @@ export function takeCourseFile(input) {
   if (input) input.value = ''
   return file
 }
+export function takeCourseFiles(input) {
+  const files = Array.from(input?.files || [])
+  if (input) input.value = ''
+  return files
+}
 
 function cancelled() {
   const error = new Error('文件读取已取消')

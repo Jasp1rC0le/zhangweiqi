@@ -52,4 +52,26 @@ class CourseImageImportPersistenceTest {
         assertThat(actual.courses()).filteredOn(c->c.name().equals("其他周原课程")).singleElement().satisfies(c->assertThat(c.weeks()).containsExactly(8,10));
         assertThat(saved.recognized().get(0).startTime()).isEqualTo("08:30");assertThat(saved.recognized().get(1).startTime()).isEqualTo("18:20");assertThat(saved.recognized().get(1).endTime()).isEqualTo("19:55");
     }
+    @Test void aBatchWritesOneRevisionAndMergesOnlyItsExplicitWeeks(){
+        schedules.save(7L,new Input(0,"合成学期",LocalDate.of(2026,9,7),7,List.of(new Course("保留课程",3,null,null,List.of(8,10,11),"测试教室",3,4))));
+        when(ocr.recognizeBatch(eq(7L),anyList())).thenReturn(List.of(CourseImageBatchImportTest.page(9,CourseImageBatchImportTest.row(9,"合成课程",9,10)),CourseImageBatchImportTest.page(10,CourseImageBatchImportTest.row(10,"合成课程",9,10))));
+        var result=importer.importImages(7,1,List.of(new byte[]{1},new byte[]{2}));var actual=schedules.get(7L).schedule();
+        assertThat(result.importedRows()).isEqualTo(2);assertThat(actual.revision()).isEqualTo(2);
+        assertThat(actual.courses()).filteredOn(c->c.name().equals("保留课程")).singleElement().satisfies(c->assertThat(c.weeks()).containsExactly(8,11));
+        assertThat(actual.courses()).filteredOn(c->c.name().equals("合成课程")).singleElement().satisfies(c->assertThat(c.weeks()).containsExactly(9,10));
+    }
+    @Test void conflictInALaterWeekRollsBackTheEntireBatchBeforeAnySave(){
+        schedules.save(7L,new Input(0,"合成学期",LocalDate.of(2026,9,7),7,List.of(new Course("原课程",3,null,null,List.of(8,9,10),"测试教室",3,4))));
+        var before=schedules.get(7L).schedule();
+        when(ocr.recognizeBatch(eq(7L),anyList())).thenReturn(List.of(CourseImageBatchImportTest.page(9,CourseImageBatchImportTest.row(9,"合成课程",1,2)),CourseImageBatchImportTest.page(10,CourseImageBatchImportTest.row(10,"冲突甲",1,2),CourseImageBatchImportTest.row(10,"冲突乙",2,3))));
+        assertThatThrownBy(()->importer.importImages(7,1,List.of(new byte[]{1},new byte[]{2}))).hasMessageContaining("整批未保存");
+        assertThat(schedules.get(7L).schedule()).isEqualTo(before);assertThat(db.queryForObject("SELECT revision FROM student_course_schedule_versions WHERE user_id=7",Integer.class)).isEqualTo(1);
+    }
+    @Test void aSessionRevokedDuringOcrCannotCommitEvenWhenTheAccountAndRevisionStillMatch(){
+        schedules.save(7L,new Input(0,"合成学期",LocalDate.of(2026,9,7),7,List.of(new Course("原课程",3,null,null,List.of(8,9,10),"测试教室",3,4))));
+        var before=schedules.get(7L).schedule();var active=new java.util.concurrent.atomic.AtomicBoolean(true);
+        when(ocr.recognizeBatch(eq(7L),anyList())).thenAnswer(call->{active.set(false);return List.of(CourseImageBatchImportTest.page(9,CourseImageBatchImportTest.row(9,"合成课程",1,2)));});
+        assertThatThrownBy(()->importer.importImages(7,1,List.of(new byte[]{1}),active::get)).hasMessageContaining("登录状态已变化");
+        assertThat(schedules.get(7L).schedule()).isEqualTo(before);assertThat(db.queryForObject("SELECT revision FROM student_course_schedule_versions WHERE user_id=7",Integer.class)).isEqualTo(1);
+    }
 }

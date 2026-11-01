@@ -21,3 +21,7 @@ Constraints: no school password, no public knowledge publishing, no OCR/model tr
 ## Finish evidence 2026-10-11
 
 Two screenshot batches: empty desktop/mobile, then synthetic saved desktop/mobile. Latest captures in `.impeccable/review/desktop.png` and `mobile.png` are synthetic and do not expose a student timetable. Reviewer disposition: fix (empty steps hid the form; saved mobile schedule started too low). Main-agent changes made steps and form concurrent, compacted mobile heading/metadata and moved checking guidance below the schedule. Normal application DOM confirms the inline empty form; final mobile changes were not recaptured after the two-round limit. Do not mark ship or claim final mobile visual acceptance. DESIGN.md and `.impeccable/design.json` document inherited Campthink rules.
+
+## Current increment 2026-11-01: batch import
+
+Mode remains Operate. Preserve the Campthink workspace and its main page title. The import form contains action buttons, core missing metadata only when required, and real progress/error/results. Remove the repeated form heading, large image picker, preview image, confirmation list and tutorial paragraphs. Multi-image import validates the whole batch before one private, revision-protected save; never replace a failed batch with a partial success. Source/functional evidence and remaining visual limits are recorded in `docs/timetable-batch-import-2026-11-01.md`; no new rendered-device acceptance is claimed.

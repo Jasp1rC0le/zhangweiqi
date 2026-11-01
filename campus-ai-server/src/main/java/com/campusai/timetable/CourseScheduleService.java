@@ -44,9 +44,14 @@ public class CourseScheduleService {
     }
     @Transactional
     public State saveImported(Long userId,Input input,long expectedSchool) {
+        return saveImported(userId,input,expectedSchool,()->true);
+    }
+    @Transactional
+    public State saveImported(Long userId,Input input,long expectedSchool,java.util.function.BooleanSupplier session) {
         // Hold the account authorization row through the revision-protected image commit.
         if(jdbc.queryForList("SELECT id FROM users WHERE id=? AND school_id=? AND status=1 FOR UPDATE",Long.class,userId,expectedSchool).isEmpty())
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,"账号或学校已变化，未导入课表");
+        if(!session.getAsBoolean())throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,"登录状态已变化，整批未保存");
         return saveInternal(userId,input,false,"课表截图自动导入");
     }
     @Transactional

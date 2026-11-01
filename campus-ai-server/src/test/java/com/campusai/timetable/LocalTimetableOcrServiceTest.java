@@ -45,4 +45,21 @@ class LocalTimetableOcrServiceTest {
             release.countDown();assertEquals(2,first.get(5,TimeUnit.SECONDS).rows().size());assertEquals(2,service.recognize(8,picture).rows().size());
         }finally{release.countDown();pool.shutdownNow();}
     }
+    @Test @Timeout(10) void batchKeepsItsCpuSlotAcrossAllPicturesAndDoesNotAcceptAnInterleavedUpload()throws Exception{
+        var secondEntered=new CountDownLatch(1);var release=new CountDownLatch(1);var reads=new java.util.concurrent.atomic.AtomicInteger();
+        when(users.findById(8L)).thenReturn(user(1));
+        when(engine.read(any(),anyLong())).thenAnswer(call->{if(reads.incrementAndGet()==2){secondEntered.countDown();assertTrue(release.await(5,TimeUnit.SECONDS));}return SchoolTimetableImageParserTest.lines();});
+        var pool=Executors.newSingleThreadExecutor();
+        try{
+            var batch=pool.submit(()->service.recognizeBatch(7,List.of(picture,picture)));assertTrue(secondEntered.await(5,TimeUnit.SECONDS));
+            assertEquals(429,assertThrows(ResponseStatusException.class,()->service.recognize(8,picture)).getStatusCode().value());
+            release.countDown();assertEquals(2,batch.get(5,TimeUnit.SECONDS).size());assertEquals(2,service.recognize(8,picture).rows().size());
+        }finally{release.countDown();pool.shutdownNow();}
+    }
+    @Test void batchBoundsAndInvalidLaterPicturesReleaseTheSlotWithoutCallingAnExternalEngine(){
+        assertEquals(400,assertThrows(ResponseStatusException.class,()->service.recognizeBatch(7,List.of())).getStatusCode().value());
+        assertEquals(400,assertThrows(ResponseStatusException.class,()->service.recognizeBatch(7,Collections.nCopies(21,picture))).getStatusCode().value());
+        assertThrows(ResponseStatusException.class,()->service.recognizeBatch(7,List.of(picture,new byte[]{1,2,3})));
+        assertEquals(2,service.recognize(7,picture).rows().size());
+    }
 }

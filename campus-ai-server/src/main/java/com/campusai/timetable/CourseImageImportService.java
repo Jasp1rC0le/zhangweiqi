@@ -16,6 +16,8 @@ public class CourseImageImportService {
     public CourseImageImportService(LocalTimetableOcrService ocr,CourseScheduleService schedules,UserMapper users,@Value("${app.timetable.bell-school-id:1}") long bellSchool){this.ocr=ocr;this.schedules=schedules;this.users=users;this.bellSchool=bellSchool;}
     public record TimedRow(String name,int weekday,int startPeriod,int endPeriod,String startTime,String endTime,String room,String teacher){}
     public record Result(Snapshot schedule,int importedRows,int week,boolean keptOtherWeeks,String bellVersion,List<TimedRow> recognized,List<String> warnings){}
+    public record BatchTimedRow(int week,String name,int weekday,int startPeriod,int endPeriod,String startTime,String endTime,String room,String teacher){}
+    public record BatchResult(Snapshot schedule,int importedRows,int week,List<Integer> weeks,int imageCount,int duplicateImages,boolean keptOtherWeeks,String bellVersion,List<BatchTimedRow> recognized,List<String> warnings){}
     public Result importImage(long owner,int revision,byte[] bytes){
         if(revision<0||revision>1000000)throw error(400,"课表版本无效，请重新读取");
         long school=school(owner);if(school!=bellSchool)throw error(422,"本校作息尚未配置，未自动保存");
@@ -42,6 +44,56 @@ public class CourseImageImportService {
         var saved=schedules.saveImported(owner,input,school).schedule();
         warnings.addAll(parsed.warnings());
         return new Result(saved,unique.size(),parsed.week(),sameTerm,CampusBellSchedule.VERSION,List.copyOf(timed),warnings.stream().distinct().limit(20).toList());
+    }
+    public BatchResult importImages(long owner,int revision,List<byte[]> pictures){
+        return importImages(owner,revision,pictures,()->true);
+    }
+    public BatchResult importImages(long owner,int revision,List<byte[]> pictures,java.util.function.BooleanSupplier session){
+        if(!session.getAsBoolean())throw error(401,"登录状态已变化，整批未保存");
+        if(revision<0||revision>1000000)throw error(400,"课表版本无效，请刷新");
+        long school=school(owner);if(school!=bellSchool)throw error(422,"本校作息尚未配置");
+        Snapshot before=schedules.get(owner).schedule();if(revision!=(before==null?0:before.revision()))throw error(409,"课表已更新，请刷新后再导入");
+        LocalTimetableOcrService.validatePictures(pictures);
+        var images=new ArrayList<byte[]>();var hashes=new HashSet<String>();
+        for(var image:pictures)if(hashes.add(ScheduleFileWriter.hash(image)))images.add(image);
+        var parsed=ocr.recognizeBatch(owner,List.copyOf(images));if(school(owner)!=school)throw error(403,"账号学校已变化，整批未保存");
+        if(parsed.size()!=images.size())throw error(422,"识别回执不完整，整批未保存");
+        LocalDate monday=null;String semester=null;var byWeek=new TreeMap<Integer,List<Course>>();var warnings=new ArrayList<String>();
+        for(int index=0;index<parsed.size();index++){
+            var page=parsed.get(index);LocalDate first;
+            try{first=LocalDate.parse(page.firstMonday());}catch(Exception failure){throw error(422,"第"+(index+1)+"张日期未读清，整批未保存");}
+            if(page.week()==null||page.week()<1||page.week()>30||page.semester()==null||page.semester().isBlank()||page.rows()==null||page.rows().isEmpty()||page.rows().size()>120)
+                throw error(422,"第"+(index+1)+"张学期、周次或课程未读清，整批未保存");
+            if(monday==null){monday=first;semester=page.semester();}
+            else if(!monday.equals(first)||!semester.equals(page.semester()))throw error(422,"图片不属于同一学期，整批未保存");
+            var courses=byWeek.computeIfAbsent(page.week(),key->new ArrayList<>());
+            for(var row:page.rows()){
+                if(row==null||row.startPeriod()==null||row.endPeriod()==null||row.startPeriod()<1||row.endPeriod()>16||row.endPeriod()<row.startPeriod()||!List.of(page.week()).equals(row.weeks()))
+                    throw error(422,"第"+(index+1)+"张节次或周次不明确，整批未保存");
+                courses.add(new Course(row.name(),row.weekday(),null,null,List.of(page.week()),row.room(),row.startPeriod(),row.endPeriod(),row.teacher()));
+            }
+            if(page.warnings()!=null)warnings.addAll(page.warnings().stream().filter(w->!w.startsWith("只识别截图明确的第")).toList());
+        }
+        boolean same=before!=null&&before.firstMonday().equals(monday);Snapshot combined=before;
+        var recognized=new ArrayList<BatchTimedRow>();int imported=0;
+        for(var entry:byWeek.entrySet()){
+            var normalized=CourseScheduleService.validate(new Input(revision,semester,monday,before==null?7:before.remindDays(),entry.getValue().stream().distinct().toList()));
+            for(int i=0;i<normalized.size();i++)for(int j=i+1;j<normalized.size();j++){
+                var a=normalized.get(i);var b=normalized.get(j);
+                if(a.weekday()==b.weekday()&&a.startPeriod()<=b.endPeriod()&&b.startPeriod()<=a.endPeriod())throw error(422,"第"+entry.getKey()+"周课程冲突，整批未保存");
+            }
+            for(var course:normalized){
+                var span=CampusBellSchedule.span(course.startPeriod(),course.endPeriod());
+                recognized.add(new BatchTimedRow(entry.getKey(),course.name(),course.weekday(),course.startPeriod(),course.endPeriod(),span==null?null:span.start(),span==null?null:span.end(),course.room(),course.teacher()));
+                if(span==null)warnings.add("第"+course.startPeriod()+"—"+course.endPeriod()+"节钟点待核对");
+                if(course.startPeriod()<=12&&course.endPeriod()>=11)warnings.add("第11—12节仅实践专周，请核对特殊连堂时间");
+            }
+            imported+=normalized.size();
+            combined=new Snapshot(revision,same?before.semester():semester,monday,before==null?7:before.remindDays(),merge(combined,normalized,monday,entry.getKey()),java.time.Instant.EPOCH,java.time.Instant.EPOCH);
+        }
+        var saved=schedules.saveImported(owner,new Input(revision,combined.semester(),monday,combined.remindDays(),combined.courses()),school,session).schedule();
+        var weeks=List.copyOf(byWeek.keySet());
+        return new BatchResult(saved,imported,weeks.get(0),weeks,images.size(),pictures.size()-images.size(),same,CampusBellSchedule.VERSION,List.copyOf(recognized),warnings.stream().distinct().limit(20).toList());
     }
     static List<Course> merge(Snapshot before,List<Course> incoming,LocalDate monday,int week){
         boolean same=before!=null&&before.firstMonday().equals(monday);var all=new ArrayList<Course>();
