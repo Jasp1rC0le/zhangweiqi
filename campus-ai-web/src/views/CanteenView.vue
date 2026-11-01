@@ -567,9 +567,9 @@ button:disabled { cursor: default; opacity: .55; }
 .table-review-toggle[aria-expanded='true'] .el-icon { transform: rotate(90deg); }
 .table-save-score, .table-comment-footer button, .table-empty button { min-height: 44px; padding: 8px 16px; border: 0; border-radius: 12px; background: var(--menu-accent); color: #fff; font-size: 14px; }
 .table-save-score:hover:not(:disabled), .table-comment-footer button:hover:not(:disabled) { background: #853913; }
-.table-featured { display: flex; align-items: center; gap: 8px; margin: 12px 0 0; padding-top: 8px; border-top: 1px solid var(--menu-line); }
-.table-featured-tag { flex: none; font-size: 12px; color: var(--menu-accent); }
-.table-featured p { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; flex: 1; overflow: hidden; margin: 0; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.table-featured { display: flex; align-items: center; min-width: 0; gap: 10px; margin: 12px 0 0; padding: 4px 12px; border-top: 1px solid var(--menu-line); }
+.table-featured-tag { flex: none; font-size: 12px; font-weight: 500; line-height: 1.4; color: var(--menu-accent); }
+.table-featured p { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; flex: 1; min-width: 0; overflow: hidden; margin: 0; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
 .table-card--expanded .table-featured p { display: block; -webkit-line-clamp: unset; overflow: visible; }
 .table-featured button, .merchant-review-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 44px; min-height: 44px; padding: 4px 8px; border: 0; border-radius: 8px; background: transparent; color: var(--menu-muted); font-size: 13px; }
 .table-featured button[aria-pressed='true'], .merchant-review-actions button[aria-pressed='true'] { background: var(--menu-soft); color: var(--menu-accent); }

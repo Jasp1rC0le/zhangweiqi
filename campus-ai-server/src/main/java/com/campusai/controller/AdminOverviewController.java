@@ -44,7 +44,7 @@ public class AdminOverviewController {
                         + "AND NOT EXISTS (SELECT 1 FROM ai_feedback_resolutions resolution "
                         + "WHERE resolution.feedback_id = feedback.id "
                         + "AND resolution.resolved_at >= feedback.updated_at)", schoolId),
-                count("SELECT COUNT(*) FROM contact_messages WHERE status = 'NEW'"),
+                count("SELECT COUNT(*) FROM contact_messages WHERE school_id = ? AND status = 'NEW'", schoolId),
                 count("SELECT COUNT(*) FROM knowledge_documents "
                         + "WHERE school_id = ? AND status = 'PUBLISHED' "
                         + "AND (effective_at IS NULL OR effective_at <= NOW()) "

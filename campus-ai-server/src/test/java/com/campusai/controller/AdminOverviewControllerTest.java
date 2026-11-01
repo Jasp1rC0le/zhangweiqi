@@ -48,11 +48,11 @@ class AdminOverviewControllerTest {
         var overview = controller.overview(1L, "ADMIN");
 
         assertThat(overview.pendingSubmissions()).isEqualTo(3);
-        assertThat(overview.openContactMessages()).isEqualTo(5);
+        assertThat(overview.openContactMessages()).isEqualTo(3);
         assertThat(overview.recentModelTokens()).isEqualTo(3);
         assertThat(overview.pendingEmployerCandidates()).isEqualTo(3);
         assertThat(overview.pendingBackgroundJobs()).isEqualTo(3);
         assertThat(overview.failedBackgroundJobs()).isEqualTo(3);
-        verify(jdbc, times(8)).queryForObject(anyString(), eq(Long.class), eq(2L));
+        verify(jdbc, times(9)).queryForObject(anyString(), eq(Long.class), eq(2L));
     }
 }

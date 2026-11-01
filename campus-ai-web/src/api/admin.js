@@ -69,6 +69,10 @@ export async function getAdminOverview() {
   return response.data
 }
 
+export async function getWebsiteStatistics(days = 7, options = {}) {
+  return (await http.get('/api/admin/website-statistics', { ...options, params: { days } })).data
+}
+
 export async function getFailedBackgroundJobs() {
   const response = await http.get('/api/admin/background-jobs', { params: { status: 'FAILED' } })
   return response.data

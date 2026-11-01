@@ -4,6 +4,7 @@ import { useRoute,useRouter } from 'vue-router'
 import CampMark from '@/components/CampMark.vue'
 import TeachingIdentityPanel from '@/components/TeachingIdentityPanel.vue'
 import OperationsCockpit from '@/components/OperationsCockpit.vue'
+import WebsiteStatistics from '@/components/WebsiteStatistics.vue'
 import { ElMessage } from 'element-plus'
 import { isSessionExpired, userSessionGeneration } from '@/api/http'
 import {
@@ -980,6 +981,7 @@ async function exitAdmin() {
           <button type="button" @click="refreshOverview()">重试</button>
         </div>
         <template v-else>
+          <WebsiteStatistics :owner="editorOwner" @navigate="activeTab = $event" />
           <OperationsCockpit :overview="overview" :actions="overviewActions" :usage="modelUsage"
             :usage-unavailable="usageLoadFailed" :failed-details-available="!sectionErrors.jobs && failedBackgroundJobs.length > 0" @navigate="activeTab = $event" />
           <section class="overview-section failed-jobs" aria-labelledby="failed-jobs-title">
