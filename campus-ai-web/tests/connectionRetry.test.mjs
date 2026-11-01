@@ -1,3 +1,4 @@
+import { createAccountActionFlow } from '../src/utils/accountActionFlow.js'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {readFileSync} from 'node:fs'
@@ -53,10 +54,18 @@ test('retry rejects external, malformed, public and unknown destinations', () =>
   assert.equal(workspaceRetryTarget('/timetable', () => { throw new Error('resolver failure') }), '/chat')
 })
 
-test('account recovery owns one inline error state, not a stale global toast', () => {
+test('account recovery owns one inline error state, not a stale global toast', async () => {
   const view = readFileSync(new URL('../src/views/AccountActionView.vue', import.meta.url), 'utf8')
   assert.doesNotMatch(view, /ElMessage|closeAll/)
   assert.match(view, /<p v-if="errorText" class="error" role="alert">/)
-  assert.match(view, /async function submit\(\)\s*\{\s*errorText\.value = ''/)
+  const state = {}, form = {}
+  let finish
+  const flow = createAccountActionFlow({ mode: () => 'forgot-password', state, form, request: () => new Promise(resolve => { finish = resolve }) })
+  await flow.initialize()
+  form.username = 'synthetic'; form.email = 'synthetic@example.test'; state.errorText = 'old error'
+  const pending = flow.submit()
+  assert.equal(state.errorText, '')
+  finish(); await pending
+  assert.equal(state.done, true)
   assert.match(view, /<template v-else-if="!done">/)
 })

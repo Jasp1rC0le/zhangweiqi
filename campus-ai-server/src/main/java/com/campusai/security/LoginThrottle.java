@@ -37,6 +37,12 @@ public class LoginThrottle {
         increment("recovery-account:" + identifier.trim().toLowerCase(Locale.ROOT), 5);
     }
 
+    public void checkAccountChange(String action,Long userId,HttpServletRequest request) {
+        String remote=request.getRemoteAddr()==null?"unknown":request.getRemoteAddr();
+        increment("account-change-ip:"+action+":"+remote,300);
+        increment("account-change-user:"+action+":"+userId,5);
+    }
+
     public void checkPublic(String action, int maximum, HttpServletRequest request) {
         String remote = request.getRemoteAddr() == null ? "unknown" : request.getRemoteAddr();
         increment("public:" + action + ":" + remote, maximum);

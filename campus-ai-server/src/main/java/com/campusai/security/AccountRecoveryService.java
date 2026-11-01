@@ -117,9 +117,7 @@ public class AccountRecoveryService {
 
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public void resetPassword(String token, String newPassword) {
-        if (newPassword == null || newPassword.length() < 6 || newPassword.length() > 72) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "密码须为6至72个字符");
-        }
+        AccountPasswordPolicy.validateNew(newPassword);
         TokenRow row = consume(token, "RESET_PASSWORD");
         // Legacy links without a bound recipient fail closed and must be requested again.
         if (row.pendingEmail() == null || !row.pendingEmail().equals(lockedVerifiedEmail(row.userId()))) throw invalid();

@@ -23,12 +23,15 @@ class AuthSessionServiceTest {
             Base64.getEncoder().encodeToString("0123456789abcdef0123456789abcdef".getBytes()), 900000);
     private final AuthSessionService service = new AuthSessionService(jdbc, users, jwt, 30);
 
+    private User activeUser() {
+        User user=new User();user.setId(7L);user.setUsername("student");user.setRole("STUDENT");user.setSchoolId(1L);user.setStatus(1);user.setPasswordHash("synthetic-stored-hash");
+        when(jdbc.queryForList("SELECT id FROM users WHERE id=? AND status=1 FOR UPDATE",Long.class,7L)).thenReturn(List.of(7L));
+        when(users.findById(7L)).thenReturn(user);return user;
+    }
+
     @Test
     void issuesRefreshTokenWithoutStoringItsPlaintext() {
-        User user = new User();
-        user.setId(7L);
-        user.setUsername("student");
-        user.setRole("STUDENT");
+        User user = activeUser();
 
         var issued = service.issue(user);
 
@@ -40,16 +43,22 @@ class AuthSessionServiceTest {
 
     @Test
     void logoutCanRevokeSessionEvenWhenRefreshCookieIsMissing() {
-        User user = new User();
-        user.setId(7L);
-        user.setUsername("student");
-        user.setRole("STUDENT");
+        User user = activeUser();
         var issued = service.issue(user);
         String sessionId = jwt.parseToken(issued.accessToken()).get("sid", String.class);
 
         service.revokeAccessToken("Bearer " + issued.accessToken());
 
         verify(jdbc).update(contains("WHERE id = ? AND user_id = ?"), eq(sessionId), eq(7L));
+    }
+
+    @Test void stalePasswordOrRoleSnapshotCannotCreateANewSessionAfterAChange() {
+        User snapshot=activeUser();User latest=new User();latest.setId(7L);latest.setStatus(1);latest.setSchoolId(1L);latest.setRole("STUDENT");latest.setPasswordHash("synthetic-new-hash");
+        when(users.findById(7L)).thenReturn(latest);
+        assertThatThrownBy(()->service.issue(snapshot)).hasMessageContaining("登录会话已失效");
+        latest.setPasswordHash(snapshot.getPasswordHash());latest.setRole("ADMIN");
+        assertThatThrownBy(()->service.issue(snapshot)).hasMessageContaining("登录会话已失效");
+        verify(jdbc,never()).update(contains("INSERT INTO auth_sessions"),any(),any(),any(),any());
     }
 
     @Test

@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Isolation;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -41,7 +42,16 @@ public class AuthSessionService {
         this.refreshDays = refreshDays;
     }
 
+    @Transactional(isolation=Isolation.READ_COMMITTED)
     public IssuedSession issue(User user) {
+        if(user==null || user.getId()==null || user.getPasswordHash()==null
+                || jdbc.queryForList("SELECT id FROM users WHERE id=? AND status=1 FOR UPDATE",Long.class,user.getId()).isEmpty())throw invalid();
+        User latest=users.findById(user.getId());
+        if(latest==null || !Integer.valueOf(1).equals(latest.getStatus())
+                || !java.util.Objects.equals(latest.getPasswordHash(),user.getPasswordHash())
+                || !java.util.Objects.equals(latest.getRole(),user.getRole())
+                || !java.util.Objects.equals(latest.getSchoolId(),user.getSchoolId()))throw invalid();
+        user=latest;
         String id = UUID.randomUUID().toString();
         String refresh = newRefreshToken();
         jdbc.update("INSERT INTO auth_sessions (id, user_id, refresh_hash, expires_at) VALUES (?, ?, ?, ?)",

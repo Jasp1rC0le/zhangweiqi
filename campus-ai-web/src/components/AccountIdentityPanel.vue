@@ -4,13 +4,14 @@ import { useAuthStore } from '@/stores/auth'
 import { isAdministrator } from '@/utils/adminAccess'
 import { IDENTITY_ROLES } from '@/utils/teachingIdentity'
 
+const props = defineProps({ blocked: Boolean })
 const auth = useAuthStore()
 const displayName = computed(() => auth.user?.nickname || auth.user?.username || '我的账户')
 const avatarLetter = computed(() => Array.from(displayName.value)[0]?.toLocaleUpperCase() || '我')
 const busy = ref(false), checked = ref(false), error = ref(''), updated = ref('')
 const roleLabel = computed(() => ({ ...IDENTITY_ROLES, ADMIN: '学校管理员', STUDENT: '校园用户' })[auth.user?.role] || '待核验')
 async function verify() {
-  if (busy.value) return
+  if (busy.value || props.blocked) return
   busy.value = true; error.value = ''; checked.value = false
   try {
     await auth.loadCurrentUser()
@@ -20,6 +21,7 @@ async function verify() {
   finally { busy.value = false }
 }
 onMounted(verify)
+defineExpose({ busy })
 </script>
 
 <template>
@@ -32,7 +34,7 @@ onMounted(verify)
     </div>
     <div class="identity-actions">
       <RouterLink v-if="checked && isAdministrator(auth.user)" to="/admin" class="identity-admin-link">管理后台</RouterLink>
-      <button type="button" :disabled="busy" @click="verify">{{ busy ? '核验中…' : '刷新身份' }}</button>
+      <button type="button" :disabled="busy || blocked" @click="verify">{{ busy ? '核验中…' : '刷新身份' }}</button>
     </div>
     <p v-if="error" class="identity-error" role="alert">{{ error }}</p>
   </section>

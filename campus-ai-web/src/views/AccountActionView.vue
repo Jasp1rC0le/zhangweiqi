@@ -1,55 +1,27 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, reactive, toRefs, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import http from '@/api/http'
 import CampMark from '@/components/CampMark.vue'
 import { Check, Lock } from '@element-plus/icons-vue'
+import { createAccountActionFlow, scrubAccountActionHistory } from '@/utils/accountActionFlow'
+import { useUnsavedChanges } from '@/utils/useUnsavedChanges'
 
 const route = useRoute()
 const mode = computed(() => route.name)
-const token = ref('')
-const busy = ref(false)
-const done = ref(false)
-const errorText = ref('')
+const state = reactive({ token: '', busy: false, done: false, errorText: '' })
+const { token, busy, done, errorText } = toRefs(state)
 const form = reactive({ username: '', email: '', password: '', confirm: '' })
-
-onMounted(async () => {
+const flow = createAccountActionFlow({ mode: () => mode.value, state, form, request: (url, body, options) => http.post(url, body, options) })
+watch(() => route.fullPath, () => {
   const params = new URLSearchParams(window.location.hash.replace(/^#/, ''))
-  token.value = params.get('token') || ''
-  if (token.value) window.history.replaceState(window.history.state, '', window.location.pathname)
-  if (mode.value === 'verify-email') {
-    if (!token.value) return (errorText.value = '验证链接缺少凭据，请重新申请')
-    busy.value = true
-    try {
-      await http.post('/api/auth/email/verify', { token: token.value })
-      done.value = true
-    } catch (error) {
-      errorText.value = error.response?.data?.message || '验证链接无效或已过期'
-    } finally { busy.value = false }
-  }
-})
-
-async function submit() {
-  errorText.value = ''
-  if (mode.value === 'reset-password' && form.password !== form.confirm) {
-    return (errorText.value = '两次输入的密码不一致')
-  }
-  busy.value = true
-  try {
-    if (mode.value === 'forgot-password') {
-      await http.post('/api/auth/password-reset/request', {
-        username: form.username.trim(), email: form.email.trim(),
-      })
-    } else {
-      await http.post('/api/auth/password-reset/confirm', { token: token.value, password: form.password })
-      form.password = ''
-      form.confirm = ''
-    }
-    done.value = true
-  } catch (error) {
-    errorText.value = error.response?.data?.message || '操作失败，请稍后再试'
-  } finally { busy.value = false }
-}
+  const value = params.get('token') || ''
+  if (value) window.history.replaceState(scrubAccountActionHistory(window.history.state, window.location.pathname, window.location.origin), '', window.location.pathname)
+  void flow.initialize(value)
+}, { immediate: true, flush: 'sync' })
+const submit = () => flow.submit()
+useUnsavedChanges(() => !done.value && Boolean(form.username || form.email || form.password || form.confirm), () => busy.value)
+onBeforeUnmount(() => flow.dispose())
 </script>
 
 <template>
@@ -60,7 +32,7 @@ async function submit() {
       <h1>{{ mode === 'verify-email' ? '验证邮箱' : mode === 'reset-password' ? '设置新密码' : '找回密码' }}</h1>
       <p v-if="done" class="description">
         {{ mode === 'verify-email' ? '邮箱验证成功，现在可以用于找回密码。' :
-          mode === 'reset-password' ? '密码已更新，其他设备的登录会话也已退出。' :
+          mode === 'reset-password' ? '密码已更新，请使用新密码登录。旧会话与链接已失效。' :
           '若用户名与已验证邮箱匹配，我们会发送重置链接。请检查收件箱。' }}
       </p>
       <p v-else-if="mode === 'verify-email'" class="description" :role="errorText ? 'alert' : 'status'">{{ busy ? '正在验证…' : errorText }}</p>
@@ -73,16 +45,16 @@ async function submit() {
           '填写用户名和已验证的邮箱，我们会发送一次性重置链接。' : '新密码至少 6 个字符。' }}</p>
         <form @submit.prevent="submit">
           <template v-if="mode === 'forgot-password'">
-            <label for="recovery-username">用户名</label>
-            <input id="recovery-username" v-model="form.username" autocomplete="username" required />
+            <label for="recovery-username">登录账号</label>
+            <input id="recovery-username" v-model="form.username" autocomplete="username" maxlength="50" :disabled="busy" required />
             <label for="recovery-email">已验证邮箱</label>
-            <input id="recovery-email" v-model="form.email" type="email" autocomplete="email" required />
+            <input id="recovery-email" v-model="form.email" type="email" autocomplete="email" maxlength="254" :disabled="busy" required />
           </template>
           <template v-else>
             <label for="new-password">新密码</label>
-            <input id="new-password" v-model="form.password" type="password" autocomplete="new-password" required minlength="6" maxlength="72" />
+            <input id="new-password" v-model="form.password" type="password" autocomplete="new-password" required minlength="6" maxlength="72" :disabled="busy" />
             <label for="confirm-password">再次输入新密码</label>
-            <input id="confirm-password" v-model="form.confirm" type="password" autocomplete="new-password" required minlength="6" maxlength="72" />
+            <input id="confirm-password" v-model="form.confirm" type="password" autocomplete="new-password" required minlength="6" maxlength="72" :disabled="busy" />
           </template>
           <p v-if="errorText" class="error" role="alert">{{ errorText }}</p>
           <button type="submit" :disabled="busy || (mode === 'reset-password' && !token)">
@@ -90,7 +62,8 @@ async function submit() {
           </button>
         </form>
       </template>
-      <RouterLink to="/login" class="return-link">返回登录 →</RouterLink>
+      <button v-if="done && mode === 'forgot-password'" type="button" class="edit-recovery" @click="flow.edit">重新填写</button>
+      <RouterLink to="/login?reauth=1" class="return-link">返回登录 →</RouterLink>
     </section>
   </main>
 </template>

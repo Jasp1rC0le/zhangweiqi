@@ -29,6 +29,11 @@ class AccountRecoveryServiceTest {
     @SuppressWarnings("unchecked")
     private final ObjectProvider<JavaMailSender> provider = mock(ObjectProvider.class);
 
+    @Test void overlongUtf8ResetPasswordIsRejectedBeforeConsumingAOneTimeLink() {
+        assertThatThrownBy(()->configured().resetPassword("opaque-token","密".repeat(25))).hasMessageContaining("密码过长");
+        verifyNoInteractions(jdbc,users,passwords);
+    }
+
     @Test
     void refusesToClaimMailWasSentWhenSmtpIsNotConfigured() {
         var service = new AccountRecoveryService(jdbc, users, passwords, provider,

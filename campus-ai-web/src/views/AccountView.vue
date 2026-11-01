@@ -6,6 +6,7 @@ import http,{userSessionGeneration} from '@/api/http'
 import { useAuthStore } from '@/stores/auth'
 import TokenActivityPanel from '@/components/TokenActivityPanel.vue'
 import AccountIdentityPanel from '@/components/AccountIdentityPanel.vue'
+import AccountCredentials from '@/components/AccountCredentials.vue'
 import TeachingIdentityPanel from '@/components/TeachingIdentityPanel.vue'
 import ProductUpdates from '@/components/ProductUpdates.vue'
 import { wasRouteFailureHandled } from '@/utils/routeRecovery'
@@ -17,7 +18,7 @@ import { createAccountLifecycle } from '@/utils/accountLifecycle'
 import { createLatestRequest } from '@/utils/latestRequest'
 
 const router = useRouter()
-const route=useRoute(),identityPanel=ref(),updatesPanel=ref(),accountRoot=ref()
+const route=useRoute(),identityPanel=ref(),updatesPanel=ref(),accountRoot=ref(),credentialsPanel=ref(),accountIdentityPanel=ref()
 let focusDisposed=false
 const auth = useAuthStore()
 const owner = computed(() => auth.user ? `${auth.user.id}:${auth.user.schoolId}:${userSessionGeneration.value}` : '')
@@ -32,7 +33,8 @@ const exportBusy = ref(false), emailLoading = ref(true), emailError = ref('')
 const emailStatus = ref(''), emailSubmitError = ref(''), deletionError = ref('')
 const accountDeleted = ref(false)
 const sessions = ref([]), sessionsLoading = ref(false), revokeBusy = ref(false), sessionsError = ref(''), sessionsStatus = ref('')
-const accountBusy = computed(() => profileBusy.value || busy.value || deleteBusy.value || revokeBusy.value || confirming.value)
+const externalAccountBusy = computed(() => profileBusy.value || busy.value || deleteBusy.value || revokeBusy.value || exportBusy.value || confirming.value || Boolean(accountIdentityPanel.value?.busy))
+const accountBusy = computed(() => externalAccountBusy.value || Boolean(credentialsPanel.value?.busy))
 const sessionsBusy = computed(() => sessionsLoading.value || accountBusy.value)
 const sessionDate = value => new Date(value).toLocaleString('zh-CN', { hour12: false })
 const sessionsReader = createLatestRequest({
@@ -62,9 +64,20 @@ const deletion = reactive({ password: '' })
 const profile = reactive({ major: '', grade: '', skillsText: '', careerDirection: '', bio: '' })
 const checkpoint = createDraftCheckpoint(() => profile)
 useUnsavedChanges(
-  () => !accountDeleted.value && (checkpoint.isDirty() || Boolean(emailForm.email || emailForm.password || deletion.password)),
+  () => !accountDeleted.value && (checkpoint.isDirty() || Boolean(emailForm.email || emailForm.password || deletion.password) || Boolean(credentialsPanel.value?.dirty)),
   () => !accountDeleted.value && accountBusy.value,
 )
+
+function applyNickname(result) {
+  if (!focusDisposed && result.owner === owner.value && auth.user) auth.user.nickname = result.nickname
+}
+async function finishPasswordChange(principal) {
+  if (focusDisposed || principal !== owner.value) return
+  auth.clearLocalSession()
+  ElMessage.success('密码已更新，请重新登录')
+  try { await router.replace('/login?reauth=1') }
+  catch (error) { if (!wasRouteFailureHandled(error)) ElMessage.error('密码已更新，请返回登录页重新登录') }
+}
 
 const profileReader = createLatestRequest({
   load: options => http.get('/api/account/profile', options),
@@ -178,7 +191,7 @@ async function focusAccountWorkflow() {
     catch (error) { if (!wasRouteFailureHandled(error)) ElMessage.error('校园资料暂未打开，请重试') }
     return
   }
-  if (!['#personal','#security','#sessions','#my-data','#close-account','#token-activity','#teaching-identity','#product-updates'].includes(hash)) return
+  if (!['#personal','#security','#password-security','#sessions','#my-data','#close-account','#token-activity','#teaching-identity','#product-updates'].includes(hash)) return
   await nextTick()
   if (focusDisposed || owner.value !== current || route.hash !== hash) return
   const target = accountRoot.value?.querySelector(hash)
@@ -211,7 +224,10 @@ onMounted(focusAccountWorkflow)
         <RouterLink to="/privacy" class="privacy-link">隐私说明</RouterLink>
       </header>
 
-      <AccountIdentityPanel />
+      <AccountIdentityPanel ref="accountIdentityPanel" :blocked="accountBusy" />
+      <AccountCredentials ref="credentialsPanel" :owner="owner" :nickname="auth.user?.nickname || ''" :blocked="externalAccountBusy"
+        :other-dirty="checkpoint.isDirty() || Boolean(emailForm.email || emailForm.password || deletion.password)"
+        :verified-email="verifiedEmail" :email-known="!emailLoading && !emailError" @nickname-saved="applyNickname" @password-changed="finishPasswordChange" />
 
       <section id="personal" class="account-card account-profile" aria-labelledby="personal-title">
         <div class="account-section-heading"><h2 id="personal-title">个人资料</h2><span>选填</span></div>
@@ -305,6 +321,9 @@ fieldset { border:0; padding:0; margin:0; min-width:0; }
 :global(html:root body .workspace-page .account-page--profile .identity-actions button),
 :global(html:root body .workspace-page .account-page--profile .identity-admin-link) { min-height:44px; margin:0; padding:8px 12px; border:0; border-radius:10px; font-size:13px; background:#e8f0fd; color:#245b9e; }
 :global(html:root body .workspace-page .account-page--profile .account-card) { min-width:0; padding:0; margin:0; border:0; border-bottom:1px solid var(--assistant-line,#e2e7ec); border-radius:0; box-shadow:none; background:transparent; }
+:global(html:root body .workspace-page .account-page--profile .account-card.account-credentials) { padding:22px 0; }
+:global(html:root body .workspace-page .account-page--profile .account-card.account-credentials .nickname-form > p) { margin:0; }
+:global(html:root body .workspace-page .account-page--profile .account-card.account-credentials p) { margin:0; }
 :global(html:root body .workspace-page .account-page--profile .account-profile) { padding:28px 0; }
 .account-section-heading { display:flex; align-items:baseline; gap:10px; margin-bottom:20px; }
 :global(html:root body .workspace-page .account-page--profile .account-section-heading h2),
