@@ -5,7 +5,7 @@ import {
   canteenMerchantPhotoUrl,
   getCanteens,
   getCanteenMerchants,
-  getCanteenMerchantReviews,
+  getCanteenMerchantReviewPage,
   rateCanteenMerchant,
   likeCanteenReview,
   reportCanteenReview,
@@ -14,7 +14,8 @@ import { useAuthStore } from '@/stores/auth'
 import CanteenFoodArt from '@/components/CanteenFoodArt.vue'
 import MerchantPhotoViewer from '@/components/MerchantPhotoViewer.vue'
 import { merchantCategories, inMerchantCategory, merchantPlaceLabel, orderCanteens, canteenFilterLabel } from '@/utils/merchantCategories'
-import { selectMerchants } from '@/utils/merchantList'
+import { selectMerchants, snapshotMerchantRanking } from '@/utils/merchantList'
+import { captureMerchantPosition } from '@/utils/merchantPosition'
 import { createLatestRequest } from '@/utils/latestRequest'
 import { useUnsavedChanges } from '@/utils/useUnsavedChanges'
 import { userSessionGeneration } from '@/api/http'
@@ -27,6 +28,7 @@ defineProps({ demo: Boolean })
 const auth = useAuthStore()
 const canteens = ref([])
 const merchants = ref([])
+const rankingSnapshot = ref(new Map())
 const orderedCanteens = computed(() => orderCanteens(canteens.value))
 const canteenCounts = computed(() => merchants.value.reduce((counts, merchant) => {
   counts[merchant.canteenId] = (counts[merchant.canteenId] || 0) + 1
@@ -47,6 +49,7 @@ const photoShapes = reactive({}), photoFailures = reactive({})
 const reviews = reactive({})
 const reviewErrors = reactive({})
 const reviewLoading = reactive({})
+const ownReviews = reactive({}), reviewPages = reactive({})
 const comments = reactive({})
 const savedScores = reactive({}), savedComments = reactive({})
 const actionErrors = reactive({}), actionStatus = reactive({})
@@ -57,13 +60,14 @@ const scope = computed(() => auth.user ? `${auth.user.id}:${auth.user.schoolId}:
 let disposed = false, lifetime = new AbortController()
 const reviewRequests = new Map()
 const searchQuery = ref('')
-const sortBy = ref('default')
+const sortBy = ref('popular')
 const canRate = computed(() => ['STUDENT','TEACHER','COUNSELOR','SECRETARY','ADMIN'].includes(auth.user?.role))
 const visibleMerchants = computed(() =>
   selectMerchants(merchants.value, {
     canteen: selectedCanteen.value,
     query: searchQuery.value,
     sort: sortBy.value,
+    ranking: rankingSnapshot.value,
   }).filter(merchant => inMerchantCategory(merchant, selectedCategory.value)),
 )
 function animateCatalogChange() {
@@ -97,22 +101,25 @@ function applyMerchants(rows) {
 const listRequest = createLatestRequest({
   load: options => Promise.all([getCanteens(options), getCanteenMerchants(options)]),
   onStart: () => { loading.value = true; loadError.value = ''; photoMerchant.value = null },
-  onSuccess: ([places, rows]) => { canteens.value = places; applyMerchants(rows) },
+  onSuccess: ([places, rows]) => { canteens.value = places; rankingSnapshot.value = snapshotMerchantRanking(rows); applyMerchants(rows) },
   onError: error => { loadError.value = error.response?.data?.message || '暂时无法读取食堂信息，请稍后重试' },
   onFinish: () => { loading.value = false },
 })
 function load() {
   if (!disposed && scope.value && !writeBusy.value) return listRequest.run()
 }
-function applyReviews(id, rows) {
-  reviews[id] = rows
-  const comment = rows.find(item => item.mine)?.comment || ''
+function applyReviews(id, page) {
+  const combined = page.offset ? [...(reviews[id] || []), ...page.items] : page.items
+  reviews[id] = Array.from(new Map(combined.map(review => [review.id, review])).values())
+  ownReviews[id] = page.mine
+  reviewPages[id] = { nextOffset: page.nextOffset, total: page.total, hasMore: page.hasMore }
+  const comment = page.mine?.comment || ''
   comments[id] = reconcileCanteenDraft(comments[id], savedComments[id], comment)
   savedComments[id] = comment
 }
 function reviewRequest(id) {
   if (!reviewRequests.has(id)) reviewRequests.set(id, createLatestRequest({
-    load: options => getCanteenMerchantReviews(id, options),
+    load: (offset, options) => getCanteenMerchantReviewPage(id, offset, options),
     onStart: () => { reviewLoading[id] = true; reviewErrors[id] = '' },
     onSuccess: rows => applyReviews(id, rows),
     onError: error => { reviewErrors[id] = error.response?.data?.message || '短评未能读取，请重试；未保存的填写仍在本页' },
@@ -121,7 +128,12 @@ function reviewRequest(id) {
   return reviewRequests.get(id)
 }
 function readReviews(merchant) {
-  if (!disposed && scope.value && !writeBusy.value && !reviewLoading[merchant.id]) return reviewRequest(merchant.id).run()
+  if (!disposed && scope.value && !writeBusy.value && !reviewLoading[merchant.id]) return reviewRequest(merchant.id).run(0)
+}
+function moreReviews(merchant) {
+  const page = reviewPages[merchant.id]
+  if (!disposed && scope.value && !writeBusy.value && !reviewLoading[merchant.id] && page?.hasMore)
+    return reviewRequest(merchant.id).run(page.nextOffset)
 }
 
 function toggleReviews(merchant) {
@@ -143,6 +155,7 @@ async function submitRating(merchant, includeComment = false) {
   const owner = scope.value, score = ratingDrafts[merchant.id]
   const comment = includeComment ? (comments[merchant.id] || '').trim() : undefined
   const current = () => !disposed && owner === scope.value
+  const position = captureMerchantPosition(catalogRoot.value, merchant.id, window, lifetime.signal)
   savingId.value = merchant.id
   actionErrors[merchant.id] = ''; actionStatus[merchant.id] = ''
   reviewRequest(merchant.id).cancel()
@@ -154,29 +167,31 @@ async function submitRating(merchant, includeComment = false) {
     if (includeComment) { comments[merchant.id] = comment; savedComments[merchant.id] = comment }
     actionStatus[merchant.id] = includeComment ? comment ? '评价已保存' : '评分已保存，短评已清空' : '评分已保存'
     if (expandedId.value === merchant.id) {
-      await reviewRequest(merchant.id).run()
-      const mine=reviews[merchant.id]?.find(item=>item.mine)
+      await reviewRequest(merchant.id).run(0)
+      const mine=ownReviews[merchant.id]
       if (current() && includeComment && comment && mine && !reviewErrors[merchant.id]) actionStatus[merchant.id]=mine.status==='PUBLISHED'?'评价已发布':'评价已保存，当前未公开'
     }
   } catch (error) {
     if (current()) actionErrors[merchant.id] = error.response?.data?.message || '未能确认保存成功，评分与短评仍保留在本页，请重试'
   } finally {
-    if (current()) savingId.value = null
+    try {
+      if (current()) { savingId.value = null; await nextTick(); if (current()) position.restore() }
+    } finally { position.dispose() }
   }
 }
 
 async function likeReview(merchant, review) {
   if (writeBusy.value || loading.value || review.mine || !canRate.value || disposed) return
   const owner = scope.value, current = () => !disposed && owner === scope.value
+  const position = captureMerchantPosition(catalogRoot.value, merchant.id, window, lifetime.signal)
   likingId.value = review.id
   actionErrors[merchant.id] = ''; actionStatus[merchant.id] = ''
   reviewRequest(merchant.id).cancel()
   try {
-    const rows = await likeCanteenReview(merchant.id, review.id, !review.liked, { signal: lifetime.signal })
+    const confirmed = await likeCanteenReview(merchant.id, review.id, !review.liked, { signal: lifetime.signal })
     if (!current()) return
-    applyReviews(merchant.id, rows)
-    const confirmed = reviews[merchant.id].find((item) => item.id === review.id)
-    if (confirmed && merchant.featuredReview?.id === review.id)
+    if (reviews[merchant.id]) reviews[merchant.id] = reviews[merchant.id].map(item => item.id === confirmed.id ? confirmed : item)
+    if (merchant.featuredReview?.id === review.id)
       Object.assign(merchant.featuredReview, confirmed)
     try {
       const next = await getCanteenMerchants({ signal: lifetime.signal })
@@ -187,7 +202,9 @@ async function likeReview(merchant, review) {
   } catch (error) {
     if (current()) actionErrors[merchant.id] = error.response?.data?.message || '未能确认点赞状态，请重试'
   } finally {
-    if (current()) likingId.value = null
+    try {
+      if (current()) { likingId.value = null; await nextTick(); if (current()) position.restore() }
+    } finally { position.dispose() }
   }
 }
 
@@ -207,10 +224,10 @@ watch(scope, (next, previous) => {
   lifetime.abort(); lifetime = new AbortController(); listRequest.cancel()
   for (const request of reviewRequests.values()) request.dispose()
   reviewRequests.clear()
-  for (const values of [ratingDrafts, comments, savedScores, savedComments, reviews, reviewLoading, reviewErrors, actionErrors, actionStatus, photoShapes, photoFailures]) {
+  for (const values of [ratingDrafts, comments, savedScores, savedComments, reviews, ownReviews, reviewPages, reviewLoading, reviewErrors, actionErrors, actionStatus, photoShapes, photoFailures]) {
     for (const key of Object.keys(values)) delete values[key]
   }
-  merchants.value = []; canteens.value = []; expandedId.value = null
+  merchants.value = []; rankingSnapshot.value = new Map(); canteens.value = []; expandedId.value = null
   photoMerchant.value = null
   selectedCategory.value = 'all'
   savingId.value = null; likingId.value = null
@@ -268,9 +285,8 @@ onMounted(async () => {
               aria-label="搜索商家"
           /></label>
           <select v-model="sortBy" aria-label="商家排序">
-            <option value="default">综合推荐</option>
-            <option value="rating">评分最高</option>
             <option value="popular">评分人数最多</option>
+            <option value="rating">评分最高</option>
           </select>
         </div>
         <nav v-if="merchants.length && canteens.length > 1" class="table-filters" aria-label="选择食堂">
@@ -319,6 +335,7 @@ onMounted(async () => {
           <article
             v-for="merchant in visibleMerchants"
             :key="merchant.id"
+            :data-merchant-id="merchant.id"
             class="table-card"
             :class="{ 'table-card--wide': merchant.hasPhoto && (photoShapes[merchant.id] || merchantPhotoShape(canteenMerchantPhotoUrl(merchant.id))) === 'wide', 'table-card--expanded': expandedId === merchant.id }"
             :aria-label="merchant.name"
@@ -384,6 +401,7 @@ onMounted(async () => {
               </div>
               <button
                 class="table-review-toggle"
+                :disabled="writeBusy"
                 :aria-expanded="expandedId === merchant.id"
                 :aria-controls="'reviews-' + merchant.id"
                 @click="toggleReviews(merchant)"
@@ -402,12 +420,12 @@ onMounted(async () => {
                 class="table-reviews"
                 aria-label="短评与评分"
               >
-                <p v-if="reviewLoading[merchant.id]" role="status">正在读取短评…</p>
-                <div v-else-if="reviewErrors[merchant.id]" role="alert">
+                <p v-if="reviewLoading[merchant.id] && !reviews[merchant.id]" role="status">正在读取短评…</p>
+                <div v-if="reviewErrors[merchant.id]" role="alert">
                   {{ reviewErrors[merchant.id] }}
                   <button class="table-text-button" @click="readReviews(merchant)">重试</button>
                 </div>
-                <template v-else>
+                <template v-if="reviews[merchant.id]">
                   <form
                     v-if="canRate"
                     class="table-comment-form"
@@ -425,7 +443,7 @@ onMounted(async () => {
                       :disabled="writeBusy"
                     />
                     <div class="table-comment-meta">
-                      <span v-if="savedComments[merchant.id] && comments[merchant.id] !== savedComments[merchant.id] && reviews[merchant.id]?.some(review => review.mine && review.likes > 0)">修改后旧点赞将清空</span>
+                      <span v-if="savedComments[merchant.id] && comments[merchant.id] !== savedComments[merchant.id] && ownReviews[merchant.id]?.likes > 0">修改后旧点赞将清空</span>
                       <span v-if="comments[merchant.id]?.length">{{ comments[merchant.id].length }}/500</span>
                     </div>
                     <div class="table-comment-footer">
@@ -435,6 +453,9 @@ onMounted(async () => {
                       </button>
                     </div>
                   </form>
+                  <div v-if="ownReviews[merchant.id] && ownReviews[merchant.id].status !== 'PUBLISHED'" class="table-review">
+                    <div><strong>我<span>{{ ownReviews[merchant.id].score }} 分</span></strong><p>{{ ownReviews[merchant.id].comment }}</p><small>未公开，仅你可见</small></div>
+                  </div>
                   <div v-for="review in reviews[merchant.id]" :key="review.id" class="table-review">
                     <div>
                       <strong
@@ -459,8 +480,9 @@ onMounted(async () => {
                     <form v-if="reportingReview===review.id" class="merchant-report-form" @submit.prevent="reportReview(merchant,review)"><label>举报原因<select v-model="reportReason" :disabled="writeBusy"><option v-for="reason in ['隐私泄露','辱骂攻击','广告诈骗','内容不实','其他问题']" :key="reason">{{reason}}</option></select></label><button type="submit" :disabled="writeBusy">提交举报</button><button type="button" :disabled="writeBusy" @click="reportingReview=null">取消</button></form>
                   </div>
                   <small v-if="reviews[merchant.id]?.length" class="table-review-limit"
-                    >最近20条 · 我的评价优先</small
+                    >点赞优先</small
                   >
+                  <button v-if="reviewPages[merchant.id]?.hasMore" type="button" class="table-text-button table-more-reviews" :disabled="writeBusy || reviewLoading[merchant.id]" @click="moreReviews(merchant)">{{ reviewLoading[merchant.id] ? '加载中…' : '更多短评' }}</button>
                   <p v-if="!canRate" class="review-account-note">当前账号仅可查看评价。</p>
 
                 </template>
@@ -471,8 +493,7 @@ onMounted(async () => {
         <details class="table-rules">
           <summary>评分规则</summary>
           <p>
-            每个本校账号对一家商家只计一条评分，可以修改。综合推荐使用 5 票、3.5
-            分的先验平滑，降低少量评分冲榜的影响；展示分数仍是真实评分均值。神评仅从公开的短评中按点赞数选出，同赞时展示较新的一条，无赞时显示“同学说”。点赞不影响商家星级。
+            每个本校账号对一家商家只计一条评分，可以修改。默认按评分人数排序，刷新后更新位置。短评与神评按点赞数优先，点赞不影响商家星级。
           </p>
           <p>
             短评不公开账号和姓名；自动检查通过直接公开，管理员可根据举报下架。点击评价旁的“举报”可提交问题。手机号等明显敏感信息会被拦截，但规则无法识别所有隐私，发布前请自行核对。
@@ -575,6 +596,7 @@ button:disabled { cursor: default; opacity: .55; }
 .merchant-report-form select { max-width: 100%; min-height: 44px; padding: 8px; border: 1px solid var(--menu-line); border-radius: 8px; font-size: 16px; }
 .merchant-report-form button { min-height: 44px; padding: 8px 12px; border: 0; border-radius: 8px; background: var(--menu-soft); color: var(--menu-accent); }
 .table-review-empty, .table-review-limit, .review-account-note { display: block; margin: 12px 0 0; color: var(--menu-muted); font-size: 12px; }
+.table-more-reviews { min-height: 44px; margin-top: 8px; }
 .table-rules { margin-top: 20px; color: var(--menu-muted); font-size: 13px; line-height: 1.7; }
 .table-rules summary { min-height: 44px; align-content: center; cursor: pointer; }
 .table-rules p { margin: 0 0 12px; max-width: 70ch; }

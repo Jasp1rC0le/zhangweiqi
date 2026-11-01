@@ -14,8 +14,12 @@ export async function getCanteenMerchantReviews(id, options = {}) {
   return (await http.get(`/api/canteens/merchants/${id}/reviews`, options)).data
 }
 
+export async function getCanteenMerchantReviewPage(id, offset = 0, options = {}) {
+  return (await http.get(`/api/canteens/merchants/${id}/reviews/page`, { ...options, params: { offset } })).data
+}
+
 export async function likeCanteenReview(merchantId, reviewId, liked, options = {}) {
-  return (await http.put(`/api/canteens/merchants/${merchantId}/reviews/${reviewId}/like`, { liked }, options)).data
+  return (await http.put(`/api/canteens/merchants/${merchantId}/reviews/${reviewId}/reaction`, { liked }, options)).data
 }
 
 export async function reportCanteenReview(merchantId, reviewId, reason, options = {}) {

@@ -22,13 +22,38 @@ class CanteenControllerTest {
         assertThatThrownBy(()->controller.like(7L,1L,2L,new CanteenService.LikeInput(true))).hasMessageContaining("401");
         user("STUDENT",0);
         assertThatThrownBy(()->controller.rate(7L,1L,new CanteenService.RatingInput(5,null))).hasMessageContaining("401");
+        assertThatThrownBy(()->controller.react(7L,1L,2L,new CanteenService.LikeInput(true))).hasMessageContaining("401");
+        assertThatThrownBy(()->controller.reviewPage(7L,1L,0)).hasMessageContaining("401");
         verifyNoInteractions(service,throttle);
     }
     @Test void unknownRolesCannotVote() {
         user("UNKNOWN",1);
         assertThatThrownBy(()->controller.like(7L,1L,2L,new CanteenService.LikeInput(true))).hasMessageContaining("403");
         assertThatThrownBy(()->controller.rate(7L,1L,new CanteenService.RatingInput(5,null))).hasMessageContaining("403");
+        assertThatThrownBy(()->controller.react(7L,1L,2L,new CanteenService.LikeInput(true))).hasMessageContaining("403");
         verifyNoInteractions(service,throttle);
+    }
+    @Test void newReviewReadsAndReactionsUseServerScopeAndCannotBeSharedCached() {
+        user("STUDENT",1);
+        assertThat(controller.reviewPage(7L,1L,20).getHeaders().getCacheControl()).isEqualTo("no-store");
+        assertThat(controller.react(7L,1L,2L,new CanteenService.LikeInput(true)).getHeaders().getCacheControl()).isEqualTo("no-store");
+        verify(service).reviewPage(12L,7L,1L,20);verify(service).react(12L,7L,1L,2L,true);verify(throttle).check(7L);
+    }
+    @Test void pagedReviewAndReactionHttpRoutesKeepTheirJsonContracts() throws Exception {
+        user("STUDENT",1);
+        var review=new CanteenService.PublicReview(2L,4,"合成公开短评",java.time.LocalDateTime.of(2026,11,1,12,0),false,"PUBLISHED",3,true);
+        when(service.reviewPage(12L,7L,1L,20)).thenReturn(new CanteenService.ReviewPage(java.util.List.of(review),null,21,20,21,false));
+        when(service.react(12L,7L,1L,2L,true)).thenReturn(review);
+        var mvc=org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(controller).build();
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/canteens/merchants/1/reviews/page?offset=20").requestAttr("currentUserId",7L))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.items[0].comment").value("合成公开短评"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.nextOffset").value(21))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.hasMore").value(false));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/canteens/merchants/1/reviews/2/reaction").requestAttr("currentUserId",7L).contentType("application/json").content("{\"liked\":true}"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.likes").value(3))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.liked").value(true));
     }
     @Test void activeCampusRolesMaySubmitButStillUseOwnSchoolAndUser() {
         for (String role : java.util.List.of("ADMIN", "TEACHER", "COUNSELOR", "SECRETARY")) {

@@ -13,6 +13,7 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
@@ -39,6 +40,8 @@ public class CanteenService {
     public record FeaturedReview(Long id, String comment, long likes, boolean liked, boolean mine) {}
     public record PublicReview(Long id, int score, String comment, LocalDateTime updatedAt,
                                boolean mine, String status, long likes, boolean liked) {}
+    public record ReviewPage(List<PublicReview> items, PublicReview mine, long total,
+                             int offset, int nextOffset, boolean hasMore) {}
     public record LikeInput(@NotNull Boolean liked) {}
     public record AdminReview(Long id, Long merchantId, String merchantName, int score,
                               String comment, String status, LocalDateTime updatedAt, long reportCount) {
@@ -77,15 +80,13 @@ public class CanteenService {
                 + "FROM campus_canteen_merchants m "
                 + "JOIN campus_canteens c ON c.id = m.canteen_id AND c.school_id = m.school_id "
                 + "LEFT JOIN (SELECT merchant_id, COUNT(*) AS rating_count, "
-                + "SUM(score) AS score_sum, ROUND(AVG(score), 1) AS average_score FROM campus_merchant_ratings "
+                + "ROUND(AVG(score), 1) AS average_score FROM campus_merchant_ratings "
                 + "GROUP BY merchant_id) stats ON stats.merchant_id = m.id "
                 + "LEFT JOIN campus_merchant_ratings mine ON mine.merchant_id = m.id "
                 + "AND mine.user_id = ? "
                 + "WHERE m.school_id = ? AND m.status = 'PUBLISHED' "
                 + "AND c.status = 'PUBLISHED' "
-                + "ORDER BY CASE WHEN stats.rating_count IS NULL THEN 1 ELSE 0 END, "
-                + "(stats.score_sum + 17.5) / (stats.rating_count + 5) DESC, "
-                + "stats.rating_count DESC, m.id",
+                + "ORDER BY COALESCE(stats.rating_count,0) DESC, stats.average_score DESC, m.id",
                 (rs, rowNum) -> new PublicMerchant(rs.getLong("id"), rs.getLong("canteen_id"),
                         rs.getString("canteen_name"), rs.getString("name"),
                         rs.getString("location"), rs.getString("description"),
@@ -101,7 +102,7 @@ public class CanteenService {
         jdbc.query("SELECT ranked.* FROM (SELECT r.id, r.merchant_id, r.comment_text, r.user_id, "
                 + "COALESCE(v.likes,0) AS likes, EXISTS(SELECT 1 FROM campus_review_likes mine "
                 + "WHERE mine.review_id=r.id AND mine.user_id=?) AS liked, "
-                + "ROW_NUMBER() OVER(PARTITION BY r.merchant_id ORDER BY COALESCE(v.likes,0) DESC,r.id DESC) AS rn "
+                + "ROW_NUMBER() OVER(PARTITION BY r.merchant_id ORDER BY COALESCE(v.likes,0) DESC,r.updated_at DESC,r.id DESC) AS rn "
                 + "FROM campus_merchant_reviews r JOIN campus_canteen_merchants m ON m.id=r.merchant_id "
                 + "JOIN campus_canteens c ON c.id=m.canteen_id "
                 + "LEFT JOIN (SELECT review_id,COUNT(*) AS likes FROM campus_review_likes GROUP BY review_id) v ON v.review_id=r.id "
@@ -166,11 +167,40 @@ public class CanteenService {
                 + "AND rating.user_id = review.user_id "
                 + "WHERE review.school_id = ? AND review.merchant_id = ? "
                 + "AND (review.status = 'PUBLISHED' OR review.user_id = ?) "
-                + "ORDER BY mine DESC, review.updated_at DESC, likes DESC, review.id DESC LIMIT 20",
+                + "ORDER BY mine DESC, likes DESC, review.updated_at DESC, review.id DESC LIMIT 20",
                 (rs, rowNum) -> new PublicReview(rs.getLong("id"), rs.getInt("score"),
                         rs.getString("comment_text"), rs.getTimestamp("updated_at").toLocalDateTime(),
                         rs.getBoolean("mine"), rs.getString("status"), rs.getLong("likes"), rs.getBoolean("liked")),
                 userId, userId, schoolId, merchantId, userId);
+    }
+
+    private static final String REVIEW_SELECT = "SELECT review.id, rating.score, review.comment_text, "
+            + "review.updated_at, review.user_id = ? AS mine, review.status, "
+            + "(SELECT COUNT(*) FROM campus_review_likes v WHERE v.review_id=review.id) AS likes, "
+            + "EXISTS(SELECT 1 FROM campus_review_likes v WHERE v.review_id=review.id AND v.user_id=?) AS liked "
+            + "FROM campus_merchant_reviews review JOIN campus_merchant_ratings rating "
+            + "ON rating.merchant_id=review.merchant_id AND rating.user_id=review.user_id ";
+    private static final RowMapper<PublicReview> REVIEW_ROW = (rs,n) -> new PublicReview(rs.getLong("id"),rs.getInt("score"),
+            rs.getString("comment_text"),rs.getTimestamp("updated_at").toLocalDateTime(),rs.getBoolean("mine"),
+            rs.getString("status"),rs.getLong("likes"),rs.getBoolean("liked"));
+
+    @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
+    public ReviewPage reviewPage(Long schoolId,Long userId,Long merchantId,int offset) {
+        if(offset<0 || offset>Integer.MAX_VALUE-20)throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"短评分页位置无效");
+        requirePublishedMerchant(schoolId,merchantId);
+        long total=jdbc.queryForObject("SELECT COUNT(*) FROM campus_merchant_reviews review JOIN campus_merchant_ratings rating ON rating.merchant_id=review.merchant_id AND rating.user_id=review.user_id WHERE review.school_id=? AND review.merchant_id=? AND review.status='PUBLISHED'",Long.class,schoolId,merchantId);
+        var items=jdbc.query(REVIEW_SELECT+"WHERE review.school_id=? AND review.merchant_id=? AND review.status='PUBLISHED' "
+                +"ORDER BY likes DESC,review.updated_at DESC,review.id DESC LIMIT 20 OFFSET ?",REVIEW_ROW,userId,userId,schoolId,merchantId,offset);
+        var own=jdbc.query(REVIEW_SELECT+"WHERE review.school_id=? AND review.merchant_id=? AND review.user_id=?",REVIEW_ROW,userId,userId,schoolId,merchantId,userId);
+        int next=offset+items.size();
+        return new ReviewPage(items,own.isEmpty()?null:own.get(0),total,offset,next,next<total);
+    }
+
+    @Transactional
+    public PublicReview react(Long schoolId,Long userId,Long merchantId,Long reviewId,boolean liked) {
+        like(schoolId,userId,merchantId,reviewId,liked);
+        return jdbc.queryForObject(REVIEW_SELECT+"WHERE review.school_id=? AND review.merchant_id=? AND review.id=? AND review.status='PUBLISHED'",
+                REVIEW_ROW,userId,userId,schoolId,merchantId,reviewId);
     }
 
     @Transactional

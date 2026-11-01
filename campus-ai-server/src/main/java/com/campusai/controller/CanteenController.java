@@ -59,6 +59,23 @@ public class CanteenController {
         return canteens.reviews(currentUser(userId).getSchoolId(), userId, id);
     }
 
+    @GetMapping("/merchants/{id}/reviews/page")
+    public ResponseEntity<CanteenService.ReviewPage> reviewPage(@RequestAttribute("currentUserId") Long userId,
+            @PathVariable Long id,@RequestParam(defaultValue="0") int offset) {
+        User user=currentUser(userId);
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(canteens.reviewPage(user.getSchoolId(),userId,id,offset));
+    }
+
+    @PutMapping("/merchants/{id}/reviews/{reviewId}/reaction")
+    public ResponseEntity<CanteenService.PublicReview> react(@RequestAttribute("currentUserId") Long userId,
+            @PathVariable Long id,@PathVariable Long reviewId,@Valid @RequestBody CanteenService.LikeInput input) {
+        User user=currentUser(userId);
+        if(List.of("STUDENT","TEACHER","COUNSELOR","SECRETARY","ADMIN").stream().noneMatch(role->role.equals(user.getRole())))
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,"当前账户不能参与评价");
+        throttle.check(userId);
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(canteens.react(user.getSchoolId(),userId,id,reviewId,input.liked()));
+    }
+
     @PostMapping("/merchants/{id}/reviews/{reviewId}/report")
     public void report(@RequestAttribute("currentUserId") Long userId, @PathVariable Long id,
                        @PathVariable Long reviewId, @Valid @RequestBody ReportInput input) {

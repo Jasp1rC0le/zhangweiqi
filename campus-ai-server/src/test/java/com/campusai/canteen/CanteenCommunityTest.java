@@ -56,6 +56,43 @@ class CanteenCommunityTest {
         assertThat(service.publishedMerchants(1L,2L)).singleElement().satisfies(m -> {
             assertThat(m.featuredReview()).isNotNull(); assertThat(m.ratingCount()).isEqualTo(1);
         });
+        assertThat(service.reviewPage(1L,2L,1L,0).items()).singleElement().satisfies(r -> {
+            assertThat(r.comment()).isEqualTo("汤热面香"); assertThat(r.mine()).isFalse(); assertThat(r.status()).isEqualTo("PUBLISHED");
+        });
+    }
+    @Test void mostRatedMerchantsLeadEvenWhenAnotherHasAHigherAverage() {
+        jdbc.update("INSERT INTO users VALUES(4)");
+        jdbc.update("INSERT INTO campus_canteen_merchants(id,school_id,canteen_id,name,status) VALUES(3,1,1,'多人评分','PUBLISHED'),(4,1,1,'未评分','PUBLISHED')");
+        service.rate(1L,1L,1L,5); service.rate(1L,2L,3L,1); service.rate(1L,3L,3L,1); service.rate(1L,4L,3L,1);
+        assertThat(service.publishedMerchants(1L,1L)).extracting(CanteenService.PublicMerchant::id).containsExactly(3L,1L,4L);
+    }
+    @Test void publicReviewPagesLeadWithLikesAndExposeEveryPublishedReviewBeyondTwenty() {
+        for(long user=4;user<=30;user++)jdbc.update("INSERT INTO users VALUES(?)",user);
+        for(long user=1;user<=25;user++)service.rate(1L,user,1L,4,"合成短评"+user);
+        long oldest=service.reviewPage(1L,1L,1L,0).mine().id();
+        service.like(1L,26L,1L,oldest,true);service.like(1L,27L,1L,oldest,true);
+        var first=service.reviewPage(1L,29L,1L,0);var second=service.reviewPage(1L,29L,1L,first.nextOffset());
+        assertThat(first.items()).hasSize(20);assertThat(first.items().get(0).id()).isEqualTo(oldest);assertThat(first.items().get(0).likes()).isEqualTo(2);
+        assertThat(first.total()).isEqualTo(25);assertThat(first.hasMore()).isTrue();assertThat(first.mine()).isNull();
+        assertThat(second.items()).hasSize(5);assertThat(second.hasMore()).isFalse();
+        var ids=new java.util.HashSet<Long>();first.items().forEach(r->assertThat(ids.add(r.id())).isTrue());second.items().forEach(r->assertThat(ids.add(r.id())).isTrue());assertThat(ids).hasSize(25);
+        var own=service.reviewPage(1L,3L,1L,0);assertThat(own.mine().comment()).isEqualTo("合成短评3");assertThat(own.items()).noneMatch(r->r.id().equals(own.mine().id()));
+        assertThatThrownBy(()->service.reviewPage(2L,29L,1L,0)).hasMessageContaining("404");
+        assertThatThrownBy(()->service.reviewPage(1L,29L,1L,-1)).hasMessageContaining("400");
+    }
+    @Test void hiddenReviewsStayPrivateAndTheirOwnersDoNotLoseTheirTextWhenPublicPagesChange() {
+        long id=approve();service.reviewStatus(1L,id,"HIDDEN");
+        var author=service.reviewPage(1L,1L,1L,0);var reader=service.reviewPage(1L,2L,1L,0);
+        assertThat(author.items()).isEmpty();assertThat(author.mine().status()).isEqualTo("HIDDEN");
+        assertThat(reader.items()).isEmpty();assertThat(reader.mine()).isNull();assertThat(reader.total()).isZero();
+    }
+    @Test void reactionReadbackHasRealCountsAndDoesNotLeakOneReadersLikeStateToAnother() {
+        long id=approve();var result=service.react(1L,2L,1L,id,true);
+        assertThat(result.id()).isEqualTo(id);assertThat(result.likes()).isEqualTo(1);assertThat(result.liked()).isTrue();
+        var other=service.reviewPage(1L,3L,1L,0).items().get(0);assertThat(other.likes()).isEqualTo(1);assertThat(other.liked()).isFalse();
+        assertThat(service.react(1L,2L,1L,id,false).likes()).isZero();
+        assertThatThrownBy(()->service.react(1L,1L,1L,id,true)).hasMessageContaining("自己的");
+        assertThatThrownBy(()->service.react(2L,2L,1L,id,true)).hasMessageContaining("404");
     }
     @Test void likesAreIdempotentReversibleAndCannotBeSelfOrCrossSchool() {
         long id = approve();
