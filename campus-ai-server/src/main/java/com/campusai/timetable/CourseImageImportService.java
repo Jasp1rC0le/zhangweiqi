@@ -23,12 +23,16 @@ public class CourseImageImportService {
         var parsed=ocr.recognize(owner,bytes);if(school(owner)!=school)throw error(403,"账号学校已变化，未保存");
         LocalDate monday;try{monday=LocalDate.parse(parsed.firstMonday());}catch(Exception e){throw error(422,"截图日期或学期未读完整，请换一张完整截图；未保存");}
         if(parsed.week()==null||parsed.week()<1||parsed.week()>30||parsed.semester()==null||parsed.semester().isBlank()||parsed.rows().isEmpty())throw error(422,"截图周次或课程未读完整，请换一张完整截图；未保存");
-        var incoming=new ArrayList<Course>();var timed=new ArrayList<TimedRow>();
+        var incoming=new ArrayList<Course>();var timed=new ArrayList<TimedRow>();var warnings=new ArrayList<String>();
         for(var row:parsed.rows()){
+            if(row.startPeriod()==null||row.endPeriod()==null||row.startPeriod()<1||row.endPeriod()>16||row.endPeriod()<row.startPeriod())
+                throw error(422,"截图课程节次边界未读清，请使用完整清晰截图；未保存");
+            if(!List.of(parsed.week()).equals(row.weeks()))throw error(422,"截图课程周次与当前周不一致，未保存");
             var span=CampusBellSchedule.span(row.startPeriod(),row.endPeriod());
-            if(span==null||!row.weeks().equals(List.of(parsed.week())))throw error(422,"截图节次无法对应已配置作息，请换一张清晰截图；未保存");
             var c=new Course(row.name(),row.weekday(),null,null,List.of(parsed.week()),row.room(),row.startPeriod(),row.endPeriod(),row.teacher());
-            incoming.add(c);timed.add(new TimedRow(c.name(),c.weekday(),span.startPeriod(),span.endPeriod(),span.start(),span.end(),c.room(),c.teacher()));
+            incoming.add(c);timed.add(new TimedRow(c.name(),c.weekday(),c.startPeriod(),c.endPeriod(),span==null?null:span.start(),span==null?null:span.end(),c.room(),c.teacher()));
+            if(span==null)warnings.add("第"+c.startPeriod()+"—"+c.endPeriod()+"节钟点未配置，已保留节次，请在个人安排核对时间");
+            if(c.startPeriod()<=12&&c.endPeriod()>=11)warnings.add("第11—12节仅实践专周可排课；实践专周连续9—12节若采用21:25下课，需按实际安排核对，未自动套用");
         }
         var unique=incoming.stream().distinct().toList();
         for(int i=0;i<unique.size();i++)for(int j=i+1;j<unique.size();j++){var a=unique.get(i);var b=unique.get(j);if(a.weekday()==b.weekday()&&a.startPeriod()<=b.endPeriod()&&b.startPeriod()<=a.endPeriod())throw error(422,"截图中有重叠课程，未自动保存；请换一张清晰截图");}
@@ -36,7 +40,8 @@ public class CourseImageImportService {
         var combined=merge(before,unique,monday,parsed.week());
         var input=new Input(revision,sameTerm?before.semester():parsed.semester(),monday,before==null?7:before.remindDays(),combined);
         var saved=schedules.saveImported(owner,input,school).schedule();
-        return new Result(saved,unique.size(),parsed.week(),sameTerm,CampusBellSchedule.VERSION,List.copyOf(timed),parsed.warnings());
+        warnings.addAll(parsed.warnings());
+        return new Result(saved,unique.size(),parsed.week(),sameTerm,CampusBellSchedule.VERSION,List.copyOf(timed),warnings.stream().distinct().limit(20).toList());
     }
     static List<Course> merge(Snapshot before,List<Course> incoming,LocalDate monday,int week){
         boolean same=before!=null&&before.firstMonday().equals(monday);var all=new ArrayList<Course>();
@@ -53,7 +58,7 @@ public class CourseImageImportService {
         return List.copyOf(merged.values());
     }
     public List<CampusBellSchedule.Slot> bells(long owner){return school(owner)==bellSchool?CampusBellSchedule.SLOTS:List.of();}
-    private static List<Object> teacherKey(Course c){var span=CampusBellSchedule.span(c.startPeriod(),c.endPeriod());return Arrays.asList(c.name().trim(),c.weekday(),span==null?c.startTime():span.start(),span==null?c.endTime():span.end(),c.room()==null?"":c.room().trim());}
+    private static List<Object> teacherKey(Course c){var span=CampusBellSchedule.span(c.startPeriod(),c.endPeriod());return Arrays.asList(c.name().trim(),c.weekday(),span==null?(c.startPeriod()==null?c.startTime():"period:"+c.startPeriod()):span.start(),span==null?(c.endPeriod()==null?c.endTime():"period:"+c.endPeriod()):span.end(),c.room()==null?"":c.room().trim());}
     private static Course withWeeks(Course c,List<Integer> weeks){return new Course(c.name(),c.weekday(),c.startTime(),c.endTime(),weeks,c.room(),c.startPeriod(),c.endPeriod(),c.teacher());}
     private static List<Object> key(Course c,boolean teacher){return Arrays.asList(c.name().trim(),c.weekday(),c.startTime(),c.endTime(),c.room()==null?"":c.room().trim(),c.startPeriod(),c.endPeriod(),teacher?c.teacher():"");}
     private long school(long id){var user=users.findById(id);if(user==null||!Integer.valueOf(1).equals(user.getStatus())||user.getSchoolId()==null)throw error(403,"账号范围已变化，未保存");return user.getSchoolId();}

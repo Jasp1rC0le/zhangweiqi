@@ -3,6 +3,15 @@ import {mondayOf} from './timetable.js'
 export function courseImageFileIssue(file){
   return !file||!['image/png','image/jpeg'].includes(file.type)||!Number.isSafeInteger(file.size)||file.size<1||file.size>2*1024*1024?'请选择2MB以内的PNG/JPG课表图片；请先裁去姓名、学号等不必要信息':''
 }
+export function courseImageImportFeedback(result) {
+  const unknown = new Set((result.recognized || []).filter(row => !row.startTime || !row.endTime)
+    .map(row => JSON.stringify([row.name, row.weekday, row.startPeriod, row.endPeriod, row.room, row.teacher])))
+  const unknownTimes = unknown.size
+  const nameReview = (result.warnings || []).some(note => /名称|符号/.test(note))
+  const practiceReview = (result.warnings || []).some(note => /第11—12节仅实践专周/.test(note))
+  const notes = [unknownTimes ? `${unknownTimes}门课钟点待核对` : '', nameReview ? '部分名称请核对' : '', practiceReview ? '11—12节仅实践专周，请核对' : ''].filter(Boolean)
+  return { unknownTimes, nameReview, message: `已导入${result.importedRows}门课 · 第${result.week}周${notes.length ? '；' + notes.join('，') : ''}` }
+}
 const single=(value,max)=>value==null?'':typeof value==='string'&&value.length<=max&&!/[\r\n\0]/.test(value)?value:(()=>{throw new Error('图片识别响应异常，未覆盖已有内容')})()
 const integer=(value,max)=>value==null?'':Number.isInteger(value)&&value>=1&&value<=max?String(value):(()=>{throw new Error('图片识别数值异常，未覆盖已有内容')})()
 export function prepareCourseImageResult(data){

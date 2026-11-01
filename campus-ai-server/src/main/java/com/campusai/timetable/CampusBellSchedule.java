@@ -2,19 +2,22 @@ package com.campusai.timetable;
 
 import java.util.List;
 
-/** User supplied 2026-10-14; not inferred from period numbers or advertised as an official feed. */
+/** User supplied screenshots; receipt dates are not document publication dates or a live school feed. */
 public final class CampusBellSchedule {
     private CampusBellSchedule() {}
     public record Slot(int period, String start, String end) {}
     public record Span(int startPeriod, int endPeriod, String start, String end) {}
-    public static final String VERSION = "user-supplied-2026-10-14";
+    public static final String VERSION = "user-supplied-2026-11-01";
+    public static final String SOURCE = "用户于2026-11-01提供作息截图；第11—12节仅实践专周，特殊连堂安排需核对";
     public static final List<Slot> SLOTS = List.of(
             new Slot(1,"08:30","09:15"), new Slot(2,"09:20","10:05"),
             new Slot(3,"10:20","11:05"), new Slot(4,"11:10","11:55"),
             new Slot(5,"14:00","14:45"), new Slot(6,"14:50","15:35"),
-            new Slot(7,"15:50","16:35"), new Slot(8,"16:40","17:25"));
+            new Slot(7,"15:50","16:35"), new Slot(8,"16:40","17:25"),
+            new Slot(9,"18:20","19:05"), new Slot(10,"19:10","19:55"),
+            new Slot(11,"20:00","20:45"), new Slot(12,"20:50","21:35"));
     public static Span span(Integer first,Integer last) {
-        if(first==null || last==null || first<1 || last>8 || last<first) return null;
+        if(first==null || last==null || first<1 || last>SLOTS.size() || last<first) return null;
         return new Span(first,last,SLOTS.get(first-1).start,SLOTS.get(last-1).end);
     }
     public static Span exact(String start,String end) {

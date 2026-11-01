@@ -25,6 +25,7 @@ import CourseWeekGrid from './CourseWeekGrid.vue'
 import PersonalScheduleOperations from './PersonalScheduleOperations.vue'
 import SchoolTimetableGuide from './SchoolTimetableGuide.vue'
 import CourseImageImport from './CourseImageImport.vue'
+import { courseImageImportFeedback } from '@/utils/courseImageRecognition'
 import { parseCourseText, coursesToCsv, describeCourseChanges } from '@/utils/courseImport'
 import { readCourseUpload } from '@/utils/courseUpload'
 import { useTimetableClock } from '@/utils/useTimetableClock'
@@ -358,9 +359,10 @@ async function afterImageImported(result) {
   if(disposed||result.owner!==store.principal)return
   try{if(!store.adopt(result.schedule,result.owner))return}catch{error.value='导入回执尚未核实，请重新读取课表';return}
   fileGeneration++;fileRead?.abort();fileRead=null;editing.value=false;raw.value='';preview.value=null;confirmed.value=false;imagePending.value=false;error.value='';versionConflict.value=false
-  notice.value=`已自动导入${result.importedRows}门课 · 第${result.week}周${result.warnings?.length?'；部分名称可能有误，可在课表修改':''}`
+  const feedback=courseImageImportFeedback(result)
+  notice.value=feedback.message
   const weekdays=result.schedule.courses.filter(c=>c.weeks.includes(result.week)).map(c=>c.weekday)
-  emit('imported',{owner:result.owner,date:addDays(result.schedule.firstMonday,7*(result.week-1)+Math.min(...weekdays)-1),count:result.importedRows,week:result.week,warnings:result.warnings?.length||0})
+  emit('imported',{owner:result.owner,date:addDays(result.schedule.firstMonday,7*(result.week-1)+Math.min(...weekdays)-1),count:result.importedRows,week:result.week,warnings:result.warnings?.length||0,...feedback})
 }
 async function refreshAfterImage(){await store.load(true);if(!store.error)editing.value=false}
 async function save() {

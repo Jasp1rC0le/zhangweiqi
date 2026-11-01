@@ -52,7 +52,7 @@ class ScheduleExportWorkflowTest {
         var r=service.prepare(2,filter("MY","STUDENT","CSV"));f.clock.value=f.clock.value.plusSeconds(301);assertEquals(410,code(()->service.download(2,new ScheduleExportService.Download(r.token()))));
     }
     @Test void unfixedPeriodTimesFailIcsAndPeriodFilteringButRemainHonestInTheOtherFormats()throws Exception{
-        f.context.getBean(CourseScheduleService.class).save(3L,new CourseScheduleService.Input(0,"模拟学期",LocalDate.of(2026,10,12),7,List.of(new CourseScheduleService.Course("未知钟点模拟课",3,null,null,List.of(1),"模拟教室",9,10))));
+        f.context.getBean(CourseScheduleService.class).save(3L,new CourseScheduleService.Input(0,"模拟学期",LocalDate.of(2026,10,12),7,List.of(new CourseScheduleService.Course("未知钟点模拟课",3,null,null,List.of(1),"模拟教室",13,14))));
         var snapshot=source.read(3,filter("PERSONAL","STUDENT","ICS"));assertNull(snapshot.entries().get(0).startTime());assertEquals(400,code(()->{try{writer.write(snapshot,f.clock.instant());}catch(IOException e){throw new UncheckedIOException(e);}}));
         assertTrue(new String(writer.write(source.read(3,filter("PERSONAL","STUDENT","CSV")),f.clock.instant()).bytes(),StandardCharsets.UTF_8).contains("钟点待配置"));
     }

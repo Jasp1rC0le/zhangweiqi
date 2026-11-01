@@ -1,7 +1,7 @@
 <script setup>
 import {onBeforeUnmount,onMounted,ref,watch} from 'vue'
 import {readCourseImageCapability,importCourseImage} from '@/api/courseSchedule'
-import {courseImageFileIssue} from '@/utils/courseImageRecognition'
+import {courseImageFileIssue,courseImageImportFeedback} from '@/utils/courseImageRecognition'
 import {takeCourseFile} from '@/utils/courseFile'
 import NavigationIcon from './NavigationIcon.vue'
 const props=defineProps({scope:String,revision:{type:Number,default:0},disabled:Boolean}),emit=defineEmits(['busy','pending','imported','refresh'])
@@ -20,7 +20,7 @@ function cancel(){generation++;controller?.abort();controller=null;busy.value=fa
 async function recognize(){
   if(props.disabled||busy.value||!file.value||!capability.value?.available||!props.scope)return
   const run=++generation,owner=props.scope,revision=props.revision,c=new AbortController();controller=c;busy.value=true;error.value='';notice.value='正在识别并导入…'
-  try{const {data}=await importCourseImage(file.value,revision,c.signal);if(disposed||run!==generation||owner!==props.scope||c.signal.aborted)return;if(!data?.schedule||!Number.isInteger(data.importedRows)||data.importedRows<1||data.importedRows>120||!Number.isInteger(data.week)||data.week<1||data.week>30)throw new Error('导入回执不完整，请重新读取课表确认');emit('imported',{...data,owner});notice.value=`已导入${data.importedRows}门课 · 第${data.week}周`}
+  try{const {data}=await importCourseImage(file.value,revision,c.signal);if(disposed||run!==generation||owner!==props.scope||c.signal.aborted)return;if(!data?.schedule||!Number.isInteger(data.importedRows)||data.importedRows<1||data.importedRows>120||!Number.isInteger(data.week)||data.week<1||data.week>30)throw new Error('导入回执不完整，请重新读取课表确认');emit('imported',{...data,owner});notice.value=courseImageImportFeedback(data).message}
   catch(e){if(!disposed&&run===generation&&owner===props.scope&&!c.signal.aborted){error.value=e.response?.data?.message||e.response?.data?.detail||e.message||'导入结果尚未确认';notice.value='可重新读取课表查看结果；不会自动重发图片'}}
   finally{if(run===generation){busy.value=false;controller=null}}
 }

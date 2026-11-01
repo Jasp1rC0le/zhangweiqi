@@ -113,7 +113,18 @@ public class CommandLocalOcrEngine implements LocalOcrEngine,AutoCloseable {
             if(colored>image.getWidth()/3.0*0.72){if(first<0)first=y;last=y;}
             else if(first>=0&&y-last>image.getHeight()*0.018)break;
         }
-        if(first>=0&&last-first>25){var crop=image.getSubimage(0,first,image.getWidth(),last-first+1);result.addAll(rescale(tesseract(enhance(crop,true,2),6,deadline,true),2,0,first));}
+        if(first>=0&&last-first>25){var crop=image.getSubimage(0,first,image.getWidth(),last-first+1);result.addAll(rescale(tesseract(enhance(crop,false,3),6,deadline,true),3,0,first));}
+        // A dropdown glyph can merge with a small week number. Re-read the observed
+        // label itself; the parser still requires an explicit, unambiguous 第N周.
+        if(result.stream().noneMatch(l->l.text().replaceAll("\\s+","").matches(".*第\\d{1,2}周.*"))){
+            var week=result.stream().filter(l->l.centerY()<image.getHeight()*.45&&l.text().replaceAll("\\s+","").matches("第[0-9?？]{1,5}周"))
+                    .max(Comparator.comparingDouble(Line::confidence));
+            if(week.isPresent()){
+                var l=week.get();int x=Math.max(0,(int)Math.floor(l.x())-3),y=Math.max(0,(int)Math.floor(l.y())-3);
+                int right=Math.min(image.getWidth(),(int)Math.ceil(l.x()+l.width())+3),bottom=Math.min(image.getHeight(),(int)Math.ceil(l.y()+l.height())+3);
+                result.addAll(rescale(tesseract(enhance(image.getSubimage(x,y,right-x,bottom-y),false,4),7,deadline,true),4,x,y));
+            }
+        }
         var dates=result.stream().filter(l->l.text().matches("\\d{1,2}[-/]\\d{1,2}")).toList();
         if(dates.size()>=5){int y=(int)dates.stream().mapToDouble(Line::y).min().orElse(0),height=(int)dates.stream().mapToDouble(Line::height).max().orElse(24);int top=Math.max(0,y-Math.max(55,image.getHeight()/25)),bottom=Math.min(image.getHeight(),y+height+12);
             if(bottom>top){var crop=image.getSubimage(0,top,image.getWidth(),bottom-top);result.addAll(rescale(tesseract(enhance(crop,false,2),6,deadline,true),2,0,top));}}

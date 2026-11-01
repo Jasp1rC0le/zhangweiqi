@@ -11,7 +11,7 @@ const separators=/^[\s，,；;。！？!?、:：]*$/u
 export function verifiedBellRange(schoolId,start,end){
   if(schoolId!==1)throw new Error('本校作息尚未核定，请提供明确起止钟点')
   const bells=[['08:30','09:15'],['09:20','10:05'],['10:20','11:05'],['11:10','11:55'],['14:00','14:45'],['14:50','15:35'],['15:50','16:35'],['16:40','17:25']],first=bells[start-1],last=bells[end-1]
-  if(!Number.isInteger(start)||!Number.isInteger(end)||end<start||!first||!last)throw new Error('已核定作息仅覆盖第1至8节，其他节次请填写明确钟点')
+  if(!Number.isInteger(start)||!Number.isInteger(end)||end<start||!first||!last)throw new Error('该节次尚无已核定钟点，请填写明确钟点')
   return{startTime:first[0],endTime:last[1]}
 }
 const plain=(value,max)=>{

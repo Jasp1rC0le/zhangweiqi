@@ -44,4 +44,18 @@ class SchoolTimetableImageParserTest {
         var result=parser.finish(h,cards,List.of(new RegionText(0,List.of(),"合成课程川 体育馆"),new RegionText(1,List.of(),"另一课程")));
         assertEquals("合成课程川",result.rows().get(0).name());assertFalse(result.rows().get(0).reviewNote().isBlank());
     }
+    @Test void adjacentWeekdayTokensAreJoinedOnlyWithinTheirActualColumn(){
+        var split=new ArrayList<>(lines());split.removeIf(l->l.text().equals("周四"));
+        split.add(line("周",380,100,16,20));split.add(line("四",400,100,16,20));
+        var parser=new SchoolTimetableImageParser();assertNotNull(parser.header(image(),split));
+        split.removeIf(l->l.text().equals("四"));split.add(line("四",480,100,16,20));
+        assertThrows(RuntimeException.class,()->parser.header(image(),split));
+        assertTrue(SchoolTimetableImageParser.weekdayAnchors(List.of(line("周",20,20,15,20),line("四",40,60,15,20))).isEmpty());
+    }
+    @Test void uncertainWeekDigitsStayUnknownAndConflictingExactWeeksAreNotChosen(){
+        var supplied=new ArrayList<>(lines());supplied.removeIf(l->l.text().equals("第9周"));
+        supplied.add(line("第9?周",350,60,80,20));assertNull(new SchoolTimetableImageParser().header(image(),supplied).week());
+        supplied.add(line("第9周",350,60,80,20));supplied.add(line("第10周",350,60,80,20));
+        assertNull(new SchoolTimetableImageParser().header(image(),supplied).week());
+    }
 }

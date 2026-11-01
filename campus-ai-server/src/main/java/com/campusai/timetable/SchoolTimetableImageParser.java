@@ -20,7 +20,7 @@ public class SchoolTimetableImageParser {
     private static final Pattern WEEK=Pattern.compile("第(\\d{1,2})周");
     private static final Pattern ROOM=Pattern.compile("教学楼|教学馆|工业中心|综合楼|实验楼|体育馆|实验室|机房|教室|操场|[（(]?[A-Z]\\d?座|[A-Z]\\d?[-—]\\d{2,4}");
     public Header header(BufferedImage image,List<Line> lines){
-        List<Line> weekdays=lines.stream().filter(l->weekday(l.text())>0&&l.width()<image.getWidth()*.2).toList();
+        List<Line> weekdays=weekdayAnchors(lines).stream().filter(l->l.width()<image.getWidth()*.2).toList();
         Line[] selected=null;
         for(Line anchor:weekdays){
             Line[] group=new Line[7];
@@ -130,6 +130,21 @@ public class SchoolTimetableImageParser {
         return matches.size()==1?matches.get(0).toString():null;
     }
     private static int weekday(String text){return switch(compact(text)){case"周一"->1;case"周二"->2;case"周三"->3;case"周四"->4;case"周五"->5;case"周六"->6;case"周日","周天"->7;default->0;};}
+    static List<Line> weekdayAnchors(List<Line> lines){
+        var result=new ArrayList<Line>();
+        for(var first:lines){
+            if(weekday(first.text())>0)result.add(first);
+            if(!compact(first.text()).equals("周"))continue;
+            for(var next:lines){
+                if(weekday("周"+compact(next.text()))==0)continue;
+                double gap=next.x()-first.x()-first.width(),height=Math.max(first.height(),next.height());
+                if(gap<0||gap>Math.max(8,first.width()*1.2)||Math.abs(first.centerY()-next.centerY())>height*.5)continue;
+                double top=Math.min(first.y(),next.y()),bottom=Math.max(first.y()+first.height(),next.y()+next.height());
+                result.add(new Line("周"+compact(next.text()),Math.min(first.confidence(),next.confidence()),first.x(),top,next.x()+next.width()-first.x(),bottom-top));
+            }
+        }
+        return List.copyOf(result);
+    }
     private static String compact(String value){return Normalizer.normalize(value==null?"":value,Normalizer.Form.NFKC).replaceAll("\\s+","");}
     private static String normalize(String value){return Normalizer.normalize(value==null?"":value,Normalizer.Form.NFKC).replaceAll("[\\p{Cntrl}]","").replaceAll("\\s+(?=\\p{IsHan})|(?<=\\p{IsHan})\\s+","").replaceAll("\\s*([-()])\\s*","$1").trim();}
     private static String limit(String value,int max){return value.length()>max?value.substring(0,max):value;}

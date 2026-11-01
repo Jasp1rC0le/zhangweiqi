@@ -12,12 +12,12 @@ import {scheduleExportRoute} from '@/utils/scheduleFileIntent'
 const legacy = useTimetableStore()
 const personal = useCourseScheduleStore()
 const importDetails = ref(), importPanel = ref(),scheduleExportPanel=ref(), reminderPanel=ref()
-const importOpen = ref(false),pageHeading=ref(),importReceipt=ref('')
-watch(()=>personal.principal,()=>{importReceipt.value=''},{flush:'sync'})
+const importOpen = ref(false),pageHeading=ref(),importReceipt=ref(''),importUnknownTimes=ref(0)
+watch(()=>personal.principal,()=>{importReceipt.value='';importUnknownTimes.value=0},{flush:'sync'})
 const importAction = ref(false)
 watch(() => importPanel.value?.importing, active => { if (!active) importAction.value = false })
 const route = useRoute(), router = useRouter()
-async function importedImage(value){if(value?.owner!==personal.principal)return;const owner=value.owner;importAction.value=false;importOpen.value=false;if(importDetails.value)importDetails.value.open=false;importReceipt.value=`已导入${value.count}门课 · 第${value.week}周${value.warnings?'；部分名称可能有误，可修改':''}`;await router.replace({path:'/timetable',query:{queryView:'STUDENT',queryDate:value.date}});await nextTick();if(!disposed&&owner===personal.principal&&route.query.queryDate===value.date){pageHeading.value?.focus({preventScroll:true});pageHeading.value?.scrollIntoView({block:'start',behavior:'auto'})}}
+async function importedImage(value){if(value?.owner!==personal.principal)return;const owner=value.owner;importAction.value=false;importOpen.value=false;if(importDetails.value)importDetails.value.open=false;importReceipt.value=value.message||`已导入${value.count}门课 · 第${value.week}周`;importUnknownTimes.value=Number.isInteger(value.unknownTimes)?value.unknownTimes:0;await router.replace({path:'/timetable',query:{queryView:'STUDENT',queryDate:value.date}});await nextTick();if(!disposed&&owner===personal.principal&&route.query.queryDate===value.date){pageHeading.value?.focus({preventScroll:true});pageHeading.value?.scrollIntoView({block:'start',behavior:'auto'})}}
 const calendarLayout = ref({ owner: '', status: 'waiting' })
 const calendarOwner = computed(() => personal.principal ? `${personal.principal}:${userSessionGeneration.value}` : '')
 const calendarExportContext = ref(null)
@@ -78,7 +78,7 @@ function loadLegacy(event) {
       <button v-if="!['COUNSELOR','SECRETARY'].includes(scope)" class="timetable-import-action timetable-export-action" type="button" @click="openOperations">修改个人安排</button>
       </div>
     </header>
-    <p v-if="importReceipt&&!importAction" class="timetable-import-receipt" role="status">{{importReceipt}}</p>
+    <p v-if="importReceipt&&!importAction" class="timetable-import-receipt" role="status">{{importReceipt}} <RouterLink v-if="importUnknownTimes>0" to="/timetable?tool=personal-manage">核对钟点</RouterLink></p>
     <ClassReminderPanel v-if="!importAction" ref="reminderPanel" :owner="calendarOwner" :disabled="importPanel?.dirty || importPanel?.unavailable" @calendar="openCalendarReminder" />
     <UnifiedWeekCalendar v-show="!importAction" @available="unifiedAvailable = $event" @scope="scope = $event" @layout="calendarLayoutChanged" @export-context="calendarExportChanged" />
     <ScheduleExportPanel v-show="!importAction" ref="scheduleExportPanel" :owner="calendarOwner" :preferred-view="scope" :preset="fileExportPreset" :calendar-context="calendarExportContext" />
@@ -106,6 +106,7 @@ function loadLegacy(event) {
 </template>
 <style scoped>
 .timetable-import-receipt{margin:0 0 18px;font-size:14px;line-height:1.7;color:var(--assistant-success,#187248)}
+.timetable-import-receipt a{display:inline-flex;align-items:center;min-height:44px;margin-left:8px;color:var(--assistant-accent,#0b62db);text-underline-offset:3px}
 .import-focused>summary{display:none}.import-focused{border-top:0!important;padding-top:0!important;margin-top:0!important}
 .timetable-page {
   max-width: 1160px;

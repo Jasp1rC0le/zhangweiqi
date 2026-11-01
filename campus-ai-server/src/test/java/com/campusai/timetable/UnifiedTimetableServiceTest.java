@@ -41,7 +41,7 @@ class UnifiedTimetableServiceTest {
     @Test void givenEightPeriodsUseAfternoonAndNeverInventNinthPeriod() {
         assertEquals("08:30",CampusBellSchedule.span(1,2).start()); assertEquals("10:05",CampusBellSchedule.span(1,2).end());
         assertEquals("14:00",CampusBellSchedule.span(5,6).start()); assertEquals("15:35",CampusBellSchedule.span(5,6).end());
-        assertEquals("17:25",CampusBellSchedule.span(7,8).end()); assertNull(CampusBellSchedule.span(9,10)); assertNull(CampusBellSchedule.exact("08:00","09:40"));
+        assertEquals("17:25",CampusBellSchedule.span(7,8).end()); assertEquals("18:20",CampusBellSchedule.span(9,10).start()); assertNull(CampusBellSchedule.span(13,14)); assertNull(CampusBellSchedule.exact("08:00","09:40"));
     }
     @Test void imageOnlySourceIsNotPresentedAsAnEmptyQueryableTimetableOrFreeWeek() {
         db.update("INSERT INTO student_timetables(user_id) VALUES(2)");
@@ -121,7 +121,7 @@ class UnifiedTimetableServiceTest {
         assertTrue(week.entries().stream().allMatch(UnifiedTimetableService.Entry::conflict));
     }
     @Test void explicitOddWeeksAndUnknownClockRowsArePreservedNotMarkedAsCurrent() {
-        save(2,List.of(period("已知钟点",5,6,List.of(1,3)),period("未知晚课",9,10,List.of(1))));
+        save(2,List.of(period("已知钟点",5,6,List.of(1,3)),period("未知晚课",13,14,List.of(1))));
         var week=unified.week(2,"STUDENT",monday,null); assertEquals(2,week.entries().size()); assertTrue(week.entries().stream().anyMatch(e->e.startTime()==null && e.timeLabel().contains("待配置")));
         assertEquals("14:00",week.next().startTime()); assertEquals(0,unified.week(2,"STUDENT",monday.plusWeeks(1),null).entries().size());
     }
@@ -238,7 +238,7 @@ class UnifiedTimetableServiceTest {
     }
     @Test void sqlMixedPageKeepsExactCaseAmbiguityCancellationAndUnknownClockSemantics() {
         String c=course(classA,"Exact课程","08:30","10:05");
-        save(2,List.of(period("Exact课程",1,2,List.of(1)),period("exact课程",1,2,List.of(1)),period("未知钟点",9,10,List.of(1))));
+        save(2,List.of(period("Exact课程",1,2,List.of(1)),period("exact课程",1,2,List.of(1)),period("未知钟点",13,14,List.of(1))));
         var legacy=unified.week(2,"STUDENT",monday,null);var paged=unified.page(2,"STUDENT",monday,null,0,50).week();
         assertEquals(legacy.entries(),paged.entries());assertEquals(legacy.summary(),paged.summary());
         teaching.cancel(1,teaching.lessons(4,"TEACHER",wednesday,wednesday).get(0).id(),0);
@@ -254,7 +254,7 @@ class UnifiedTimetableServiceTest {
         assertEquals(2,personal.get(2L).schedule().courses().size()); assertEquals(1,unified.week(2,"STUDENT",monday.plusWeeks(2),null).entries().size());
     }
     @Test void unknownDifferentPeriodRangesDoNotCollapseAndTodayDueAttendanceIsComputedByBackend() {
-        save(2,List.of(period("未知课程",9,10,List.of(1)),period("未知课程",11,12,List.of(1)))); assertEquals(2,unified.week(2,"STUDENT",monday,null).entries().size());
+        save(2,List.of(period("未知课程",13,14,List.of(1)),period("未知课程",15,16,List.of(1)))); assertEquals(2,unified.week(2,"STUDENT",monday,null).entries().size());
         course(classA,"上午未完成点名","08:30","10:05"); course(classB,"下午下一节","14:00","15:35");
         var teacher=unified.week(4,null,monday,null); assertEquals("上午未完成点名",teacher.attention().name()); assertEquals("下午下一节",teacher.next().name());
         assertTrue(teacher.attention().canMark()); assertFalse(teacher.next().canMark());
@@ -337,7 +337,7 @@ class UnifiedTimetableServiceTest {
         fail(403,()->unified.scopes(5,"COUNSELOR"));var fallback=unified.scopes(5,null);assertEquals("STUDENT",fallback.view());assertFalse(fallback.viewHasTeaching());assertTrue(fallback.classes().isEmpty());
     }
     @Test void wholeWeekGridMustNotOmitAnActiveUnknownPeriodCourse() {
-        save(2,List.of(period("白天课程",1,2,List.of(1)),period("未配置晚课",9,10,List.of(1))));
+        save(2,List.of(period("白天课程",1,2,List.of(1)),period("未配置晚课",13,14,List.of(1))));
         var before=personal.get(2L).schedule();var week=unified.week(2,"STUDENT",monday,null);
         assertEquals(2,week.entries().size());assertFalse(week.gridSafe());assertEquals(before,personal.get(2L).schedule());
         assertTrue(unified.day(2,wednesday).answer().contains("未配置晚课"));

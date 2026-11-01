@@ -84,7 +84,7 @@ public class UnifiedTimetableService {
             var warnings=new ArrayList<String>();if(result.conflicts()>0)warnings.add("有"+result.conflicts()+"项时间重叠；统计覆盖全部来源与分页，没有自动删课。");
             if(teaching.privateCopyNeedsReview(user,snapshot.checkedAt()))warnings.add("学籍变动后的旧个人副本待核对，不作为未来有效安排；原件与历史保留。重新核对不恢复教学选课权限。");
             if(entries.stream().anyMatch(e->e.cancelled() && e.sources().size()>1))warnings.add("教学取消的课程已标记；原个人导入没有修改，需重新核对。");
-            Week week=new Week(1,monday,monday.plusDays(6),today,clock.instant(),scope.view(),scope.views(),List.of(),useBell?CampusBellSchedule.SLOTS:List.of(),useBell?"用户提供的作息，2026-10-14；第5—8节按下午":"本校作息尚未配置",scope.teachingEnabled(),entries,
+            Week week=new Week(1,monday,monday.plusDays(6),today,clock.instant(),scope.view(),scope.views(),List.of(),useBell?CampusBellSchedule.SLOTS:List.of(),useBell?CampusBellSchedule.SOURCE:"本校作息尚未配置",scope.teachingEnabled(),entries,
                     new Summary(result.planned(),result.today(),result.conflicts(),result.merged(),snapshot.revision(),result.attendance().absentStudents(),result.attendance().counts()),next,attention,attention!=null?"今天待完成点名":next==null?"":!next.date.atTime(LocalTime.parse(next.startTime)).atZone(TeachingService.ZONE).toInstant().isAfter(clock.instant())?"正在上课":"下一节安排",pages<=1 && gridSafe(entries,result.planned(),useBell),teaching.notices(user),List.copyOf(warnings));
             return new WeekPage(week,page,size,result.total(),pages,"本人完整混合来源；SQL合并去重后分页，统计不是本页小计");
         }
@@ -106,7 +106,7 @@ public class UnifiedTimetableService {
             Entry attention=pending.stream().filter(e->e.date.atTime(LocalTime.parse(e.endTime)).atZone(TeachingService.ZONE).toInstant().isAfter(clock.instant())).findFirst().orElse(pending.isEmpty()?null:pending.get(0));
             String label=attention!=null?"今天待完成点名":next==null?"":!next.date.atTime(LocalTime.parse(next.startTime)).atZone(TeachingService.ZONE).toInstant().isAfter(clock.instant())?"正在上课":"下一节安排";
             Week week=new Week(1,monday,monday.plusDays(6),LocalDate.now(clock.withZone(TeachingService.ZONE)),clock.instant(),scope.view(),scope.views(),scope.classes(),
-                    useBell?CampusBellSchedule.SLOTS:List.of(),useBell?"用户提供的作息，2026-10-14；第5—8节按下午":"本校作息尚未配置",scope.teachingEnabled(),List.copyOf(entries),
+                    useBell?CampusBellSchedule.SLOTS:List.of(),useBell?CampusBellSchedule.SOURCE:"本校作息尚未配置",scope.teachingEnabled(),List.copyOf(entries),
                     new Summary(lessons.planned(),lessons.today(),lessons.conflicts(),0,0,lessons.summary().absentStudents(),lessons.summary().counts()),next,attention,label,completeOwn && gridSafe(entries,lessons.planned(),useBell),ownTeaching?teaching.notices(user):List.of(),
                     lessons.conflicts()>0?List.of("有"+lessons.conflicts()+"项时间冲突，请按班级核对；汇总覆盖完整筛选范围。"):List.of());
             return new WeekPage(week,page,size,lessons.total(),lessons.totalPages(),ownTeaching?"本人完整筛选范围；不是本页小计":"全部已授权筛选范围；不是本页小计");
@@ -211,7 +211,7 @@ public class UnifiedTimetableService {
         boolean gridSafe=gridSafe(entries,planned,useBell);
         if(!conflicts.isEmpty()) warnings.add("有"+conflicts.size()+"项安排时间重叠，请核对来源；没有自动删课。");
         if(entries.stream().anyMatch(e->e.startTime==null)) warnings.add("部分节次没有已配置钟点，不能判断上课中或生成时间提醒。");
-        return new Week(1,monday,sunday,today,clock.instant(),view,views,classes,useBell?CampusBellSchedule.SLOTS:List.of(),useBell?"用户提供的作息，2026-10-14；第5—8节按下午":"本校作息尚未配置",scope.teachingEnabled(),List.copyOf(entries),
+        return new Week(1,monday,sunday,today,clock.instant(),view,views,classes,useBell?CampusBellSchedule.SLOTS:List.of(),useBell?CampusBellSchedule.SOURCE:"本校作息尚未配置",scope.teachingEnabled(),List.copyOf(entries),
                 new Summary(planned,todayCount,conflicts.size(),merged,snapshot==null?0:snapshot.revision(),stats.absentStudents(),stats.counts()),next,attention,focusLabel,gridSafe,
                 scope.teachingEnabled()?teaching.notices(user):List.of(),warnings.stream().distinct().toList());
     }
