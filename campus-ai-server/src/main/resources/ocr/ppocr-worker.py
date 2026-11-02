@@ -112,22 +112,14 @@ def locate_lines(image, cv2, np):
     return clean, mask, boxes
 
 
-def recognize_regions(image_path, region_path, model_root):
+def create_engine(model_root):
     import hashlib
-    import cv2
-    import numpy as np
     from rapidocr import RapidOCR, EngineType, LangRec, ModelType, OCRVersion
 
     model = model_root / MODEL
     if not model.is_file() or hashlib.sha256(model.read_bytes()).hexdigest() != MODEL_SHA:
         raise ValueError("invalid local model")
-    image = cv2.imread(str(image_path))
-    if image is None or image.shape[0] * image.shape[1] > 12_000_000 or region_path.stat().st_size > 65536:
-        raise ValueError("invalid input")
-    height, width = image.shape[:2]
-    regions = json.loads(region_path.read_text())
-    validate_regions(width, height, regions)
-    engine = RapidOCR(params={
+    return RapidOCR(params={
         "Global.use_det": False, "Global.use_cls": False, "Global.log_level": "error",
         "EngineConfig.onnxruntime.intra_op_num_threads": 2,
         "EngineConfig.onnxruntime.inter_op_num_threads": 1,
@@ -135,6 +127,20 @@ def recognize_regions(image_path, region_path, model_root):
         "Rec.model_type": ModelType.MOBILE, "Rec.ocr_version": OCRVersion.PPOCRV5,
         "Rec.model_path": str(model),
     })
+
+
+def recognize_regions(image_path, region_path, model_root, engine=None):
+    import cv2
+    import numpy as np
+
+    image = cv2.imread(str(image_path))
+    if image is None or image.shape[0] * image.shape[1] > 12_000_000 or region_path.stat().st_size > 65536:
+        raise ValueError("invalid input")
+    height, width = image.shape[:2]
+    regions = json.loads(region_path.read_text())
+    validate_regions(width, height, regions)
+    if engine is None:
+        engine = create_engine(model_root)
 
     def read(band):
         result = engine(band, use_det=False, use_cls=False)
@@ -184,6 +190,44 @@ def recognize_regions(image_path, region_path, model_root):
     return {"version": 1, "width": width, "height": height, "lines": [], "regions": output}
 
 
+def serve(model_root, private_root):
+    import select
+    import uuid
+
+    root = private_root.resolve(strict=True)
+    engine = create_engine(model_root)
+    engine._load_rec_model()
+    print("LOCAL_OCR_READY_V1", flush=True)
+    while select.select([sys.stdin], [], [], 60)[0]:
+        raw = sys.stdin.buffer.readline(65537)
+        if not raw:
+            return
+        if len(raw) > 65536 or not raw.endswith(b"\n"):
+            raise ValueError("invalid frame")
+        request = result = reply = None
+        try:
+            request = json.loads(raw)
+            identity = request["id"]
+            if not isinstance(identity, str) or str(uuid.UUID(identity)) != identity:
+                raise ValueError("invalid identity")
+            image, regions = (Path(request[key]) for key in ("image", "regions"))
+            if image.parent != regions.parent:
+                raise ValueError("mixed inputs")
+            for path in (image, regions):
+                if path.is_symlink() or not path.is_file() or not path.resolve(strict=True).is_relative_to(root):
+                    raise ValueError("invalid private input")
+            result = recognize_regions(image, regions, model_root, engine)
+            reply = {"id": identity, "result": result, "error": None}
+        except BaseException:
+            identity = request.get("id") if isinstance(request, dict) else None
+            reply = {"id": identity, "result": None, "error": "LOCAL_OCR_FAILED"}
+        text = json.dumps(reply, ensure_ascii=False)
+        if len(text.encode()) > 1024 * 1024:
+            raise ValueError("output too large")
+        print(text, flush=True)
+        raw = request = result = reply = text = None
+
+
 def main():
     def deny_network(event, _args):
         if event in {"socket.connect", "socket.getaddrinfo"}:
@@ -191,6 +235,9 @@ def main():
     sys.addaudithook(deny_network)
     if len(sys.argv) != 4:
         raise ValueError("invalid invocation")
+    if sys.argv[1] == "--serve":
+        serve(Path(sys.argv[2]), Path(sys.argv[3]))
+        return
     result = recognize_regions(Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3]))
     text = json.dumps(result, ensure_ascii=False)
     if len(text.encode()) > 1024 * 1024:

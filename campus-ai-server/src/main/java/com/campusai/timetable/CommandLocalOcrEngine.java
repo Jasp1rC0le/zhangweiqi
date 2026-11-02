@@ -26,6 +26,7 @@ public class CommandLocalOcrEngine implements LocalOcrEngine,AutoCloseable {
     private final boolean mac;
     private final Set<Process> processes=ConcurrentHashMap.newKeySet();
     private Path runtime,binary;
+    private PersistentLocalOcrWorker accurateWorker;
     public CommandLocalOcrEngine(ObjectMapper json,String configured){this(json,configured,"");}
     @Autowired
     public CommandLocalOcrEngine(ObjectMapper json,@Value("${app.timetable.ocr.command:}") String configured,@Value("${app.timetable.ocr.python:/opt/campus-ai/ocr/ppocrv5-20261101-r1/bin/python3}") String python){
@@ -36,6 +37,21 @@ public class CommandLocalOcrEngine implements LocalOcrEngine,AutoCloseable {
     }
     public String engine(){return mac?"apple-vision":python.isBlank()?"tesseract":"tesseract+ppocrv5-local";}
     public boolean available(){return !command.isBlank()&&Path.of(command).isAbsolute()&&Files.isExecutable(Path.of(command))&&(mac||python.isBlank()||Path.of(python).isAbsolute()&&Files.isExecutable(Path.of(python)));}
+    public void warmup(){
+        if(mac||python.isBlank()||!available())return;
+        try{accurateWorker().warmup();}catch(IOException ignored){/* Recognition reports readiness failures on use. */}
+    }
+    private synchronized PersistentLocalOcrWorker accurateWorker()throws IOException{
+        if(accurateWorker==null){
+            Path script=privateFile(runtime(),"ppocr-worker.py");
+            try(var source=getClass().getResourceAsStream("/ocr/ppocr-worker.py")){
+                if(source==null)throw unavailable();Files.write(script,source.readAllBytes());
+            }
+            Path models=Path.of(python).getParent().getParent().resolve("models");
+            accurateWorker=new PersistentLocalOcrWorker(List.of(python,"-u",script.toString(),"--serve",models.toString(),runtime().toString()),runtime());
+        }
+        return accurateWorker;
+    }
     private synchronized Path runtime() throws IOException {
         if(runtime==null)runtime=Files.createTempDirectory("campthink-local-ocr-",PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------")));
         return runtime;
@@ -68,22 +84,28 @@ public class CommandLocalOcrEngine implements LocalOcrEngine,AutoCloseable {
         return List.copyOf(result);
     }
     private record NativeOutput(int version,int width,int height,List<Line> lines,List<RegionText> regions){}
+    private record WorkerReply(String id,NativeOutput result,String error){}
     private List<RegionText> accurateRegions(BufferedImage image,List<Region> regions,long deadline){
         Path job=null;
         try{
             if(!available())throw unavailable();
             for(var region:regions)validateRegion(image,region);
             job=Files.createTempDirectory(runtime(),"text-",PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------")));
-            Path input=privateFile(job,"image.png"),ranges=privateFile(job,"regions.json"),worker=privateFile(job,"worker.py");
+            Path input=privateFile(job,"image.png"),ranges=privateFile(job,"regions.json");
             ImageIO.write(image,"png",input.toFile());Files.writeString(ranges,json.writeValueAsString(regions));
-            try(var source=getClass().getResourceAsStream("/ocr/ppocr-worker.py")){if(source==null)throw unavailable();Files.write(worker,source.readAllBytes());}
-            Path models=Path.of(python).getParent().getParent().resolve("models");
-            String output=run(List.of(python,worker.toString(),input.toString(),ranges.toString(),models.toString()),job,deadline);
-            var parsed=json.readValue(output,NativeOutput.class);
+            String id=UUID.randomUUID().toString();
+            String message=json.writeValueAsString(Map.of("id",id,"image",input.toString(),"regions",ranges.toString()));
+            String output=accurateWorker().request(message,deadline);
+            var reply=json.readValue(output,WorkerReply.class);
+            if(!id.equals(reply.id())||reply.error()!=null||reply.result()==null){accurateWorker().invalidate();throw unavailable();}
+            var parsed=reply.result();
             if(parsed.version()!=1||parsed.width()!=image.getWidth()||parsed.height()!=image.getHeight()||parsed.regions()==null||parsed.regions().size()!=regions.size())throw unavailable();
             for(int i=0;i<parsed.regions().size();i++){var region=parsed.regions().get(i);if(region.index()!=i||region.reliable()==null||region.title()!=null&&region.title().length()>100||region.room()!=null&&region.room().length()>100)throw unavailable();validLines(region.lines());}
             return parsed.regions();
-        }catch(ResponseStatusException failure){throw failure;}catch(Exception failure){throw unavailable();}finally{delete(job);}
+        }catch(ResponseStatusException failure){throw failure;}
+        catch(TimeoutException failure){throw timeout();}
+        catch(InterruptedException failure){Thread.currentThread().interrupt();throw timeout();}
+        catch(Exception failure){if(accurateWorker!=null)accurateWorker.invalidate();throw unavailable();}finally{delete(job);}
     }
     private NativeOutput nativeRead(BufferedImage image,List<Region> regions,long deadline){
         Path job=null;
@@ -183,5 +205,5 @@ public class CommandLocalOcrEngine implements LocalOcrEngine,AutoCloseable {
     private static ResponseStatusException unavailable(){return new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,"后台本地识别暂未就绪，请使用表格导入或稍后重试");}
     private static ResponseStatusException timeout(){return new ResponseStatusException(HttpStatus.GATEWAY_TIMEOUT,"本地识别超时，未保存课表；请裁剪清晰截图后重试");}
     private static void delete(Path dir){if(dir!=null)try(var paths=Files.walk(dir)){paths.sorted(Comparator.reverseOrder()).forEach(p->{try{Files.deleteIfExists(p);}catch(IOException ignored){}});}catch(IOException ignored){}}
-    @PreDestroy public synchronized void close(){processes.forEach(p->{p.descendants().forEach(ProcessHandle::destroyForcibly);p.destroyForcibly();});delete(runtime);}
+    @PreDestroy public synchronized void close(){if(accurateWorker!=null)accurateWorker.close();processes.forEach(p->{p.descendants().forEach(ProcessHandle::destroyForcibly);p.destroyForcibly();});delete(runtime);}
 }

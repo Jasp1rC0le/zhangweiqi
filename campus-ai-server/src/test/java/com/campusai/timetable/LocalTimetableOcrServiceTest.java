@@ -29,6 +29,12 @@ class LocalTimetableOcrServiceTest {
         when(engine.available()).thenReturn(false);assertThrows(ResponseStatusException.class,()->service.recognize(7,picture));verify(engine,never()).read(any(),anyLong());
         when(users.findById(7L)).thenReturn(null);assertThrows(ResponseStatusException.class,()->service.capability(7));
     }
+    @Test void onlyAnAuthorizedAvailableCapabilityReadPrewarmsTheLocalModel(){
+        assertTrue(service.capability(7).available());verify(engine).warmup();clearInvocations(engine);
+        when(engine.available()).thenReturn(false);assertFalse(service.capability(7).available());verify(engine,never()).warmup();
+        when(users.findById(7L)).thenReturn(null);clearInvocations(engine);
+        assertThrows(ResponseStatusException.class,()->service.capability(7));verifyNoInteractions(engine);
+    }
     @Test void changedSchoolDiscardsCompletedResult(){
         when(users.findById(7L)).thenReturn(user(1),user(2));var error=assertThrows(ResponseStatusException.class,()->service.recognize(7,picture));assertEquals(403,error.getStatusCode().value());
     }

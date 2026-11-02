@@ -15,6 +15,7 @@ public interface LocalOcrEngine {
     }
     boolean available();
     String engine();
+    default void warmup() {}
     List<Line> read(BufferedImage image,long deadlineNanos);
     List<RegionText> regions(BufferedImage image,List<Region> regions,long deadlineNanos);
 }

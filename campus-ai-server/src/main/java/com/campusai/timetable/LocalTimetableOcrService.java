@@ -18,7 +18,7 @@ public class LocalTimetableOcrService {
     public LocalTimetableOcrService(LocalOcrEngine engine,UserMapper users){this.engine=engine;this.users=users;}
     public record Capability(int version,boolean available,String provider,String engine,boolean external,int maxBytes,int maxRows){}
     public record Result(int version,String provider,String engine,boolean external,String semester,String firstMonday,Integer week,String weekMonday,List<SchoolTimetableImageParser.Row> rows,List<String> warnings){}
-    public Capability capability(long owner){user(owner,null);return new Capability(2,engine.available(),"local-ocr",engine.engine(),false,TimetableService.MAX_IMAGE_BYTES,120);}
+    public Capability capability(long owner){user(owner,null);boolean ready=engine.available();if(ready)engine.warmup();return new Capability(2,ready,"local-ocr",engine.engine(),false,TimetableService.MAX_IMAGE_BYTES,120);}
     public Result recognize(long owner,byte[] bytes){return recognizeAll(owner,Collections.singletonList(bytes),75).get(0);}
     public List<Result> recognizeBatch(long owner,List<byte[]> pictures){validatePictures(pictures);return recognizeAll(owner,pictures,MAX_BATCH_SECONDS);}
     static void validatePictures(List<byte[]> pictures){
