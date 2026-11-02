@@ -34,3 +34,8 @@ The user replaces the text-first daily summary and optional week grid with a vis
 Import is labelled 导入 and remains multi-select/atomic. Low-frequency import, edits, table export, reminder settings and old-original recovery live in the header menu; the private JSON export interface is removed. 关联教师 is directly accessible and edits only personal teacher annotations with revision protection. Reminder configuration belongs to account settings, defaults to 30 minutes, and preserves explicit opt-out; calendar handoff is not OS-import confirmation.
 
 Staff attendance uses compact 点名/汇总/记录 actions without removing save, complete, undo, correction reason, pagination, export or scope gates. Student attendance logic stays unchanged. No new authority, schema migration, model call, roster write or branding is introduced. Evidence: docs/timetable-direct-2026-11-02.md. One detector completed; no current rendered QA or fresh full visual verdict is available because browser tools remain unavailable. Prior narrow visual verdicts do not transfer to this increment.
+
+
+## Course details 2026-11-02
+
+Load the actual Dialog foundation from the shared application entry. Use an inherited white mobile bottom sheet and desktop centered panel, with a complete wrapping title, date/time, prominent full location and existing scoped actions. Dense cells foreground real room codes or an honest multiple-location summary; details and copy retain the original value. Responsive synthetic checks cover320/393/1280 widths, long text, overlapping courses, keyboard dismissal and association events. No new global design tokens, data edits, OCR changes or real teaching grants. Evidence and exact delivery scope: docs/course-detail-ui-2026-11-02.md.
