@@ -22,6 +22,7 @@
 
 ## 开发与部署
 
+- [本地开发与部署说明](development.md)：本地开发步骤、环境变量、检查与构建、部署与当前限制
 - [本地开发配置模板](../deploy/development.env.example)
 - [生产配置模板](../.env.example)
 - [运行手册](free-launch-runbook.md)
