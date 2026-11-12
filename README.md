@@ -118,9 +118,12 @@ database/schema.sql        早期数据库结构，仅供历史参考
    ```bash
    cd campus-ai-web
    cp .env.example .env.development
+   printf '\nVITE_API_BASE_URL=http://localhost:8080\n' >> .env.development
    npm ci
    npm run dev
    ```
+
+前端配置复制仅用于首次设置；已有 `.env.development` 时直接编辑。`VITE_API_BASE_URL` 指向后端，不加 `/api` 后缀；不要把后端密钥放入前端配置。
 
 注册即创建普通用户。仓库不提供管理员默认密码或自动提权入口；邮箱验证与密码找回需要配置可用 SMTP；模型 API Key 为可选项，未配置的模型不可用于真实生成。
 
