@@ -96,23 +96,28 @@ database/schema.sql        早期数据库结构，仅供历史参考
 完整步骤（建库、环境变量全表、检查与构建、部署与限制）见[本地开发与部署说明](docs/development.md)，这里只列主线：
 
 1. 准备 JDK 17、Maven 3.9、Node.js `^22.18.0` 或 `>=24.12.0`、MySQL 8+，并建立独立开发库 `campus_ai_dev`（不要把开发配置指向生产库）。
-2. 复制配置模板并填写数据库账号与 JWT 密钥，不要提交实际 `.env`：
+2. 在仓库根目录使用 Bash 复制开发配置模板，填写 `DB_USERNAME`、`DB_PASSWORD` 与 `JWT_SECRET`，不要提交实际 `.env`。JWT 密钥须为至少 32 字节随机数据的 Base64 编码，可用 `openssl rand -base64 32` 生成：
 
    ```bash
+   umask 077
    cp deploy/development.env.example .env
    ```
 
-3. 启动后端（默认 `http://localhost:8080`，`/api/health` 存活、`/api/health/ready` 就绪）：
+3. 在同一终端、仓库根目录加载自己创建并信任的 `.env` 后启动后端。Spring Boot 不会自动读取该文件；每次新开后端终端都需重新加载（默认 `http://localhost:8080`，`/api/health` 存活、`/api/health/ready` 就绪）：
 
    ```bash
+   set -a
+   source .env
+   set +a
    cd campus-ai-server
    mvn spring-boot:run
    ```
 
-4. 另开终端启动前端（默认 `http://localhost:5173`）：
+4. 另开终端，先进入仓库根目录，再启动前端（默认 `http://localhost:5173`）：
 
    ```bash
    cd campus-ai-web
+   cp .env.example .env.development
    npm ci
    npm run dev
    ```
