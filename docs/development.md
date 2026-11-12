@@ -54,9 +54,12 @@ mvn spring-boot:run
 ```bash
 cd campus-ai-web
 cp .env.example .env.development
+printf '\nVITE_API_BASE_URL=http://localhost:8080\n' >> .env.development
 npm ci
 npm run dev
 ```
+
+以上复制步骤用于首次配置；已有 `.env.development` 时直接编辑，不要覆盖自己的配置。`VITE_API_BASE_URL` 指向本机后端（不含 `/api` 后缀），Vite 未配置 API 代理，不能省略；前端配置中不要放数据库密码、JWT 密钥或模型 Key。
 
 访问 Vite 输出的本机地址，默认是 `http://localhost:5173`。前后端本机配置应使用相同的主机名；修改端口时同步调整 `CORS_ALLOWED_ORIGINS`、`PUBLIC_WEB_URL` 与 `VITE_API_BASE_URL`。
 
